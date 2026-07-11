@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+.next/
+dist/
+build/
+coverage/
+
+# Environment
+.env
+.env.local
+
+# ML artifacts
+services/ml/data/raw/*
+services/ml/data/processed/*
+services/ml/models/*
+services/ml/reports/*
+!services/ml/data/raw/.gitkeep
+!services/ml/data/processed/.gitkeep
+!services/ml/models/.gitkeep
+!services/ml/reports/.gitkeep
+!services/ml/data/README.md
+!services/ml/README.md
+!services/ml/.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/

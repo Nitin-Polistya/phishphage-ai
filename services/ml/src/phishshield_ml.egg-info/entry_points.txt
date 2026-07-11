@@ -1,0 +1,4 @@
+[console_scripts]
+phishshield-evaluate = phishshield_ml.scripts.evaluate_model:main
+phishshield-predict = phishshield_ml.scripts.predict_email:main
+phishshield-train = phishshield_ml.scripts.train_model:main
