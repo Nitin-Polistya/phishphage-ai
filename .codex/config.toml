@@ -1,0 +1,7 @@
+[mcp_servers.shadcn]
+command = "npx"
+args = ["-y", "shadcn@latest", "mcp"]
+cwd = "D:\\Development\\Projects\\phishshield-ai\\apps\\web"
+enabled = true
+startup_timeout_sec = 60
+tool_timeout_sec = 180
