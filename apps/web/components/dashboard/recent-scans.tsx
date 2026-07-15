@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import type { ScanResult } from '@/types';
+import type { ScanRecord } from '@/types';
 
 interface RecentScansProps {
-  scans: ScanResult[];
+  scans: ScanRecord[];
 }
 
-const classificationStyles: Record<ScanResult['status'], string> = {
+const classificationStyles: Record<ScanRecord['classification'], string> = {
   phishing: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
   suspicious: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
   safe: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
@@ -31,7 +31,7 @@ export function RecentScans({ scans }: RecentScansProps) {
     <Card className="h-full border-slate-800 bg-slate-900/80">
       <CardHeader className="pb-3">
         <CardTitle className="text-base text-slate-100">Recent scans</CardTitle>
-        <CardDescription className="text-slate-400">The latest email classifications from this demo workspace.</CardDescription>
+        <CardDescription className="text-slate-400">The latest email classifications saved in this browser.</CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
         {scans.length === 0 ? (
@@ -62,8 +62,8 @@ export function RecentScans({ scans }: RecentScansProps) {
                   </TableCell>
                   <TableCell className="hidden max-w-56 truncate text-slate-400 md:table-cell">{scan.sender}</TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={cn('capitalize', classificationStyles[scan.status])}>
-                      {scan.status}
+                    <Badge variant="outline" className={cn('capitalize', classificationStyles[scan.classification])}>
+                      {scan.classification}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden font-medium tabular-nums text-slate-300 sm:table-cell">

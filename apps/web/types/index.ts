@@ -1,12 +1,24 @@
-export interface ScanResult {
+import type { ThreatClassification, ThreatSeverity } from './analysis';
+
+export interface ScanIndicator {
+  code: string;
+  title: string;
+  category: string;
+  severity: ThreatSeverity;
+  score: number;
+}
+
+export interface ScanRecord {
   id: string;
   subject: string;
   sender: string;
   timestamp: string;
-  status: 'safe' | 'suspicious' | 'phishing';
+  classification: ThreatClassification;
   riskScore: number;
   confidence: number;
-  threatType?: string;
+  indicators: ScanIndicator[];
+  attachmentCount: number;
+  extractedUrlCount: number;
 }
 
 export interface DashboardStats {

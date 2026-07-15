@@ -7,16 +7,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import type { DashboardStats, ScanResult, ThreatVector } from '@/types';
+import type { DashboardStats, ScanRecord, ThreatVector } from '@/types';
 
 interface SecurityInsightsProps {
-  scans: ScanResult[];
+  scans: ScanRecord[];
   stats: DashboardStats;
   vectors: ThreatVector[];
 }
 
 export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProps) {
-  const highestRisk = scans.reduce<ScanResult | null>((highest, scan) => (
+  const highestRisk = scans.reduce<ScanRecord | null>((highest, scan) => (
     !highest || scan.riskScore > highest.riskScore ? scan : highest
   ), null);
   const safeRate = stats.totalScans ? Math.round((stats.safeEmails / stats.totalScans) * 100) : 0;
@@ -33,7 +33,7 @@ export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProp
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Most common signal</p>
               <p className="mt-1 text-sm font-medium text-slate-200">{vectors[0]?.label ?? 'No signals detected'}</p>
-              <Badge variant="outline" className="mt-2 border-slate-700 text-slate-400">{vectors[0]?.count ?? 0} observations</Badge>
+              {vectors[0] && <Badge variant="outline" className="mt-2 border-slate-700 text-slate-400">{vectors[0].count} observations</Badge>}
             </div>
           </div>
 
@@ -50,7 +50,7 @@ export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProp
                         Risk {highestRisk.riskScore}/100
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent className="border-slate-700 bg-slate-950 text-slate-200">Mock risk score from recent activity</TooltipContent>
+                    <TooltipContent className="border-slate-700 bg-slate-950 text-slate-200">Highest risk score across saved scans</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
@@ -62,11 +62,11 @@ export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProp
             <div className="w-full">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Safe classification rate</p>
-                <span className="text-sm font-semibold tabular-nums text-emerald-300">{safeRate}%</span>
+                <span className="text-sm font-semibold tabular-nums text-emerald-300">{stats.totalScans ? `${safeRate}%` : '—'}</span>
               </div>
               <Separator className="my-2 bg-slate-800" />
-              <Progress value={safeRate} aria-label={`${safeRate}% of scans classified safe`} className="h-2 bg-slate-800 [&>div]:bg-emerald-500" />
-              <p className="mt-2 text-xs text-slate-500">Across all demo scans</p>
+              <Progress value={safeRate} aria-label={stats.totalScans ? `${safeRate}% of scans classified safe` : 'No scans available for safe classification rate'} className="h-2 bg-slate-800 [&>div]:bg-emerald-500" />
+              <p className="mt-2 text-xs text-slate-500">{stats.totalScans ? 'Across all saved scans' : 'No scans analyzed yet'}</p>
             </div>
           </div>
         </div>

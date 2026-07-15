@@ -20,7 +20,8 @@ import {
   toAttachmentMetadataPayload,
   type SelectedQuickAttachment,
 } from '@/lib/attachment-metadata';
-import { MOCK_EXAMPLE_EMAIL } from '@/lib/mock-data';
+import { EXAMPLE_EMAIL } from '@/lib/example-email';
+import { createScanRecord, saveScan } from '@/lib/scan-store';
 import { cn } from '@/lib/utils';
 import type { AnalysisInputMode, UnifiedAnalysisResponse } from '@/types/analysis';
 import { AnalysisResults } from './analysis-results';
@@ -128,7 +129,7 @@ export function AnalysisForm() {
     setIsLoading(true);
     setError(null);
     try {
-      setResult(await analyzeEmail(mode === 'quick_paste'
+      const analysis = await analyzeEmail(mode === 'quick_paste'
         ? {
           input_mode: mode,
           sender_name: optional(quick.sender_name),
@@ -140,7 +141,9 @@ export function AnalysisForm() {
           body: quick.body,
           attachments: toAttachmentMetadataPayload(attachments),
         }
-        : { input_mode: mode, raw_email: mode === 'raw_email' ? rawEmail : emlText }));
+        : { input_mode: mode, raw_email: mode === 'raw_email' ? rawEmail : emlText });
+      setResult(analysis);
+      saveScan(createScanRecord(analysis));
     } catch (caught) {
       setResult(null);
       setError(caught instanceof ApiError ? caught.message : 'Unexpected analysis error. Please try again.');
@@ -168,7 +171,7 @@ export function AnalysisForm() {
           <CardHeader className="border-b border-slate-800 pb-4">
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-base text-slate-100">Email input</CardTitle>
-              <Badge variant="outline" className="border-slate-700 text-slate-400">No content is stored</Badge>
+              <Badge variant="outline" className="border-slate-700 text-slate-400">Only the scan summary is stored locally</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-5 p-5">
@@ -250,7 +253,7 @@ export function AnalysisForm() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-800 pt-4">
               <div className="flex gap-2">
-                {mode === 'raw_email' && <Button type="button" variant="ghost" size="sm" onClick={() => { setRawEmail(MOCK_EXAMPLE_EMAIL); setResult(null); }} className="text-slate-400 hover:bg-slate-800 hover:text-white">Load example</Button>}
+                {mode === 'raw_email' && <Button type="button" variant="ghost" size="sm" onClick={() => { setRawEmail(EXAMPLE_EMAIL); setResult(null); }} className="text-slate-400 hover:bg-slate-800 hover:text-white">Load example</Button>}
                 <Button type="button" variant="ghost" size="sm" onClick={handleClear} disabled={isLoading} className="text-slate-400 hover:bg-slate-800 hover:text-white"><Trash2 />Clear</Button>
               </div>
               <Button type="button" onClick={handleAnalyze} disabled={isLoading || !canAnalyze} className="bg-blue-600 text-white hover:bg-blue-500">{isLoading ? <><Loader2 className="animate-spin" />Analyzing…</> : <><Send />Analyze email</>}</Button>

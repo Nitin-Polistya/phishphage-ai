@@ -19,6 +19,7 @@ const severityStyles = {
 export function ThreatOverview({ vectors }: ThreatOverviewProps) {
   const maximum = Math.max(...vectors.map((vector) => vector.count), 0);
   const total = vectors.reduce((sum, vector) => sum + vector.count, 0);
+  const visibleVectors = vectors.slice(0, 5);
 
   return (
     <Card className="h-full border-slate-800 bg-slate-900/80">
@@ -26,9 +27,9 @@ export function ThreatOverview({ vectors }: ThreatOverviewProps) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle className="text-base text-slate-100">Threat overview</CardTitle>
-            <CardDescription className="mt-1 text-slate-400">Signals observed across flagged demo scans.</CardDescription>
+            <CardDescription className="mt-1 text-slate-400">Signals observed across saved email analyses.</CardDescription>
           </div>
-          <Badge variant="outline" className="border-slate-700 bg-slate-950/50 text-slate-400">Last 30 days</Badge>
+          <Badge variant="outline" className="border-slate-700 bg-slate-950/50 text-slate-400">All saved scans</Badge>
         </div>
       </CardHeader>
       <CardContent>
@@ -40,7 +41,7 @@ export function ThreatOverview({ vectors }: ThreatOverviewProps) {
           </div>
         ) : (
           <div className="space-y-4" role="img" aria-label={`Threat signal distribution totaling ${total} observations`}>
-            {vectors.map((vector) => (
+            {visibleVectors.map((vector) => (
               <div key={vector.label}>
                 <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
                   <span className="truncate font-medium text-slate-300">{vector.label}</span>
@@ -57,18 +58,22 @@ export function ThreatOverview({ vectors }: ThreatOverviewProps) {
           </div>
         )}
 
-        <Separator className="my-5 bg-slate-800" />
-        <div className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Threat severity legend">
-          {(['high', 'medium', 'low'] as const).map((severity) => (
-            <div key={severity} className="flex items-center gap-2 text-xs capitalize text-slate-400">
-              <span className={cn('h-2 w-2 rounded-full', severityStyles[severity].dot)} aria-hidden="true" />
-              {severity} severity
+        {total > 0 && (
+          <>
+            <Separator className="my-5 bg-slate-800" />
+            <div className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Threat severity legend">
+              {(['high', 'medium', 'low'] as const).map((severity) => (
+                <div key={severity} className="flex items-center gap-2 text-xs capitalize text-slate-400">
+                  <span className={cn('h-2 w-2 rounded-full', severityStyles[severity].dot)} aria-hidden="true" />
+                  {severity} severity
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="mt-4 text-xs leading-5 text-slate-500">
-          Credential harvesting remains the leading signal, representing {Math.round((vectors[0]?.count ?? 0) / total * 100)}% of observations.
-        </p>
+            <p className="mt-4 text-xs leading-5 text-slate-500">
+              {vectors[0].label} is the leading signal, representing {Math.round((vectors[0].count / total) * 100)}% of observations.
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   );
