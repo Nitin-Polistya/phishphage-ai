@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { ThemeController } from '@/components/theme-controller';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,8 +15,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body><ThemeController />{children}</body>
     </html>
   );
 }

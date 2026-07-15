@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useScanRecords } from '@/hooks/use-scan-records';
+import { usePreferences } from '@/hooks/use-preferences';
 import { filterAndSortScans, paginateScans, type ScanHistoryFilter, type ScanHistorySortOrder } from '@/lib/scan-history';
 import { clearScans, deleteScan, deleteScans } from '@/lib/scan-store';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ function LoadingTable() {
 
 export function ScanHistory() {
   const { scans, isLoaded } = useScanRecords();
+  const { preferences, isLoaded: preferencesLoaded } = usePreferences();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<ScanHistoryFilter>('all');
   const [sortOrder, setSortOrder] = useState<ScanHistorySortOrder>('newest');
@@ -49,6 +51,13 @@ export function ScanHistory() {
   useEffect(() => {
     setPage((current) => Math.min(current, pageCount));
   }, [pageCount]);
+
+  useEffect(() => {
+    if (preferencesLoaded) {
+      setSortOrder(preferences.defaultHistorySortOrder);
+      setPage(1);
+    }
+  }, [preferences.defaultHistorySortOrder, preferencesLoaded]);
 
   useEffect(() => {
     const availableIds = new Set(scans.map((scan) => scan.id));
@@ -97,10 +106,20 @@ export function ScanHistory() {
     setPendingDelete(null);
   };
 
+  const requestClearHistory = () => {
+    if (preferences.confirmBeforeClearingHistory) {
+      setPendingDelete({ kind: 'all', ids: [] });
+      return;
+    }
+    clearScans();
+    setSelectedIds(new Set());
+    setOpenScanId(null);
+  };
+
   const resetControls = () => {
     setQuery('');
     setFilter('all');
-    setSortOrder('newest');
+    setSortOrder(preferences.defaultHistorySortOrder);
     setPage(1);
   };
 
@@ -120,7 +139,7 @@ export function ScanHistory() {
           <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">Scan History</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Search, triage, and review every email analysis stored in this browser.</p>
         </div>
-        <Button type="button" variant="outline" disabled={!isLoaded || scans.length === 0} onClick={() => setPendingDelete({ kind: 'all', ids: [] })} className="border-slate-700 bg-slate-900 text-slate-300 hover:bg-rose-500/10 hover:text-rose-300"><Trash2 aria-hidden="true" />Clear history</Button>
+        <Button type="button" variant="outline" disabled={!isLoaded || scans.length === 0} onClick={requestClearHistory} className="border-slate-700 bg-slate-900 text-slate-300 hover:bg-rose-500/10 hover:text-rose-300"><Trash2 aria-hidden="true" />Clear history</Button>
       </header>
 
       {!isLoaded ? (

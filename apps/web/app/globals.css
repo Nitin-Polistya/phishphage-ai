@@ -18,3 +18,43 @@ body {
 * {
   box-sizing: border-box;
 }
+
+html[data-theme='light'] body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+html[data-theme='light'] [class~='bg-slate-950'],
+html[data-theme='light'] [class~='bg-slate-950/95'],
+html[data-theme='light'] [class~='bg-slate-950/80'],
+html[data-theme='light'] [class~='bg-slate-950/60'],
+html[data-theme='light'] [class~='bg-slate-950/50'] { background-color: #f8fafc !important; }
+html[data-theme='light'] [class~='bg-slate-900'],
+html[data-theme='light'] [class~='bg-slate-900/80'],
+html[data-theme='light'] [class~='bg-slate-900/60'],
+html[data-theme='light'] [class~='bg-slate-900/40'],
+html[data-theme='light'] [class~='bg-slate-900/25'] { background-color: #ffffff !important; }
+html[data-theme='light'] [class~='bg-slate-800'],
+html[data-theme='light'] [class~='bg-slate-800/50'] { background-color: #e2e8f0 !important; }
+html[data-theme='light'] [class~='text-slate-50'],
+html[data-theme='light'] [class~='text-slate-100'],
+html[data-theme='light'] [class~='text-slate-200'] { color: #0f172a !important; }
+html[data-theme='light'] [class~='text-slate-300'] { color: #334155 !important; }
+html[data-theme='light'] [class~='text-slate-400'] { color: #475569 !important; }
+html[data-theme='light'] [class~='text-slate-500'],
+html[data-theme='light'] [class~='text-slate-600'] { color: #64748b !important; }
+html[data-theme='light'] [class~='border-slate-800'],
+html[data-theme='light'] [class~='border-slate-800/80'],
+html[data-theme='light'] [class~='border-slate-700'] { border-color: #cbd5e1 !important; }
+html[data-theme='light'] [class~='ring-slate-800'] { --tw-ring-color: #cbd5e1 !important; }
+html[data-theme='light'] [class~='from-slate-950'] { --tw-gradient-from: #f8fafc var(--tw-gradient-from-position) !important; }
+html[data-theme='light'] [class~='via-slate-950'] { --tw-gradient-via: #f8fafc var(--tw-gradient-via-position) !important; }
+html[data-theme='light'] [class~='to-slate-950'] { --tw-gradient-to: #f8fafc var(--tw-gradient-to-position) !important; }
+html[data-theme='light'] [class~='hover:bg-slate-900']:hover,
+html[data-theme='light'] [class~='hover:bg-slate-800']:hover { background-color: #e2e8f0 !important; }
+html[data-theme='light'] h1[class~='text-white'],
+html[data-theme='light'] h2[class~='text-white'],
+html[data-theme='light'] p[class~='text-white'],
+html[data-theme='light'] [class~='hover:text-white']:hover { color: #0f172a !important; }
+html[data-theme='light'] .fixed[class~='bg-slate-950/80'],
+html[data-theme='light'] .fixed[class~='bg-slate-950/75'] { background-color: rgb(15 23 42 / 0.72) !important; }

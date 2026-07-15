@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Loader2, Mail, Paperclip, Send, Trash2, UploadCloud, X } from 'lucide-react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -21,6 +21,7 @@ import {
   type SelectedQuickAttachment,
 } from '@/lib/attachment-metadata';
 import { EXAMPLE_EMAIL } from '@/lib/example-email';
+import { readPreferences } from '@/lib/preferences';
 import { createScanRecord, saveScan } from '@/lib/scan-store';
 import { cn } from '@/lib/utils';
 import type { AnalysisInputMode, UnifiedAnalysisResponse } from '@/types/analysis';
@@ -63,6 +64,10 @@ export function AnalysisForm() {
   const [result, setResult] = useState<UnifiedAnalysisResponse | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const quickAttachmentInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMode(readPreferences().defaultAnalysisMode);
+  }, []);
 
   const selectMode = (nextMode: AnalysisInputMode) => {
     if (mode === 'quick_paste' && nextMode !== 'quick_paste') {
@@ -143,7 +148,9 @@ export function AnalysisForm() {
         }
         : { input_mode: mode, raw_email: mode === 'raw_email' ? rawEmail : emlText });
       setResult(analysis);
-      saveScan(createScanRecord(analysis, mode));
+      if (readPreferences().saveSuccessfulScans) {
+        saveScan(createScanRecord(analysis, mode));
+      }
     } catch (caught) {
       setResult(null);
       setError(caught instanceof ApiError ? caught.message : 'Unexpected analysis error. Please try again.');

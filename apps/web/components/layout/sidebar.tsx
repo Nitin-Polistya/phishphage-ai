@@ -18,7 +18,7 @@ const navigation = [
   { name: 'Analyze Email', href: '/analyze', icon: MailSearch, active: true },
   { name: 'Scan History', href: '/history', icon: History, active: true },
   { name: 'Reports', href: '/reports', icon: FileText, active: true },
-  { name: 'Settings', href: '/settings', icon: Settings, active: false },
+  { name: 'Settings', href: '/settings', icon: Settings, active: true },
 ];
 
 export function Sidebar() {
@@ -68,9 +68,9 @@ export function Sidebar() {
         </nav>
 
         <div className="mt-auto border-t border-slate-800 px-2 pt-4">
-          <div className="flex items-center gap-3 rounded-lg bg-slate-900 px-2 py-3 text-xs font-medium text-slate-400">
-            <div className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-            Demo status: Operational
+          <div className="rounded-lg bg-slate-900 px-3 py-3">
+            <p className="text-xs font-semibold text-slate-300">Local Workspace</p>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">Browser-only data</p>
           </div>
         </div>
       </div>

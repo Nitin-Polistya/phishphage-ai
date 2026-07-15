@@ -1,5 +1,11 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 
+export interface HealthResponse {
+  status: string;
+  service: string;
+  firebase: string;
+}
+
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'unexpected';
 
 export class ApiError extends Error {
@@ -9,7 +15,16 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+
+export function validateApiBaseUrl(url = API_BASE_URL): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function safeDetail(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || !('detail' in payload)) return null;
@@ -57,6 +72,36 @@ export async function analyzeEmail(payload: AnalysisRequest): Promise<UnifiedAna
     return (await response.json()) as UnifiedAnalysisResponse;
   } catch {
     throw new ApiError('unexpected', 'The analysis service returned an invalid response.');
+  }
+}
+
+export async function fetchHealthStatus(): Promise<HealthResponse> {
+  if (!validateApiBaseUrl()) {
+    throw new ApiError('validation', 'The configured backend API URL is invalid.');
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 5000);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/v1/health`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new ApiError('unexpected', `Health check returned HTTP ${response.status}.`);
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== 'object') throw new ApiError('unexpected', 'The health endpoint returned an invalid response.');
+    const health = payload as Partial<HealthResponse>;
+    if (typeof health.status !== 'string' || typeof health.service !== 'string' || typeof health.firebase !== 'string') {
+      throw new ApiError('unexpected', 'The health endpoint returned an invalid response.');
+    }
+    return health as HealthResponse;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError('backend_unavailable', 'The backend health endpoint could not be reached.');
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
