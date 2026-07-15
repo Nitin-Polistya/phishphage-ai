@@ -19,6 +19,32 @@ body {
   box-sizing: border-box;
 }
 
+.theme-link {
+  color: #94a3b8;
+}
+
+.theme-link:hover,
+.theme-link:focus-visible {
+  color: #f1f5f9;
+}
+
+.theme-active-link {
+  color: #60a5fa;
+}
+
+html[data-theme='light'] .theme-link {
+  color: #475569;
+}
+
+html[data-theme='light'] .theme-link:hover,
+html[data-theme='light'] .theme-link:focus-visible {
+  color: #0f172a;
+}
+
+html[data-theme='light'] .theme-active-link {
+  color: #1d4ed8;
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 5rem;
@@ -54,6 +80,8 @@ html[data-theme='light'] [class~='text-slate-300'] { color: #334155 !important; 
 html[data-theme='light'] [class~='text-slate-400'] { color: #475569 !important; }
 html[data-theme='light'] [class~='text-slate-500'],
 html[data-theme='light'] [class~='text-slate-600'] { color: #64748b !important; }
+html[data-theme='light'] [class~='text-blue-400'] { color: #1d4ed8 !important; }
+html[data-theme='light'] [class~='text-blue-300'] { color: #1e40af !important; }
 html[data-theme='light'] [class~='border-slate-800'],
 html[data-theme='light'] [class~='border-slate-800/80'],
 html[data-theme='light'] [class~='border-slate-700'] { border-color: #cbd5e1 !important; }
@@ -63,6 +91,10 @@ html[data-theme='light'] [class~='via-slate-950'] { --tw-gradient-via: #f8fafc v
 html[data-theme='light'] [class~='to-slate-950'] { --tw-gradient-to: #f8fafc var(--tw-gradient-to-position) !important; }
 html[data-theme='light'] [class~='hover:bg-slate-900']:hover,
 html[data-theme='light'] [class~='hover:bg-slate-800']:hover { background-color: #e2e8f0 !important; }
+html[data-theme='light'] [class~='hover:text-slate-100']:hover,
+html[data-theme='light'] [class~='hover:text-slate-200']:hover,
+html[data-theme='light'] [class~='hover:text-slate-300']:hover,
+html[data-theme='light'] [class~='hover:text-blue-300']:hover { color: #0f172a !important; }
 html[data-theme='light'] h1[class~='text-white'],
 html[data-theme='light'] h2[class~='text-white'],
 html[data-theme='light'] p[class~='text-white'],

@@ -70,7 +70,7 @@ export function LandingSectionNavigation() {
             href={`#${id}`}
             aria-current={active ? 'location' : undefined}
             onClick={(event) => navigateToSection(event, id)}
-            className={cn('rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500', active ? 'text-blue-400' : 'text-slate-400 hover:text-slate-100')}
+            className={cn('rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500', active ? 'theme-active-link' : 'theme-link')}
           >
             {label}
           </a>

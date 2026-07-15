@@ -294,7 +294,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
-              <a href="https://github.com/Nitin-Polistya/phishphage-ai" target="_blank" rel="noreferrer" className="transition-colors hover:text-slate-200">GitHub repository</a>
+              <a href="https://github.com/Nitin-Polistya/phishphage-ai" target="_blank" rel="noreferrer" className="theme-link rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">GitHub repository</a>
               <span className="flex items-center gap-1.5" title="Documentation coming soon"><BookOpen size={14} aria-hidden="true" />Documentation · Coming soon</span>
               <span className="flex items-center gap-1.5"><BadgeCheck size={14} aria-hidden="true" />Internship MVP</span>
             </div>
