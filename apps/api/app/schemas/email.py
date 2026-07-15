@@ -2,7 +2,21 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from enum import Enum
+
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+
+
+RISKY_ATTACHMENT_EXTENSIONS = {
+    '.exe', '.scr', '.js', '.vbs', '.bat', '.cmd', '.ps1', '.iso', '.img', '.zip', '.rar',
+    '.docm', '.dotm', '.xlsm', '.xltm', '.pptm', '.potm', '.ppam', '.ppsm', '.sldm',
+}
+
+
+class AnalysisInputMode(str, Enum):
+    quick_paste = 'quick_paste'
+    raw_email = 'raw_email'
+    eml_upload = 'eml_upload'
 
 
 class EmailAddress(BaseModel):
@@ -17,8 +31,20 @@ class EmailAttachmentMetadata(BaseModel):
 
     filename: str | None = Field(default=None, description='Original filename')
     content_type: str | None = Field(default=None, description='MIME content type')
-    size_bytes: int = Field(..., description='Size in bytes')
+    size_bytes: int = Field(..., ge=0, description='Size in bytes')
     disposition: str | None = Field(default=None, description='Content disposition')
+    extension: str | None = Field(default=None, description='Lowercase file extension')
+    suspicious_extension: bool = Field(default=False, description='Whether the extension is risky')
+
+    @model_validator(mode='after')
+    def derive_extension_status(self) -> 'EmailAttachmentMetadata':
+        if self.filename and not self.extension:
+            suffix = self.filename.rsplit('.', 1)
+            self.extension = f'.{suffix[1].lower()}' if len(suffix) == 2 else None
+        if self.extension:
+            self.extension = self.extension.lower()
+            self.suspicious_extension = self.extension in RISKY_ATTACHMENT_EXTENSIONS
+        return self
 
 
 class ParsedEmail(BaseModel):
@@ -44,3 +70,37 @@ class EmailParserRequest(BaseModel):
     """Request to parse raw email content."""
 
     raw_email: str = Field(..., description='Full raw email content or .eml text')
+
+
+class AnalysisPreviewRequest(BaseModel):
+    """Mode-aware analysis request; legacy raw_email requests remain valid."""
+
+    input_mode: AnalysisInputMode = AnalysisInputMode.raw_email
+    raw_email: str | None = None
+    sender_name: str | None = Field(default=None, max_length=200)
+    sender_email: EmailStr | None = None
+    recipient_name: str | None = Field(default=None, max_length=200)
+    recipient_email: EmailStr | None = None
+    reply_to: EmailStr | None = None
+    subject: str | None = Field(default=None, max_length=998)
+    body: str | None = None
+    attachments: list[EmailAttachmentMetadata] = Field(default_factory=list, max_length=25)
+
+    @field_validator('sender_email', 'recipient_email', 'reply_to', mode='before')
+    @classmethod
+    def blank_email_to_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @field_validator('sender_name', 'recipient_name', 'subject', mode='before')
+    @classmethod
+    def blank_optional_text_to_none(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
+
+    @model_validator(mode='after')
+    def validate_mode_content(self) -> 'AnalysisPreviewRequest':
+        if self.input_mode == AnalysisInputMode.quick_paste:
+            if not self.body or not self.body.strip():
+                raise ValueError('Email body is required for Quick Paste')
+        elif self.raw_email is None:
+            raise ValueError('Raw email content is required for this input mode')
+        return self

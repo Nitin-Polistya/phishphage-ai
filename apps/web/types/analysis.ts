@@ -1,5 +1,6 @@
 export type ThreatClassification = 'safe' | 'suspicious' | 'phishing';
 export type ThreatSeverity = 'low' | 'medium' | 'high';
+export type AnalysisInputMode = 'quick_paste' | 'raw_email' | 'eml_upload';
 
 export interface EmailAddress {
   name: string | null;
@@ -11,6 +12,8 @@ export interface EmailAttachmentMetadata {
   content_type: string | null;
   size_bytes: number;
   disposition: string | null;
+  extension?: string | null;
+  suspicious_extension?: boolean;
 }
 
 export interface ParsedEmail {
@@ -68,4 +71,17 @@ export interface UnifiedAnalysisResponse {
   ml_analysis: MLAnalysis;
   decision: FinalDecision;
   recommendations: string[];
+}
+
+export interface AnalysisRequest {
+  input_mode: AnalysisInputMode;
+  raw_email?: string;
+  sender_name?: string;
+  sender_email?: string;
+  recipient_name?: string;
+  recipient_email?: string;
+  reply_to?: string;
+  subject?: string;
+  body?: string;
+  attachments?: EmailAttachmentMetadata[];
 }

@@ -20,10 +20,11 @@ if ML_SRC_PATH not in sys.path:
 # Runtime import handled after sys.path modification
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
-from app.services.email_parser import parse_email
+from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, parse_email, parse_email_address, validate_rfc822_source
 from app.services.phishing_analyzer import analyze_parsed_email
 from app.services.decision_engine import fuse_analysis_results
 from app.schemas.analysis import UnifiedAnalysisResponse, MLAnalysisResult
+from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, ParsedEmail
 
 logger = logging.getLogger(__name__)
 
@@ -58,10 +59,41 @@ class AnalysisPipeline:
         """
         # Step 1: Parse raw email
         # parse_email raises ValueError for invalid input
-        parsed_email = parse_email(raw_email)
+        request = AnalysisPreviewRequest(input_mode=AnalysisInputMode.raw_email, raw_email=raw_email)
+        return self.run_request(request)
+
+    def run_request(self, request: AnalysisPreviewRequest) -> UnifiedAnalysisResponse:
+        """Execute one normalized analysis path for every supported input mode."""
+        if request.input_mode == AnalysisInputMode.quick_paste:
+            size = len((request.body or '').encode('utf-8'))
+            if size > MAX_EMAIL_SIZE_BYTES:
+                raise ValueError(f'Email exceeds maximum size of {MAX_EMAIL_SIZE_BYTES} bytes')
+            sender_value = str(request.sender_email) if request.sender_email else None
+            if sender_value and request.sender_name:
+                sender_value = f'{request.sender_name} <{sender_value}>'
+            recipient_value = str(request.recipient_email) if request.recipient_email else None
+            if recipient_value and request.recipient_name:
+                recipient_value = f'{request.recipient_name} <{recipient_value}>'
+            parsed_email = ParsedEmail(
+                subject=request.subject,
+                sender=parse_email_address(sender_value),
+                reply_to=parse_email_address(str(request.reply_to)) if request.reply_to else None,
+                recipients=[parsed for parsed in [parse_email_address(recipient_value)] if parsed] if recipient_value else [],
+                body_text=request.body or '',
+                extracted_urls=extract_urls(f'{request.subject or ""}\n{request.body or ""}'),
+                attachments=request.attachments,
+            )
+        else:
+            try:
+                validate_rfc822_source(request.raw_email or '')
+            except ValueError as error:
+                if request.input_mode == AnalysisInputMode.eml_upload:
+                    raise ValueError('The .eml file does not contain a valid RFC822 message structure.') from None
+                raise error
+            parsed_email = parse_email(request.raw_email or '')
         
         # Step 2: Run rule-based analyzer
-        rule_result = analyze_parsed_email(parsed_email)
+        rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
         
         # Step 3: Run ML inference
         ml_result: MLAnalysisResult

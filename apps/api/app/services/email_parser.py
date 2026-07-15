@@ -17,6 +17,8 @@ from app.schemas.email import (
 logger = logging.getLogger(__name__)
 
 MAX_EMAIL_SIZE_BYTES = 2 * 1024 * 1024
+RAW_SOURCE_ERROR = "This looks like copied inbox text, not full email source. Use Quick Paste, or paste the message from 'Show original' / 'View source'."
+STANDARD_SOURCE_HEADERS = {'from', 'to', 'subject', 'date', 'message-id', 'mime-version', 'content-type'}
 URL_PATTERN = re.compile(
     r'https?://[^\s<>"\'\)]+',
     re.IGNORECASE,
@@ -37,6 +39,19 @@ def validate_email_input(raw_email: str) -> None:
 
     if len(raw_email.encode('utf-8')) > MAX_EMAIL_SIZE_BYTES:
         raise ValueError(f'Email exceeds maximum size of {MAX_EMAIL_SIZE_BYTES} bytes')
+
+
+def validate_rfc822_source(raw_email: str) -> None:
+    """Reject copied display text while accepting a real RFC822 header block."""
+    validate_email_input(raw_email)
+    header_block = re.split(r'\r?\n\r?\n', raw_email, maxsplit=1)[0]
+    recognized = set()
+    for line in header_block.splitlines():
+        match = re.match(r'^([A-Za-z0-9-]+):', line)
+        if match and match.group(1).lower() in STANDARD_SOURCE_HEADERS:
+            recognized.add(match.group(1).lower())
+    if len(recognized) < 2:
+        raise ValueError(RAW_SOURCE_ERROR)
 
 
 def parse_email_address(address_str: str | None) -> EmailAddress | None:
@@ -161,9 +176,10 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
     if message.is_multipart():
         for part in message.walk():
             content_type = part.get_content_type()
-            content_disposition = part.get('Content-Disposition', '')
+            content_disposition = part.get_content_disposition()
+            filename = part.get_filename()
 
-            if 'attachment' in content_disposition:
+            if content_disposition == 'attachment' or filename:
                 continue
 
             if content_type == 'text/plain':
@@ -219,20 +235,27 @@ def extract_attachment_metadata(message: Any) -> list[EmailAttachmentMetadata]:
         if part.get_content_maintype() == 'multipart':
             continue
 
-        content_disposition = part.get('Content-Disposition', '')
-        if 'attachment' not in content_disposition:
+        content_disposition = part.get_content_disposition()
+        filename = part.get_filename()
+        if content_disposition != 'attachment' and not filename:
             continue
 
         try:
-            filename = part.get_filename()
+            if filename:
+                decoded_parts = decode_header(filename)
+                filename = ''.join(
+                    value.decode(encoding or 'utf-8', errors='replace') if isinstance(value, bytes) else value
+                    for value, encoding in decoded_parts
+                )
             content_type = part.get_content_type()
-            size_bytes = len(part.get_payload(decode=True) or b'')
+            decoded_payload = part.get_payload(decode=True)
+            size_bytes = len(decoded_payload) if isinstance(decoded_payload, bytes) else 0
 
             metadata = EmailAttachmentMetadata(
                 filename=filename,
                 content_type=content_type,
                 size_bytes=size_bytes,
-                disposition=content_disposition.split(';')[0].strip(),
+                disposition=content_disposition,
             )
             attachments.append(metadata)
         except Exception as e:

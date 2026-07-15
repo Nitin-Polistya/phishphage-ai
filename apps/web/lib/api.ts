@@ -1,4 +1,4 @@
-import type { UnifiedAnalysisResponse } from '@/types/analysis';
+import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'unexpected';
 
@@ -14,16 +14,28 @@ const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:
 function safeDetail(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object' || !('detail' in payload)) return null;
   const detail = (payload as { detail?: unknown }).detail;
-  return typeof detail === 'string' && detail.length <= 300 ? detail : null;
+  if (typeof detail === 'string' && detail.length <= 300) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const error = item as { loc?: unknown; msg?: unknown };
+      if (typeof error.msg !== 'string') return [];
+      const location = Array.isArray(error.loc) ? error.loc.at(-1) : null;
+      const field = typeof location === 'string' ? location.replaceAll('_', ' ') : 'input';
+      return [`${field}: ${error.msg.replace(/^Value error,\s*/i, '')}`];
+    });
+    return messages.length ? messages.join(' ') : null;
+  }
+  return null;
 }
 
-export async function analyzeRawEmail(rawEmail: string): Promise<UnifiedAnalysisResponse> {
+export async function analyzeEmail(payload: AnalysisRequest): Promise<UnifiedAnalysisResponse> {
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}/api/v1/analysis/preview`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ raw_email: rawEmail }),
+      body: JSON.stringify(payload),
     });
   } catch {
     throw new ApiError('backend_unavailable', 'Cannot connect to the analysis service. Check that the backend is running and try again.');
@@ -46,4 +58,8 @@ export async function analyzeRawEmail(rawEmail: string): Promise<UnifiedAnalysis
   } catch {
     throw new ApiError('unexpected', 'The analysis service returned an invalid response.');
   }
+}
+
+export function analyzeRawEmail(rawEmail: string): Promise<UnifiedAnalysisResponse> {
+  return analyzeEmail({ input_mode: 'raw_email', raw_email: rawEmail });
 }

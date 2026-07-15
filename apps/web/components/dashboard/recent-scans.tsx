@@ -1,60 +1,86 @@
-import { ScanResult } from '@/types';
+import { Eye, Inbox } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import type { ScanResult } from '@/types';
 
 interface RecentScansProps {
   scans: ScanResult[];
 }
 
-export function RecentScans({ scans }: RecentScansProps) {
-  const getStatusStyle = (status: ScanResult['status']) => {
-    switch (status) {
-      case 'phishing': return 'bg-red-100 text-red-700 border-red-200';
-      case 'suspicious': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'safe': return 'bg-green-100 text-green-700 border-green-200';
-    }
-  };
+const classificationStyles: Record<ScanResult['status'], string> = {
+  phishing: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
+  suspicious: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+  safe: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+};
 
+function formatDate(timestamp: string) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(timestamp));
+}
+
+export function RecentScans({ scans }: RecentScansProps) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-100">
-        <h3 className="font-semibold text-slate-900">Recent Analysis</h3>
-        <p className="text-xs text-slate-500">Last 5 email scans performed</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
-            <tr>
-              <th className="px-6 py-3 font-medium">Timestamp</th>
-              <th className="px-6 py-3 font-medium">Status</th>
-              <th className="px-6 py-3 font-medium">Confidence</th>
-              <th className="px-6 py-3 font-medium">Threat Type</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {scans.map((scan) => (
-              <tr key={scan.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-slate-600">
-                  {new Date(scan.timestamp).toLocaleString()}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={cn(
-                    "px-2 py-1 rounded-full text-[10px] font-bold uppercase border",
-                    getStatusStyle(scan.status)
-                  )}>
-                    {scan.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-slate-600">
-                  {(scan.confidence * 100).toFixed(1)}%
-                </td>
-                <td className="px-6 py-4 text-slate-600 italic">
-                  {scan.threatType || '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <Card className="h-full border-slate-800 bg-slate-900/80">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base text-slate-100">Recent scans</CardTitle>
+        <CardDescription className="text-slate-400">The latest email classifications from this demo workspace.</CardDescription>
+      </CardHeader>
+      <CardContent className="px-0 pb-0">
+        {scans.length === 0 ? (
+          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
+            <Inbox className="h-8 w-8 text-slate-600" aria-hidden="true" />
+            <p className="mt-3 text-sm font-medium text-slate-200">No scans yet</p>
+            <p className="mt-1 text-xs text-slate-500">Analyzed emails will appear here.</p>
+          </div>
+        ) : (
+          <Table>
+            <TableHeader className="bg-slate-950/40">
+              <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableHead className="min-w-52 text-slate-400">Subject</TableHead>
+                <TableHead className="hidden min-w-52 text-slate-400 md:table-cell">Sender</TableHead>
+                <TableHead className="text-slate-400">Classification</TableHead>
+                <TableHead className="hidden whitespace-nowrap text-slate-400 sm:table-cell">Risk score</TableHead>
+                <TableHead className="hidden whitespace-nowrap text-slate-400 lg:table-cell">Date</TableHead>
+                <TableHead className="w-20 text-right text-slate-400">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {scans.map((scan) => (
+                <TableRow key={scan.id} className="border-slate-800 hover:bg-slate-800/40">
+                  <TableCell>
+                    <p className="max-w-64 truncate font-medium text-slate-200">{scan.subject}</p>
+                    <p className="mt-1 max-w-64 truncate text-xs text-slate-500 md:hidden">{scan.sender}</p>
+                    <p className="mt-1 text-xs text-slate-500 sm:hidden">Risk {scan.riskScore}/100</p>
+                  </TableCell>
+                  <TableCell className="hidden max-w-56 truncate text-slate-400 md:table-cell">{scan.sender}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn('capitalize', classificationStyles[scan.status])}>
+                      {scan.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden font-medium tabular-nums text-slate-300 sm:table-cell">
+                    {scan.riskScore}/100
+                  </TableCell>
+                  <TableCell className="hidden whitespace-nowrap text-slate-400 lg:table-cell">{formatDate(scan.timestamp)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="icon" disabled aria-label={`View ${scan.subject} scan details`} className="text-slate-500">
+                      <Eye aria-hidden="true" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
   );
 }
