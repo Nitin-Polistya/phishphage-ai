@@ -17,7 +17,38 @@ function isScanIndicator(value: unknown): value is ScanIndicator {
     && typeof indicator.title === 'string'
     && typeof indicator.category === 'string'
     && (indicator.severity === 'low' || indicator.severity === 'medium' || indicator.severity === 'high')
-    && typeof indicator.score === 'number';
+    && typeof indicator.score === 'number'
+    && (indicator.description === undefined || typeof indicator.description === 'string')
+    && (indicator.evidence === undefined || indicator.evidence === null || typeof indicator.evidence === 'string');
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isAttachment(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const attachment = value as Record<string, unknown>;
+  return (attachment.filename === null || typeof attachment.filename === 'string')
+    && (attachment.content_type === null || typeof attachment.content_type === 'string')
+    && typeof attachment.size_bytes === 'number'
+    && (attachment.disposition === null || typeof attachment.disposition === 'string')
+    && (attachment.extension === undefined || attachment.extension === null || typeof attachment.extension === 'string')
+    && (attachment.suspicious_extension === undefined || typeof attachment.suspicious_extension === 'boolean');
+}
+
+function isScanDetails(value: unknown) {
+  if (!value || typeof value !== 'object') return false;
+  const details = value as Record<string, unknown>;
+  return (details.replyTo === null || typeof details.replyTo === 'string')
+    && isStringArray(details.recipients)
+    && isStringArray(details.cc)
+    && (details.messageDate === null || typeof details.messageDate === 'string')
+    && (details.messageId === null || typeof details.messageId === 'string')
+    && isStringArray(details.recommendations)
+    && isStringArray(details.urls)
+    && Array.isArray(details.attachments)
+    && details.attachments.every(isAttachment);
 }
 
 function isScanRecord(value: unknown): value is ScanRecord {
@@ -33,7 +64,8 @@ function isScanRecord(value: unknown): value is ScanRecord {
     && Array.isArray(scan.indicators)
     && scan.indicators.every(isScanIndicator)
     && typeof scan.attachmentCount === 'number'
-    && typeof scan.extractedUrlCount === 'number';
+    && typeof scan.extractedUrlCount === 'number'
+    && (scan.details === undefined || isScanDetails(scan.details));
 }
 
 function notifyScanChange() {
@@ -64,9 +96,21 @@ export function createScanRecord(result: UnifiedAnalysisResponse): ScanRecord {
       category: signal.category,
       severity: signal.severity,
       score: signal.score,
+      description: signal.description,
+      evidence: signal.evidence,
     })),
     attachmentCount: result.parser.attachments.length,
     extractedUrlCount: result.parser.extracted_urls.length,
+    details: {
+      replyTo: result.parser.reply_to?.address ?? null,
+      recipients: result.parser.recipients.map((recipient) => recipient.address),
+      cc: result.parser.cc.map((recipient) => recipient.address),
+      messageDate: result.parser.date,
+      messageId: result.parser.message_id,
+      recommendations: [...result.recommendations],
+      urls: [...result.parser.extracted_urls],
+      attachments: result.parser.attachments.map((attachment) => ({ ...attachment })),
+    },
   };
 }
 
@@ -95,6 +139,28 @@ export function saveScan(scan: ScanRecord): boolean {
   } catch {
     return false;
   }
+}
+
+export function deleteScans(ids: Iterable<string>): number {
+  if (typeof window === 'undefined') return 0;
+  const selectedIds = new Set(ids);
+  if (selectedIds.size === 0) return 0;
+
+  try {
+    const scans = readScans();
+    const remaining = scans.filter((scan) => !selectedIds.has(scan.id));
+    const deletedCount = scans.length - remaining.length;
+    if (deletedCount === 0) return 0;
+    window.localStorage.setItem(SCAN_STORAGE_KEY, JSON.stringify(remaining));
+    notifyScanChange();
+    return deletedCount;
+  } catch {
+    return 0;
+  }
+}
+
+export function deleteScan(id: string): boolean {
+  return deleteScans([id]) === 1;
 }
 
 export function clearScans(): boolean {

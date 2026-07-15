@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, active: true },
   { name: 'Analyze Email', href: '/analyze', icon: MailSearch, active: true },
-  { name: 'Scan History', href: '/history', icon: History, active: false },
+  { name: 'Scan History', href: '/history', icon: History, active: true },
   { name: 'Reports', href: '/reports', icon: FileText, active: false },
   { name: 'Settings', href: '/settings', icon: Settings, active: false },
 ];

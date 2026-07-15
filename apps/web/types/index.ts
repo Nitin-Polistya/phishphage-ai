@@ -1,4 +1,4 @@
-import type { ThreatClassification, ThreatSeverity } from './analysis';
+import type { EmailAttachmentMetadata, ThreatClassification, ThreatSeverity } from './analysis';
 
 export interface ScanIndicator {
   code: string;
@@ -6,6 +6,19 @@ export interface ScanIndicator {
   category: string;
   severity: ThreatSeverity;
   score: number;
+  description?: string;
+  evidence?: string | null;
+}
+
+export interface ScanDetails {
+  replyTo: string | null;
+  recipients: string[];
+  cc: string[];
+  messageDate: string | null;
+  messageId: string | null;
+  recommendations: string[];
+  urls: string[];
+  attachments: EmailAttachmentMetadata[];
 }
 
 export interface ScanRecord {
@@ -19,6 +32,7 @@ export interface ScanRecord {
   indicators: ScanIndicator[];
   attachmentCount: number;
   extractedUrlCount: number;
+  details?: ScanDetails;
 }
 
 export interface DashboardStats {
