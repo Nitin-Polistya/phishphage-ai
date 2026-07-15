@@ -19,6 +19,17 @@ body {
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 html[data-theme='light'] body {
   background: #f8fafc;
   color: #1e293b;

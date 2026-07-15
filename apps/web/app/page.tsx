@@ -24,6 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { LandingSectionNavigation } from '@/components/landing/section-navigation';
 
 export const metadata: Metadata = {
   title: {
@@ -72,8 +73,8 @@ const workflow = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800/80 bg-slate-950/95">
+    <div className="min-h-screen overflow-x-clip bg-slate-950 text-slate-100">
+      <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white">
@@ -82,11 +83,7 @@ export default function LandingPage() {
             <span className="font-semibold tracking-tight text-slate-50">PhishPhage AI</span>
           </Link>
 
-          <nav aria-label="Primary navigation" className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
-            <a href="#methods" className="transition-colors hover:text-slate-100">Methods</a>
-            <a href="#capabilities" className="transition-colors hover:text-slate-100">Capabilities</a>
-            <a href="#privacy" className="transition-colors hover:text-slate-100">Privacy</a>
-          </nav>
+          <LandingSectionNavigation />
 
           <Button asChild size="sm" className="bg-blue-600 text-white hover:bg-blue-500">
             <Link href="/analyze">

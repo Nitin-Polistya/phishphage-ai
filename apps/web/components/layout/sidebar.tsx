@@ -27,14 +27,14 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 -translate-x-full border-r border-slate-800 bg-slate-950 transition-transform lg:translate-x-0">
       <div className="flex h-full flex-col px-3 py-4">
-        <div className="mb-10 flex items-center gap-2 px-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+        <Link href="/" aria-label="PhishPhage AI home" className="mb-10 flex items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
             <ShieldAlert size={20} aria-hidden="true" />
-          </div>
+          </span>
           <span className="text-lg font-bold tracking-tight text-slate-100">
             PhishPhage AI
           </span>
-        </div>
+        </Link>
 
         <nav className="flex-1 space-y-1">
           {navigation.map((item) => {
