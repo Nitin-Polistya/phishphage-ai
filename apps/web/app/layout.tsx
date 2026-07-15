@@ -11,16 +11,10 @@ export const metadata: Metadata = {
   description: 'PhishPhage AI email phishing detection and risk analysis.',
 };
 
-import { AppShell } from '@/components/layout/app-shell';
-
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>
-        <AppShell>
-          {children}
-        </AppShell>
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

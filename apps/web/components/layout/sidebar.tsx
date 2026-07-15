@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, active: true },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, active: true },
   { name: 'Analyze Email', href: '/analyze', icon: MailSearch, active: true },
   { name: 'Scan History', href: '/history', icon: History, active: false },
   { name: 'Reports', href: '/reports', icon: FileText, active: false },

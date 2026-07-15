@@ -1,4 +1,10 @@
+import type { Metadata } from 'next';
+
 import { AnalysisForm } from '@/components/analysis/analysis-form';
+
+export const metadata: Metadata = {
+  title: 'Analyze Email',
+};
 
 export default function AnalyzePage() {
   return (
