@@ -1,5 +1,5 @@
 import type { DashboardStats, ScanIndicator, ScanRecord, ThreatVector } from '@/types';
-import type { ThreatSeverity, UnifiedAnalysisResponse } from '@/types/analysis';
+import type { AnalysisInputMode, ThreatSeverity, UnifiedAnalysisResponse } from '@/types/analysis';
 
 const SCAN_STORAGE_KEY = 'phishphage.scan-records.v1';
 const SCAN_STORAGE_EVENT = 'phishphage:scan-records-changed';
@@ -48,7 +48,20 @@ function isScanDetails(value: unknown) {
     && isStringArray(details.recommendations)
     && isStringArray(details.urls)
     && Array.isArray(details.attachments)
-    && details.attachments.every(isAttachment);
+    && details.attachments.every(isAttachment)
+    && (details.inputMode === undefined || details.inputMode === 'quick_paste' || details.inputMode === 'raw_email' || details.inputMode === 'eml_upload')
+    && (details.ruleEngine === undefined || (
+      typeof details.ruleEngine === 'object'
+      && details.ruleEngine !== null
+      && (details.ruleEngine as Record<string, unknown>).status === 'active'
+      && typeof (details.ruleEngine as Record<string, unknown>).version === 'string'
+    ))
+    && (details.mlEngine === undefined || (
+      typeof details.mlEngine === 'object'
+      && details.mlEngine !== null
+      && ((details.mlEngine as Record<string, unknown>).status === 'available' || (details.mlEngine as Record<string, unknown>).status === 'unavailable')
+      && ((details.mlEngine as Record<string, unknown>).version === null || typeof (details.mlEngine as Record<string, unknown>).version === 'string')
+    ));
 }
 
 function isScanRecord(value: unknown): value is ScanRecord {
@@ -81,7 +94,7 @@ function createId() {
   return `scan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
-export function createScanRecord(result: UnifiedAnalysisResponse): ScanRecord {
+export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: AnalysisInputMode): ScanRecord {
   return {
     id: createId(),
     timestamp: new Date().toISOString(),
@@ -110,6 +123,15 @@ export function createScanRecord(result: UnifiedAnalysisResponse): ScanRecord {
       recommendations: [...result.recommendations],
       urls: [...result.parser.extracted_urls],
       attachments: result.parser.attachments.map((attachment) => ({ ...attachment })),
+      inputMode,
+      ruleEngine: {
+        status: 'active',
+        version: result.rule_analysis.engine_version,
+      },
+      mlEngine: {
+        status: result.ml_analysis.status,
+        version: result.ml_analysis.model_version,
+      },
     },
   };
 }

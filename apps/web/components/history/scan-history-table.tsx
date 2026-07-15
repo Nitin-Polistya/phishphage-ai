@@ -3,7 +3,7 @@
 import { KeyboardEvent, MouseEvent } from 'react';
 import { Trash2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import { ClassificationBadge } from '@/components/scans/classification-badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -18,12 +18,6 @@ interface ScanHistoryTableProps {
   onToggle: (id: string) => void;
   onTogglePage: (ids: string[], selected: boolean) => void;
 }
-
-const classificationStyles: Record<ScanRecord['classification'], string> = {
-  phishing: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
-  suspicious: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-  safe: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-};
 
 function formatDate(timestamp: string) {
   return new Intl.DateTimeFormat('en', {
@@ -83,7 +77,7 @@ export function ScanHistoryTable({ scans, selectedIds, onOpen, onDelete, onToggl
               </TableCell>
               <TableCell className="font-medium text-slate-200"><TruncatedValue>{scan.subject}</TruncatedValue></TableCell>
               <TableCell className="text-slate-400"><TruncatedValue>{scan.sender}</TruncatedValue></TableCell>
-              <TableCell><Badge variant="outline" className={cn('capitalize', classificationStyles[scan.classification])}>{scan.classification}</Badge></TableCell>
+              <TableCell><ClassificationBadge classification={scan.classification} /></TableCell>
               <TableCell className={cn('font-semibold tabular-nums', scan.riskScore >= 70 ? 'text-rose-300' : scan.riskScore >= 30 ? 'text-amber-300' : 'text-emerald-300')}>{scan.riskScore}/100</TableCell>
               <TableCell className="tabular-nums text-slate-300">{Math.round(scan.confidence * 100)}%</TableCell>
               <TableCell className="whitespace-nowrap text-slate-400">{formatDate(scan.timestamp)}</TableCell>

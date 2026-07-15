@@ -143,7 +143,7 @@ export function AnalysisForm() {
         }
         : { input_mode: mode, raw_email: mode === 'raw_email' ? rawEmail : emlText });
       setResult(analysis);
-      saveScan(createScanRecord(analysis));
+      saveScan(createScanRecord(analysis, mode));
     } catch (caught) {
       setResult(null);
       setError(caught instanceof ApiError ? caught.message : 'Unexpected analysis error. Please try again.');

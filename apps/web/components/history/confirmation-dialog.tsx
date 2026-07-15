@@ -10,11 +10,12 @@ interface ConfirmationDialogProps {
   title: string;
   description: string;
   confirmLabel: string;
+  tone?: 'danger' | 'primary';
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-export function ConfirmationDialog({ open, title, description, confirmLabel, onCancel, onConfirm }: ConfirmationDialogProps) {
+export function ConfirmationDialog({ open, title, description, confirmLabel, tone = 'danger', onCancel, onConfirm }: ConfirmationDialogProps) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -40,7 +41,7 @@ export function ConfirmationDialog({ open, title, description, confirmLabel, onC
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button type="button" variant="outline" onClick={onCancel} className="border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white">Cancel</Button>
-          <Button type="button" autoFocus onClick={onConfirm} className="bg-rose-600 text-white hover:bg-rose-500">{confirmLabel}</Button>
+          <Button type="button" autoFocus onClick={onConfirm} className={tone === 'danger' ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-blue-600 text-white hover:bg-blue-500'}>{confirmLabel}</Button>
         </div>
       </div>
     </div>

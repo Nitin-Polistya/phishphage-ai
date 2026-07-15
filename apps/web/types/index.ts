@@ -1,4 +1,4 @@
-import type { EmailAttachmentMetadata, ThreatClassification, ThreatSeverity } from './analysis';
+import type { AnalysisInputMode, EmailAttachmentMetadata, ThreatClassification, ThreatSeverity } from './analysis';
 
 export interface ScanIndicator {
   code: string;
@@ -19,6 +19,15 @@ export interface ScanDetails {
   recommendations: string[];
   urls: string[];
   attachments: EmailAttachmentMetadata[];
+  inputMode?: AnalysisInputMode;
+  ruleEngine?: {
+    status: 'active';
+    version: string;
+  };
+  mlEngine?: {
+    status: 'available' | 'unavailable';
+    version: string | null;
+  };
 }
 
 export interface ScanRecord {
