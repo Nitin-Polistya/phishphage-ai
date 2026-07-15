@@ -11,7 +11,7 @@ from phishshield_ml.training import train_model
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Train the PhishShield ML baseline")
+    parser = argparse.ArgumentParser(description="Train the PhishPhage ML baseline")
     parser.add_argument("--dataset", required=True, help="Path to a labeled CSV dataset")
     parser.add_argument("--model-output", required=True, help="Path to write the model bundle")
     parser.add_argument("--metrics-output", required=True, help="Path to write metrics JSON")

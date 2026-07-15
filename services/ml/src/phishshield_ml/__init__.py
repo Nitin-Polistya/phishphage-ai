@@ -1,4 +1,4 @@
-"""PhishShield ML baseline package."""
+"""PhishPhage ML baseline package."""
 
 from .config import MLConfig
 

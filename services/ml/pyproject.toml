@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "phishshield-ml"
 version = "0.1.0"
-description = "ML scaffold for PhishShield AI"
+description = "ML scaffold for PhishPhage AI"
 requires-python = ">=3.11"
 dependencies = [
 	"joblib>=1.4,<2.0",

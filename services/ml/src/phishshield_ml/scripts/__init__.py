@@ -1,1 +1,1 @@
-"""CLI entrypoint package for PhishShield ML scripts."""
+"""CLI entrypoint package for PhishPhage ML scripts."""

@@ -32,7 +32,7 @@ export function Sidebar() {
             <ShieldAlert size={20} aria-hidden="true" />
           </div>
           <span className="text-lg font-bold tracking-tight text-slate-100">
-            PhishShield AI
+            PhishPhage AI
           </span>
         </div>
 

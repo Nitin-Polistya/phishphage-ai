@@ -14,7 +14,7 @@ from phishshield_ml.inference import load_model_bundle
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Evaluate the PhishShield ML baseline")
+    parser = argparse.ArgumentParser(description="Evaluate the PhishPhage ML baseline")
     parser.add_argument("--dataset", required=True, help="Path to a labeled CSV dataset")
     parser.add_argument("--model", required=True, help="Path to a saved model bundle")
     parser.add_argument("--output", required=True, help="Path to write evaluation JSON")

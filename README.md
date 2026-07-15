@@ -1,3 +1,3 @@
-# PhishShield AI
+# PhishPhage AI
 
-Initial project scaffold for the PhishShield AI internship MVP.
+Initial project scaffold for the PhishPhage AI internship MVP.

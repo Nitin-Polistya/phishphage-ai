@@ -20,7 +20,7 @@ export default function DashboardPage() {
               Demo data · System status: Operational
             </Badge>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">Security Overview</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">PhishPhage AI Dashboard</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
             Monitor recent phishing-detection activity, risk distribution, and the signals driving email classifications.
           </p>

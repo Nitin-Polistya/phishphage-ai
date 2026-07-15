@@ -1,1 +1,1 @@
-"""PhishShield API application package."""
+"""PhishPhage API application package."""

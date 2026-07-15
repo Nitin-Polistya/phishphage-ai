@@ -1,4 +1,4 @@
-# PhishShield ML Baseline
+# PhishPhage ML Baseline
 
 Offline internship-ready machine learning baseline for phishing classification.
 
@@ -147,4 +147,4 @@ Performance depends entirely on the supplied dataset quality and coverage.
 The API reads the model location from `ML_MODEL_PATH`. No model bundle is committed by default. With the API's default `ML_REQUIRED=false`, a missing or invalid bundle produces a transparent rule-only response. Set `ML_REQUIRED=true` only in environments where a validated bundle is provisioned and ML must be available.
 # ML Service
 
-Initial ML scaffold for PhishShield AI.
+Initial ML scaffold for PhishPhage AI.

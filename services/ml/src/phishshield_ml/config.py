@@ -1,4 +1,4 @@
-"""Typed configuration for the PhishShield ML baseline."""
+"""Typed configuration for the PhishPhage ML baseline."""
 
 from __future__ import annotations
 

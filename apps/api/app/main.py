@@ -14,7 +14,11 @@ configure_logging(settings.log_level)
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+app = FastAPI(
+	title=settings.app_name,
+	description='PhishPhage AI API for email parsing and phishing-risk analysis.',
+	version=settings.app_version,
+)
 
 app.add_middleware(
 	CORSMiddleware,
@@ -31,4 +35,4 @@ app.include_router(api_router)
 @app.get('/')
 def root() -> dict[str, str]:
 	logger.info('Root endpoint requested')
-	return {'message': 'PhishShield API is running'}
+	return {'message': 'PhishPhage AI API is running'}

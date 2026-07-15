@@ -1,6 +1,6 @@
 # Data Directory
 
-This directory stores local, user-supplied datasets for the offline PhishShield ML baseline.
+This directory stores local, user-supplied datasets for the offline PhishPhage ML baseline.
 
 Structure:
 

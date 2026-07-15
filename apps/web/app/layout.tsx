@@ -4,8 +4,11 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'PhishShield AI',
-  description: 'Project setup complete for the PhishShield AI MVP.',
+  title: {
+    default: 'PhishPhage AI',
+    template: '%s | PhishPhage AI',
+  },
+  description: 'PhishPhage AI email phishing detection and risk analysis.',
 };
 
 import { AppShell } from '@/components/layout/app-shell';

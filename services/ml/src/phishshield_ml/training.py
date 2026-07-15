@@ -1,4 +1,4 @@
-"""Training entrypoints for the PhishShield ML baseline."""
+"""Training entrypoints for the PhishPhage ML baseline."""
 
 from __future__ import annotations
 
