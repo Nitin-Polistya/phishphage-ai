@@ -106,3 +106,11 @@ html[data-theme='light'] .dashboard-surface [class~='text-emerald-300'] { color:
 html[data-theme='light'] .dashboard-surface [class~='text-amber-300'] { color: #b45309 !important; }
 html[data-theme='light'] .dashboard-surface [class~='text-rose-300'] { color: #be123c !important; }
 html[data-theme='light'] .dashboard-surface [class~='text-sky-400'] { color: #0369a1 !important; }
+
+html[data-theme='light'] .analyze-surface [class~='text-emerald-300'] { color: #047857 !important; }
+html[data-theme='light'] .analyze-surface [class~='text-amber-300'] { color: #b45309 !important; }
+html[data-theme='light'] .analyze-surface [class~='text-rose-300'],
+html[data-theme='light'] .analyze-surface [class~='text-rose-200'],
+html[data-theme='light'] .analyze-surface [class~='text-rose-100'],
+html[data-theme='light'] .analyze-surface [class~='text-rose-400'] { color: #be123c !important; }
+html[data-theme='light'] .analyze-surface [class~='text-sky-300'] { color: #0369a1 !important; }
