@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import List
 
 from app.analyzers.content_analyzer import analyze_content
@@ -13,24 +14,11 @@ from app.schemas.email import AnalysisInputMode
 from app.services.risk_scoring import calculate_risk_score, classify_risk_score, calculate_confidence
 
 
-ENGINE_VERSION = 'rules-v1.0.0'
+ENGINE_VERSION = 'rules-v2.0.0'
 
 
 def _recommendations_from_signals(signals: List[ThreatSignal]) -> List[str]:
-    cats = {s.code for s in signals}
-    recs: List[str] = []
-    if any(c.startswith('url_') for c in cats):
-        recs.append('Do not click links in this email.')
-    if any('credential' in c or 'login' in c for c in cats):
-        recs.append('Do not enter or share passwords or authentication codes.')
-    if any(c in ('content_excessive_punct', 'content_excessive_caps') for c in cats):
-        recs.append('Verify the sender through a trusted communication channel.')
-    if any(c.startswith('content_') and ('attachment' in c or 'attachment' in s.title.lower()) for c, s in [(s.code, s) for s in signals]):
-        recs.append('Do not open unexpected attachments.')
-    if any(c.startswith('attachment_') for c in cats):
-        recs.append('Do not open unexpected attachments.')
-    if any(c.startswith('content_impersonation') or c.startswith('header_displayname_impersonation') for c in cats):
-        recs.append('Verify the sender via the organization\'s official website or phone number.')
+    recs = [signal.recommendation for signal in signals if signal.recommendation]
     if not recs:
         recs.append('Report the email to your security team or email provider if suspicious.')
     # Deduplicate while preserving order
@@ -44,21 +32,47 @@ def _recommendations_from_signals(signals: List[ThreatSignal]) -> List[str]:
 
 
 def _attachment_signals(attachments) -> List[ThreatSignal]:
-    risky = []
+    executable = {'.exe', '.scr', '.com', '.bat', '.cmd', '.msi', '.js', '.jse', '.vbs', '.vbe', '.wsf', '.ps1', '.hta', '.lnk'}
+    macro = {'.docm', '.dotm', '.xlsm', '.xltm', '.pptm', '.potm', '.ppam', '.ppsm', '.sldm'}
+    archives = {'.zip', '.rar', '.7z', '.tar', '.gz', '.iso', '.img'}
+    benign_decoys = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt'}
+    suspicious_words = {'urgent', 'invoice', 'payment', 'password', 'payroll', 'confidential', 'scan', 'receipt'}
+    findings: dict[str, list[str]] = {}
+
     for attachment in attachments or []:
-        if attachment.suspicious_extension:
-            risky.append(attachment.filename or 'unnamed attachment')
-    if not risky:
-        return []
+        filename = (attachment.filename or '').strip()
+        lowered = filename.lower().rstrip('. ')
+        suffixes = [f'.{part}' for part in lowered.split('.')[1:]] if '.' in lowered else []
+        final_extension = suffixes[-1] if suffixes else (attachment.extension or '').lower()
+        if final_extension in executable | macro | archives:
+            findings.setdefault('attachment_risky_extension', []).append(filename or 'unnamed attachment')
+        if final_extension in executable:
+            findings.setdefault('attachment_executable', []).append(filename or 'unnamed attachment')
+        if final_extension in macro:
+            findings.setdefault('attachment_office_macro', []).append(filename)
+        if len(suffixes) >= 2 and suffixes[-2].lstrip('.') in benign_decoys and final_extension in executable | macro | archives:
+            findings.setdefault('attachment_double_extension', []).append(filename)
+        if sum(extension in archives for extension in suffixes) >= 2 or any(
+            token in lowered for token in ('.zip.zip', '.rar.zip', '.7z.zip', 'nested_archive')
+        ):
+            findings.setdefault('attachment_nested_archive', []).append(filename)
+        stem_tokens = set(re.findall(r'[a-z]+', lowered.rsplit('.', 1)[0]))
+        if stem_tokens & suspicious_words and (final_extension in executable | macro | archives):
+            findings.setdefault('attachment_suspicious_name', []).append(filename)
+
+    specs = {
+        'attachment_risky_extension': (ThreatSeverity.medium, 'Risky attachment type', 'The filename extension permits executable, active, or concealed content.', 12),
+        'attachment_executable': (ThreatSeverity.high, 'Executable attachment', 'The filename has an extension capable of running code.', 34),
+        'attachment_office_macro': (ThreatSeverity.high, 'Macro-enabled Office attachment', 'The Office filename indicates that embedded macros are permitted.', 28),
+        'attachment_double_extension': (ThreatSeverity.high, 'Deceptive double extension', 'The filename uses a familiar document extension before a risky final extension.', 30),
+        'attachment_nested_archive': (ThreatSeverity.medium, 'Nested archive indicator', 'The filename suggests an archive packaged inside another archive.', 18),
+        'attachment_suspicious_name': (ThreatSeverity.medium, 'Suspicious attachment naming', 'The filename combines pressure or business bait with a risky file type.', 14),
+    }
     return [ThreatSignal(
-        code='attachment_risky_extension',
-        category='attachment',
-        severity=ThreatSeverity.high,
-        title='Risky attachment extension',
-        description='The attachment type can deliver executable code or conceal active content.',
-        score=35,
-        evidence=', '.join(risky[:5]),
-    )]
+        code=code, category='attachment', severity=specs[code][0], title=specs[code][1],
+        description=specs[code][2], score=specs[code][3], evidence=', '.join(names[:5]),
+        recommendation='Do not open the attachment; verify it with the sender and have security tooling inspect it.',
+    ) for code, names in findings.items()]
 
 
 def _quick_paste_metadata_signals(parsed_email) -> List[ThreatSignal]:
@@ -79,6 +93,7 @@ def _quick_paste_metadata_signals(parsed_email) -> List[ThreatSignal]:
         ),
         score=0,
         evidence=sender,
+        recommendation='No action is required for this fact alone; consider it only with other evidence.',
     )]
 
 

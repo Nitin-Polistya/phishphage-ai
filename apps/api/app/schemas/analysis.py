@@ -30,6 +30,10 @@ class ThreatSignal(BaseModel):
     description: str = Field(..., description='Concise description')
     score: Annotated[int, Field(ge=0, le=100)] = Field(..., description='Signal score contribution')
     evidence: str | None = Field(default=None, description='Short evidence string')
+    recommendation: str = Field(
+        default='Verify the message through a trusted channel before taking action.',
+        description='Action the recipient should take in response to this finding',
+    )
 
 
 class AnalysisResult(BaseModel):

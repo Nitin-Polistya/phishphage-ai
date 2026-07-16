@@ -122,6 +122,7 @@ def test_same_sender_and_recipient_is_zero_point_safe_context():
         ),
         'score': 0,
         'evidence': 'user@example.com',
+        'recommendation': 'No action is required for this fact alone; consider it only with other evidence.',
     }
     assert finding['score'] <= 5
     assert data['rule_analysis']['risk_score'] == 0
