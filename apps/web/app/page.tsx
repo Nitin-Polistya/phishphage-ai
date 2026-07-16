@@ -85,7 +85,7 @@ const howToUseSteps = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-950 text-slate-100">
-      <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
+      <header data-landing-header className="sticky top-0 z-50 border-b border-slate-800/80 bg-slate-950/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white">
@@ -186,7 +186,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="methods" className="scroll-mt-20 border-b border-slate-800/80 py-20 sm:py-24">
+        <section id="methods" className="border-b border-slate-800/80 py-20 sm:py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
               <div>
@@ -215,7 +215,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="capabilities" className="scroll-mt-20 border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
+        <section id="capabilities" className="border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
           <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 lg:px-8">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">Core capabilities</p>
@@ -234,7 +234,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="border-b border-slate-800/80 py-20 sm:py-24">
+        <section id="how-it-works" className="border-b border-slate-800/80 py-20 sm:py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">How it works</p>
@@ -252,7 +252,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="how-to-use" className="scroll-mt-20 border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
+        <section id="how-to-use" className="border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">How to use</p>
@@ -273,7 +273,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="privacy" className="scroll-mt-20 py-20 sm:py-24">
+        <section id="privacy" className="py-20 sm:py-24">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="border border-slate-700 bg-slate-900 px-6 py-8 sm:px-10 sm:py-10">
               <div className="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">

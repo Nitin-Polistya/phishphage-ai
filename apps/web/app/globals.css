@@ -47,7 +47,7 @@ html[data-theme='light'] .theme-active-link {
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 5rem;
+  scroll-padding-top: 4rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
