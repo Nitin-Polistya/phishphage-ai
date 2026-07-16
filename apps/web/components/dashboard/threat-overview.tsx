@@ -1,13 +1,15 @@
 import { Activity } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { ThreatVector } from '@/types';
 
 interface ThreatOverviewProps {
   vectors: ThreatVector[];
+  isLoaded: boolean;
 }
 
 const severityStyles = {
@@ -16,7 +18,7 @@ const severityStyles = {
   low: { bar: 'bg-sky-500', dot: 'bg-sky-400' },
 };
 
-export function ThreatOverview({ vectors }: ThreatOverviewProps) {
+export function ThreatOverview({ vectors, isLoaded }: ThreatOverviewProps) {
   const maximum = Math.max(...vectors.map((vector) => vector.count), 0);
   const total = vectors.reduce((sum, vector) => sum + vector.count, 0);
   const visibleVectors = vectors.slice(0, 5);
@@ -26,14 +28,18 @@ export function ThreatOverview({ vectors }: ThreatOverviewProps) {
       <CardHeader>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-base text-slate-100">Threat overview</CardTitle>
+            <h2 className="text-base font-semibold text-slate-100">Threat overview</h2>
             <CardDescription className="mt-1 text-slate-400">Signals observed across saved email analyses.</CardDescription>
           </div>
           <Badge variant="outline" className="border-slate-700 bg-slate-950/50 text-slate-400">All saved scans</Badge>
         </div>
       </CardHeader>
       <CardContent>
-        {total === 0 ? (
+        {!isLoaded ? (
+          <div className="space-y-5 py-2" aria-busy="true" aria-label="Loading threat overview">
+            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-9 w-full bg-slate-800" />)}
+          </div>
+        ) : total === 0 ? (
           <div className="flex min-h-52 flex-col items-center justify-center text-center">
             <Activity className="h-8 w-8 text-slate-600" aria-hidden="true" />
             <p className="mt-3 text-sm font-medium text-slate-200">No threat signals</p>

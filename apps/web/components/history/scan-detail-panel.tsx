@@ -15,7 +15,7 @@ import type { ScanRecord } from '@/types';
 interface ScanDetailPanelProps {
   scan: ScanRecord;
   onClose: () => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const verdictStyles = {
@@ -67,7 +67,7 @@ export function ScanDetailPanel({ scan, onClose, onDelete }: ScanDetailPanelProp
             <p className="mt-1 flex items-center gap-2 text-xs text-slate-500"><Clock size={13} aria-hidden="true" />{formatTimestamp(scan.timestamp)}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(scan.id)} aria-label="Delete this scan" className="text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"><Trash2 aria-hidden="true" /></Button>
+            {onDelete && <Button type="button" variant="ghost" size="icon" onClick={() => onDelete(scan.id)} aria-label="Delete this scan" className="text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"><Trash2 aria-hidden="true" /></Button>}
             <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close scan details" className="text-slate-400 hover:bg-slate-800 hover:text-white"><X aria-hidden="true" /></Button>
           </div>
         </header>

@@ -101,3 +101,8 @@ html[data-theme='light'] p[class~='text-white'],
 html[data-theme='light'] [class~='hover:text-white']:hover { color: #0f172a !important; }
 html[data-theme='light'] .fixed[class~='bg-slate-950/80'],
 html[data-theme='light'] .fixed[class~='bg-slate-950/75'] { background-color: rgb(15 23 42 / 0.72) !important; }
+
+html[data-theme='light'] .dashboard-surface [class~='text-emerald-300'] { color: #047857 !important; }
+html[data-theme='light'] .dashboard-surface [class~='text-amber-300'] { color: #b45309 !important; }
+html[data-theme='light'] .dashboard-surface [class~='text-rose-300'] { color: #be123c !important; }
+html[data-theme='light'] .dashboard-surface [class~='text-sky-400'] { color: #0369a1 !important; }

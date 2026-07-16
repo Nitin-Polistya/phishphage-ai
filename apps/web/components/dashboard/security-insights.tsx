@@ -3,9 +3,10 @@
 import { AlertTriangle, ScanSearch, ShieldCheck } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DashboardStats, ScanRecord, ThreatVector } from '@/types';
 
@@ -13,9 +14,10 @@ interface SecurityInsightsProps {
   scans: ScanRecord[];
   stats: DashboardStats;
   vectors: ThreatVector[];
+  isLoaded: boolean;
 }
 
-export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProps) {
+export function SecurityInsights({ scans, stats, vectors, isLoaded }: SecurityInsightsProps) {
   const highestRisk = scans.reduce<ScanRecord | null>((highest, scan) => (
     !highest || scan.riskScore > highest.riskScore ? scan : highest
   ), null);
@@ -24,10 +26,14 @@ export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProp
   return (
     <Card className="border-slate-800 bg-slate-900/80">
       <CardHeader className="pb-4">
-        <CardTitle className="text-base text-slate-100">Security insights</CardTitle>
+        <h2 className="text-base font-semibold text-slate-100">Security insights</h2>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-5 md:grid-cols-3">
+        {!isLoaded ? (
+          <div className="grid gap-5 md:grid-cols-3" aria-busy="true" aria-label="Loading security insights">
+            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full bg-slate-800" />)}
+          </div>
+        ) : <div className="grid gap-5 md:grid-cols-3">
           <div className="flex gap-3">
             <ScanSearch className="mt-0.5 h-5 w-5 text-sky-400" aria-hidden="true" />
             <div>
@@ -69,7 +75,7 @@ export function SecurityInsights({ scans, stats, vectors }: SecurityInsightsProp
               <p className="mt-2 text-xs text-slate-500">{stats.totalScans ? 'Across all saved scans' : 'No scans analyzed yet'}</p>
             </div>
           </div>
-        </div>
+        </div>}
       </CardContent>
     </Card>
   );

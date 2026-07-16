@@ -1,21 +1,19 @@
-import { Eye, Inbox } from 'lucide-react';
+import { ArrowUpRight, Inbox } from 'lucide-react';
+import Link from 'next/link';
 
-import { Badge } from '@/components/ui/badge';
+import { ClassificationBadge } from '@/components/scans/classification-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import type { ScanRecord } from '@/types';
 
 interface RecentScansProps {
   scans: ScanRecord[];
+  onOpen: (id: string) => void;
+  isLoaded: boolean;
 }
-
-const classificationStyles: Record<ScanRecord['classification'], string> = {
-  phishing: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
-  suspicious: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-  safe: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-};
 
 function formatDate(timestamp: string) {
   return new Intl.DateTimeFormat('en', {
@@ -26,59 +24,81 @@ function formatDate(timestamp: string) {
   }).format(new Date(timestamp));
 }
 
-export function RecentScans({ scans }: RecentScansProps) {
+const riskStyles = {
+  safe: 'text-emerald-300',
+  suspicious: 'text-amber-300',
+  phishing: 'text-rose-300',
+};
+
+export function RecentScans({ scans, onOpen, isLoaded }: RecentScansProps) {
   return (
     <Card className="h-full border-slate-800 bg-slate-900/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base text-slate-100">Recent scans</CardTitle>
+        <h2 className="text-base font-semibold text-slate-100">Recent scans</h2>
         <CardDescription className="text-slate-400">The latest email classifications saved in this browser.</CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
-        {scans.length === 0 ? (
+        {!isLoaded ? (
+          <div className="space-y-3 px-5 py-5" aria-busy="true" aria-label="Loading recent scans">
+            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-16 w-full bg-slate-800" />)}
+          </div>
+        ) : scans.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
             <Inbox className="h-8 w-8 text-slate-600" aria-hidden="true" />
             <p className="mt-3 text-sm font-medium text-slate-200">No scans yet</p>
-            <p className="mt-1 text-xs text-slate-500">Analyzed emails will appear here.</p>
+            <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Run an email analysis to create the first locally stored scan.</p>
+            <Button asChild size="sm" className="mt-5 bg-blue-600 text-white hover:bg-blue-500">
+              <Link href="/analyze">Analyze email</Link>
+            </Button>
           </div>
         ) : (
-          <Table>
-            <TableHeader className="bg-slate-950/40">
-              <TableRow className="border-slate-800 hover:bg-transparent">
-                <TableHead className="min-w-52 text-slate-400">Subject</TableHead>
-                <TableHead className="hidden min-w-52 text-slate-400 md:table-cell">Sender</TableHead>
-                <TableHead className="text-slate-400">Classification</TableHead>
-                <TableHead className="hidden whitespace-nowrap text-slate-400 sm:table-cell">Risk score</TableHead>
-                <TableHead className="hidden whitespace-nowrap text-slate-400 lg:table-cell">Date</TableHead>
-                <TableHead className="w-20 text-right text-slate-400">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <>
+            <div className="divide-y divide-slate-800 md:hidden">
               {scans.map((scan) => (
-                <TableRow key={scan.id} className="border-slate-800 hover:bg-slate-800/40">
-                  <TableCell>
-                    <p className="max-w-64 truncate font-medium text-slate-200">{scan.subject}</p>
-                    <p className="mt-1 max-w-64 truncate text-xs text-slate-500 md:hidden">{scan.sender}</p>
-                    <p className="mt-1 text-xs text-slate-500 sm:hidden">Risk {scan.riskScore}/100</p>
-                  </TableCell>
-                  <TableCell className="hidden max-w-56 truncate text-slate-400 md:table-cell">{scan.sender}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn('capitalize', classificationStyles[scan.classification])}>
-                      {scan.classification}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden font-medium tabular-nums text-slate-300 sm:table-cell">
-                    {scan.riskScore}/100
-                  </TableCell>
-                  <TableCell className="hidden whitespace-nowrap text-slate-400 lg:table-cell">{formatDate(scan.timestamp)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" disabled aria-label={`View ${scan.subject} scan details`} className="text-slate-500">
-                      <Eye aria-hidden="true" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <button key={scan.id} type="button" onClick={() => onOpen(scan.id)} className="group block w-full px-5 py-4 text-left transition-colors hover:bg-slate-800/50 focus-visible:bg-slate-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500" aria-label={`Open scan details for ${scan.subject}`}>
+                  <span className="flex items-start justify-between gap-4">
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-slate-200">{scan.subject}</span>
+                      <span className="mt-1 block truncate text-xs text-slate-500">{scan.sender}</span>
+                    </span>
+                    <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-600 transition-colors group-hover:text-blue-400" aria-hidden="true" />
+                  </span>
+                  <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <ClassificationBadge classification={scan.classification} />
+                    <span className={cn('text-xs font-semibold tabular-nums', riskStyles[scan.classification])}>Risk {scan.riskScore}/100</span>
+                    <span className="text-xs text-slate-500">{formatDate(scan.timestamp)}</span>
+                  </span>
+                </button>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader className="bg-slate-950/40">
+                  <TableRow className="border-slate-800 hover:bg-transparent">
+                    <TableHead className="min-w-56 text-slate-400">Subject</TableHead>
+                    <TableHead className="min-w-48 text-slate-400">Sender</TableHead>
+                    <TableHead className="text-slate-400">Verdict</TableHead>
+                    <TableHead className="whitespace-nowrap text-slate-400">Risk</TableHead>
+                    <TableHead className="whitespace-nowrap text-slate-400">Scanned</TableHead>
+                    <TableHead className="w-10"><span className="sr-only">Open details</span></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {scans.map((scan) => (
+                    <TableRow key={scan.id} role="button" tabIndex={0} onClick={() => onOpen(scan.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(scan.id); } }} aria-label={`Open scan details for ${scan.subject}`} className="group cursor-pointer border-slate-800 transition-colors hover:bg-slate-800/50 focus-visible:bg-slate-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
+                      <TableCell><p className="max-w-64 truncate font-medium text-slate-200" title={scan.subject}>{scan.subject}</p></TableCell>
+                      <TableCell><p className="max-w-52 truncate text-slate-400" title={scan.sender}>{scan.sender}</p></TableCell>
+                      <TableCell><ClassificationBadge classification={scan.classification} /></TableCell>
+                      <TableCell className={cn('font-semibold tabular-nums', riskStyles[scan.classification])}>{scan.riskScore}/100</TableCell>
+                      <TableCell className="whitespace-nowrap text-slate-400">{formatDate(scan.timestamp)}</TableCell>
+                      <TableCell><ArrowUpRight className="h-4 w-4 text-slate-600 transition-colors group-hover:text-blue-400" aria-hidden="true" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
