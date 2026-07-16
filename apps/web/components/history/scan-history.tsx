@@ -130,7 +130,7 @@ export function ScanHistory() {
       : { title: 'Delete this scan?', description: 'This scan record will be permanently removed from this browser and dashboard statistics will update immediately.', label: 'Delete scan' };
 
   return (
-    <div className="space-y-6">
+    <div className="history-surface space-y-6">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-3 flex items-center gap-2">
@@ -155,7 +155,7 @@ export function ScanHistory() {
         </Card>
       ) : (
         <Card className="overflow-hidden border-slate-800 bg-slate-900/80">
-          <CardHeader className="border-b border-slate-800 pb-5">
+          <CardHeader className="sticky top-16 z-20 border-b border-slate-800 bg-slate-900/95 pb-5 backdrop-blur">
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
               <div><CardTitle className="text-base text-slate-100">Investigation records</CardTitle><CardDescription className="mt-1 text-slate-400">{filteredScans.length} of {scans.length} scans</CardDescription></div>
               {selectedIds.size > 0 && <Button type="button" size="sm" onClick={() => setPendingDelete({ kind: 'selected', ids: [...selectedIds] })} className="bg-rose-600 text-white hover:bg-rose-500"><Trash2 aria-hidden="true" />Delete selected ({selectedIds.size})</Button>}

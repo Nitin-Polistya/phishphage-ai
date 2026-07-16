@@ -168,25 +168,27 @@ export function createPrintableReportHtml(scan: ScanRecord, generatedAt = new Da
     @page { size: auto; margin: 16mm; }
     * { box-sizing: border-box; }
     body { margin: 0; color: #0f172a; background: #fff; font: 13px/1.5 Arial, Helvetica, sans-serif; }
-    header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; }
-    h1 { margin: 0; font-size: 24px; } h2 { margin: 0 0 12px; font-size: 16px; } p { margin: 4px 0; }
+    header { display: flex; justify-content: space-between; gap: 24px; border-bottom: 3px solid #2563eb; padding-bottom: 16px; margin-bottom: 24px; break-inside: avoid; }
+    h1 { margin: 0; font-size: 24px; } h2 { margin: 0 0 12px; font-size: 16px; break-after: avoid; page-break-after: avoid; } p { margin: 4px 0; orphans: 3; widows: 3; }
     .brand { color: #1d4ed8; font-weight: 700; letter-spacing: .02em; } .muted { color: #64748b; }
     .verdict { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
     .metric { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; } .metric strong { display: block; margin-top: 4px; font-size: 18px; text-transform: capitalize; }
     .section { break-inside: avoid; page-break-inside: avoid; margin: 0 0 20px; }
+    .section.allow-break { break-inside: auto; page-break-inside: auto; }
     .metadata { display: grid; grid-template-columns: 150px 1fr; border-top: 1px solid #e2e8f0; }
     .metadata dt, .metadata dd { margin: 0; padding: 7px 0; border-bottom: 1px solid #e2e8f0; } .metadata dt { color: #64748b; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; } th, td { border: 1px solid #cbd5e1; padding: 7px; text-align: left; vertical-align: top; } th { background: #f1f5f9; }
-    ul { margin: 6px 0; padding-left: 20px; } .privacy { border: 1px solid #94a3b8; background: #f8fafc; padding: 12px; font-size: 11px; }
-    @media print { body { color: #000; background: #fff; } a { color: #000; text-decoration: none; } .section { break-inside: avoid; } }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; } thead { display: table-header-group; } tr { break-inside: avoid; page-break-inside: avoid; } th, td { border: 1px solid #cbd5e1; padding: 7px; text-align: left; vertical-align: top; overflow-wrap: anywhere; } th { background: #f1f5f9; }
+    ul { margin: 6px 0; padding-left: 20px; } li { break-inside: avoid; } .privacy { border: 1px solid #94a3b8; background: #f8fafc; padding: 12px; font-size: 11px; break-inside: avoid; }
+    @media print { body { color: #000; background: #fff; } a { color: #000; text-decoration: none; } .section.allow-break { break-inside: auto; } }
   </style></head><body>
     <header><div><div class="brand">PhishPhage AI</div><h1>Email Analysis Report</h1></div><div><p><strong>Report generated</strong></p><p>${escapeHtml(formatReportDate(report.report_generated_at))}</p></div></header>
     <section class="verdict"><div class="metric"><span class="muted">Final classification</span><strong>${escapeHtml(report.final_classification)}</strong></div><div class="metric"><span class="muted">Risk score</span><strong>${escapeHtml(report.risk_score)}/100</strong></div><div class="metric"><span class="muted">Confidence</span><strong>${escapeHtml(Math.round(report.confidence * 100))}%</strong></div></section>
-    <section class="section"><h2>Email and scan metadata</h2><dl class="metadata"><dt>Scan timestamp</dt><dd>${escapeHtml(formatReportDate(report.scan_timestamp))}</dd><dt>Subject</dt><dd>${escapeHtml(report.subject)}</dd><dt>Sender</dt><dd>${escapeHtml(report.sender)}</dd><dt>Recipients</dt><dd>${escapeHtml(report.recipients.join(', ') || 'Not recorded')}</dd><dt>Input mode</dt><dd>${escapeHtml(formatReportInputMode(report.input_mode))}</dd><dt>Rule engine</dt><dd>${escapeHtml(report.rule_engine.status)} · ${escapeHtml(report.rule_engine.version || 'Version not recorded')}</dd><dt>ML engine</dt><dd>${escapeHtml(report.ml_engine.status)} · ${escapeHtml(report.ml_engine.version || 'Version not recorded')}</dd></dl></section>
-    <section class="section"><h2>Detected indicators</h2>${indicators}</section>
-    <section class="section"><h2>Recommendations</h2>${printableList(report.recommendations, 'No recommendations recorded.')}</section>
+    <section class="section"><h2>Email and scan metadata</h2><dl class="metadata"><dt>Scan timestamp</dt><dd>${escapeHtml(formatReportDate(report.scan_timestamp))}</dd><dt>Subject</dt><dd>${escapeHtml(report.subject)}</dd><dt>Sender</dt><dd>${escapeHtml(report.sender)}</dd><dt>Recipients</dt><dd>${escapeHtml(report.recipients.join(', ') || 'Not recorded')}</dd><dt>Input mode</dt><dd>${escapeHtml(formatReportInputMode(report.input_mode))}</dd></dl></section>
+    <section class="section allow-break"><h2>Detected indicators</h2>${indicators}</section>
     <section class="section"><h2>Extracted URLs</h2>${printableList(report.extracted_urls, 'No URLs recorded.')}</section>
-    <section class="section"><h2>Attachment metadata</h2>${attachments}</section>
+    <section class="section allow-break"><h2>Attachment metadata</h2>${attachments}</section>
+    <section class="section"><h2>Recommendations</h2>${printableList(report.recommendations, 'No recommendations recorded.')}</section>
+    <section class="section"><h2>Engine metadata</h2><dl class="metadata"><dt>Rule engine</dt><dd>${escapeHtml(report.rule_engine.status)} · ${escapeHtml(report.rule_engine.version || 'Version not recorded')}</dd><dt>ML engine</dt><dd>${escapeHtml(report.ml_engine.status)} · ${escapeHtml(report.ml_engine.version || 'Version not recorded')}</dd><dt>Report schema</dt><dd>${escapeHtml(report.report_schema_version)}</dd><dt>Scan ID</dt><dd>${escapeHtml(report.scan_id)}</dd></dl></section>
     <footer class="privacy"><strong>Privacy notice:</strong> ${escapeHtml(report.privacy_disclaimer)}</footer>
   </body></html>`;
 }

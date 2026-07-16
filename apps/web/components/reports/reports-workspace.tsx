@@ -89,7 +89,7 @@ export function ReportsWorkspace() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="reports-surface space-y-6">
       <header>
         <div className="mb-3 flex items-center gap-2"><Badge variant="outline" className="border-slate-700 bg-slate-900 text-slate-400"><FileText className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />Browser-generated reports</Badge></div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-50 sm:text-3xl">Reports</h1>
@@ -109,7 +109,7 @@ export function ReportsWorkspace() {
         </Card>
       ) : (
         <Card className="overflow-hidden border-slate-800 bg-slate-900/80">
-          <CardHeader className="border-b border-slate-800 pb-5">
+          <CardHeader className="sticky top-16 z-20 border-b border-slate-800 bg-slate-900/95 pb-5 backdrop-blur">
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
               <div><CardTitle className="text-base text-slate-100">Stored scans</CardTitle><CardDescription className="mt-1 text-slate-400">{visibleScans.length} of {scans.length} scans · {selectedIds.size} selected</CardDescription></div>
               <div className="flex flex-wrap gap-2">

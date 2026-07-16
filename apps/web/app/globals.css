@@ -65,8 +65,11 @@ html[data-theme='light'] [class~='bg-slate-950'],
 html[data-theme='light'] [class~='bg-slate-950/95'],
 html[data-theme='light'] [class~='bg-slate-950/80'],
 html[data-theme='light'] [class~='bg-slate-950/60'],
-html[data-theme='light'] [class~='bg-slate-950/50'] { background-color: #f8fafc !important; }
+html[data-theme='light'] [class~='bg-slate-950/50'],
+html[data-theme='light'] [class~='bg-slate-950/45'],
+html[data-theme='light'] [class~='bg-slate-950/40'] { background-color: #f8fafc !important; }
 html[data-theme='light'] [class~='bg-slate-900'],
+html[data-theme='light'] [class~='bg-slate-900/95'],
 html[data-theme='light'] [class~='bg-slate-900/80'],
 html[data-theme='light'] [class~='bg-slate-900/60'],
 html[data-theme='light'] [class~='bg-slate-900/40'],
@@ -114,3 +117,10 @@ html[data-theme='light'] .analyze-surface [class~='text-rose-200'],
 html[data-theme='light'] .analyze-surface [class~='text-rose-100'],
 html[data-theme='light'] .analyze-surface [class~='text-rose-400'] { color: #be123c !important; }
 html[data-theme='light'] .analyze-surface [class~='text-sky-300'] { color: #0369a1 !important; }
+
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-emerald-300'] { color: #047857 !important; }
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-amber-300'] { color: #b45309 !important; }
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-rose-300'],
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-rose-200'] { color: #be123c !important; }
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-sky-300'],
+html[data-theme='light'] :is(.reports-surface, .history-surface, .settings-surface) [class~='text-sky-200'] { color: #0369a1 !important; }
