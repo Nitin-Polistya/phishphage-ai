@@ -71,6 +71,17 @@ const workflow = [
   { step: 'Act', description: 'Follow practical recommendations for the next step.' },
 ];
 
+const howToUseSteps = [
+  { title: 'Open Analyze Email', description: 'Start a new investigation from the Analyze Email workspace.', icon: MailSearch },
+  { title: 'Choose an input method', description: 'Select Quick Paste, Raw Email, or .eml Upload for the evidence you have.', icon: ClipboardPaste },
+  { title: 'Submit the email', description: 'Provide the available message data and begin the analysis.', icon: ArrowRight },
+  { title: 'Review the AI verdict', description: 'Check the final classification, risk score, and confidence.', icon: Gauge },
+  { title: 'Review detected indicators', description: 'Inspect the evidence and signals that contributed to the result.', icon: FileSearch },
+  { title: 'Follow recommended actions', description: 'Use the suggested next steps to respond safely and consistently.', icon: ShieldCheck },
+  { title: 'Save to Scan History', description: 'Successful analyses are retained locally when scan saving is enabled.', icon: ScanText },
+  { title: 'Export a report if needed', description: 'Open Reports to preview, download, print, or save the investigation.', icon: FileUp },
+];
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-950 text-slate-100">
@@ -238,6 +249,27 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="how-to-use" className="scroll-mt-20 border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="max-w-2xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">How to use</p>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Move from email submission to a documented decision.</h2>
+              <p className="mt-4 text-sm leading-6 text-slate-400">Follow the same practical workflow for every suspicious message, from choosing the right input to exporting the final report.</p>
+            </div>
+            <ol className="mt-12 grid border-l border-t border-slate-800 md:grid-cols-2">
+              {howToUseSteps.map((item, index) => (
+                <li key={item.title} className="grid min-h-36 grid-cols-[44px_1fr] gap-4 border-b border-r border-slate-800 p-5 sm:p-6">
+                  <div>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-800 bg-slate-950 text-blue-400"><item.icon size={18} aria-hidden="true" /></span>
+                    <span className="mt-3 block text-xs font-semibold tabular-nums text-slate-600">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                  <div><h3 className="font-semibold text-slate-100">{item.title}</h3><p className="mt-2 text-sm leading-6 text-slate-400">{item.description}</p></div>
+                </li>
+              ))}
+            </ol>
           </div>
         </section>
 

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 const sections = [
   { id: 'methods', label: 'Methods' },
   { id: 'capabilities', label: 'Capabilities' },
+  { id: 'how-to-use', label: 'How to Use' },
   { id: 'privacy', label: 'Privacy' },
 ] as const;
 
@@ -61,7 +62,7 @@ export function LandingSectionNavigation() {
   };
 
   return (
-    <nav aria-label="Landing page sections" className="hidden items-center gap-7 text-sm md:flex">
+    <nav aria-label="Landing page sections" className="hidden items-center gap-5 text-sm md:flex">
       {sections.map(({ id, label }) => {
         const active = activeSection === id;
         return (
