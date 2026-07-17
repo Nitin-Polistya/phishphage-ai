@@ -66,6 +66,7 @@ Environment variables are loaded with `pydantic-settings` from `apps/api/.env`.
 - `ML_MODEL_PATH` identifies the Joblib model bundle. Relative paths are resolved from the repository root. The default is `services/ml/models/phishshield_model.joblib`.
 - `ML_REQUIRED=false` is the local MVP default. If the model cannot be loaded or inference fails, analysis returns HTTP 200 with the deterministic rule result and `ml_analysis.status` set to `unavailable`.
 - `ML_REQUIRED=true` makes ML mandatory. Model load or inference failure returns HTTP 503 with a safe client message.
+- `ML_MARGINAL_ALERT_BAND=0.08` defines the maximum amount above the saved model threshold that can be treated as a marginal, uncorroborated alert. It does not change the model threshold.
 
 The optional fallback does not manufacture a prediction: prediction, probabilities, threshold, and model version are `null`. Classification, risk score, and recommendations come from rules; incomplete Safe evidence is explicitly qualified and its displayed confidence is capped at 0.65.
 
@@ -124,6 +125,7 @@ The API now features a unified analysis pipeline that integrates the email parse
 The final decision uses correlation-aware fusion:
 - Rule categories use diminishing returns, so several tracking-infrastructure observations do not add linearly.
 - A modest model-only alert can resolve to Safe only when aligned DKIM/DMARC supports the visible sender and no strong malicious rule evidence exists.
+- A marginal alert within `ML_MARGINAL_ALERT_BAND` can also remain Safe with limited-authentication qualification when the sole rule finding is missing authentication, the rule score is at most 8, every actionable link aligns organizationally with the sender, and there is no failure, impersonation, sensitive request, attachment risk, hidden destination, or multi-category corroboration.
 - Authentication never suppresses credential harvesting, payment fraud, deceptive destinations, or other high-severity evidence.
 - A high ML probability requires medium/high actionable rule corroboration before reaching Phishing; low-severity infrastructure observations alone cannot do so.
 - The final risk score combines the adjusted rule score and ML probability. `fusion_reason` explains the selected branch.
@@ -138,7 +140,8 @@ The final decision uses correlation-aware fusion:
     - `decision`: Final unified classification, risk score, and confidence.
     - `analysis_completeness`: `body_text_only`, `structured_fields`, `html_content`, or `complete_raw_email`, evidence-availability booleans, and any limited-evidence warning.
     - `engine_agreement`: explicit rule/ML agreement, disagreement, or ML-unavailable state.
-    - additive diagnostics: `rule_raw_score`, `rule_adjusted_score`, `ml_prediction`, `ml_phishing_probability`, `ml_threshold`, `final_decision_confidence`, `rule_ml_agreement`, `fusion_reason`, and `positive_authentication_evidence`.
+    - additive diagnostics: `rule_raw_score`, `rule_adjusted_score`, `ml_prediction`, `ml_phishing_probability`, `ml_threshold`, `final_decision_confidence`, `rule_ml_agreement`, `fusion_reason`, `positive_authentication_evidence`, and `authentication_evidence_status`.
+    - `analysis_freshness` and `stale_reason`: current results always have a null stale reason; stale results include the exact rule/model availability or version reason.
 
 HTML is parsed locally and never rendered. URL evidence records `anchor_href`, `plain_text`, `form_action`, `image_src`, `css_resource`, `tracking_pixel`, `document_metadata`, or `namespace_or_dtd`. Only user-actionable sources receive transport, sensitive-action, and visible-destination analysis. Domain comparison uses an offline bundled Public Suffix List snapshot, so parent/subdomain relationships and multipart suffixes are handled without network access. Content rules receive decoded visible text only, excluding headers, transfer encodings, markup, CSS, URLs, scripts, and attachment payloads.
 

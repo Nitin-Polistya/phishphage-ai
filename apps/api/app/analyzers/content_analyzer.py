@@ -103,6 +103,11 @@ RULES = (
 
 UPPERCASE_RATIO_THRESHOLD = 0.30
 REPEATED_PUNCTUATION_PATTERN = re.compile(r'([!?])\1{2,}')
+VISIBLE_PROSE_URL_PATTERN = re.compile(r'\b(?:h(?:tt|xx)ps?://|www\.)\S+', re.IGNORECASE)
+VISIBLE_PROSE_DOMAIN_PATTERN = re.compile(r'\b(?:[a-z0-9-]+\.)+[a-z]{2,}\b', re.IGNORECASE)
+VISIBLE_PROSE_WORD_PATTERN = re.compile(r"[A-Za-z][A-Za-z'-]*")
+MIN_CAPS_ALPHABETIC_CHARS = 40
+MIN_MEANINGFUL_UPPERCASE_WORDS = 3
 
 
 def _normalize_text(parts: Iterable[str]) -> str:
@@ -111,6 +116,18 @@ def _normalize_text(parts: Iterable[str]) -> str:
 
 def _matching_phrases(text: str, phrases: tuple[str, ...]) -> list[str]:
     return [phrase for phrase in phrases if phrase in text]
+
+
+def _capitalization_prose(*parts: str) -> tuple[str, list[str]]:
+    text = ' '.join(part for part in parts if part)
+    text = VISIBLE_PROSE_URL_PATTERN.sub(' ', text)
+    text = VISIBLE_PROSE_DOMAIN_PATTERN.sub(' ', text)
+    text = re.sub(r'(?:=[0-9A-F]{2}|%[0-9A-F]{2})+', ' ', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b[A-Za-z0-9+/=_-]{24,}\b', ' ', text)
+    words = VISIBLE_PROSE_WORD_PATTERN.findall(text)
+    # Short all-uppercase tokens are treated as acronyms and removed from this feature.
+    prose_words = [word for word in words if not (word.isupper() and len(word) <= 5)]
+    return ' '.join(prose_words), prose_words
 
 
 def analyze_content(subject: str | None, body_text: str | None, body_html: str | None,
@@ -133,9 +150,18 @@ def analyze_content(subject: str | None, body_text: str | None, body_html: str |
                 recommendation=rule.recommendation,
             ))
 
-    raw = ' '.join((subject or '', body_text or ''))
-    raw_letters = [char for char in raw if char.isalpha()]
-    if len(raw_letters) >= 20:
+    raw = ' '.join((subject or '', body_text or '', body_html or ''))
+    capitalization_text, capitalization_words = _capitalization_prose(
+        subject or '', body_text or '', body_html or ''
+    )
+    raw_letters = [char for char in capitalization_text if char.isalpha()]
+    meaningful_uppercase_words = [
+        word for word in capitalization_words if word.isupper() and len(word) > 5
+    ]
+    if (
+        len(raw_letters) >= MIN_CAPS_ALPHABETIC_CHARS
+        and len(meaningful_uppercase_words) >= MIN_MEANINGFUL_UPPERCASE_WORDS
+    ):
         upper_fraction = sum(char.isupper() for char in raw_letters) / len(raw_letters)
         if upper_fraction > UPPERCASE_RATIO_THRESHOLD:
             signals.append(ThreatSignal(

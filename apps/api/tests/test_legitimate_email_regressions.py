@@ -22,7 +22,7 @@ FIXTURE_DIR = Path(__file__).parent / 'fixtures' / 'legitimate_regression'
 FIXTURE_PROBABILITIES = {
     'cline_hubspot_newsletter.eml': 0.359566,
     'github_education_approval.eml': 0.502895,
-    'gmail_inbox_welcome.eml': 0.569407,
+    'gmail_inbox_welcome_missing_auth.eml': 0.531410,
     'openai_mandrill_subscription.eml': 0.482337,
     'unstop_moengage_promotion.eml': 0.344276,
 }
@@ -52,12 +52,24 @@ def test_sanitized_legitimate_fixture_is_not_phishing(filename):
     result = _run_fixture(filename)
     assert result.rule_analysis.classification == ThreatClassification.safe
     assert result.decision.classification == ThreatClassification.safe
-    assert result.rule_analysis.engine_version == 'rules-v3.0.0'
+    assert result.rule_analysis.engine_version == 'rules-v3.1.0'
     assert result.ml_analysis.model_version == 'ml-english-template-robust-v3.0.0'
-    assert result.positive_authentication_evidence
+    if 'missing_auth' in filename:
+        assert result.positive_authentication_evidence == []
+        assert result.authentication_evidence_status == 'unavailable'
+        assert result.engine_agreement == 'disagreement'
+        assert result.analysis_completeness.limited_evidence is True
+        assert result.analysis_completeness.warning.startswith('Safe based on limited authentication evidence:')
+        assert result.decision.confidence <= 0.60
+        assert result.decision.limited_authentication_evidence is True
+        assert any('official service' in recommendation for recommendation in result.recommendations)
+    else:
+        assert result.positive_authentication_evidence
     assert result.rule_raw_score == result.rule_adjusted_score
-    assert result.rule_adjusted_score <= 4
+    assert result.rule_adjusted_score <= (5 if 'missing_auth' in filename else 4)
     assert result.fusion_reason
+    assert result.analysis_freshness == 'current'
+    assert result.stale_reason is None
 
 
 def test_parser_records_url_source_semantics_without_fetching():
@@ -145,7 +157,7 @@ def test_authentication_states_and_authenticated_esp_suppression():
 
 def test_positive_authentication_does_not_override_strong_malicious_evidence():
     rule = AnalysisResult(
-        classification='phishing', risk_score=94, confidence=0.92, engine_version='rules-v3.0.0',
+        classification='phishing', risk_score=94, confidence=0.92, engine_version='rules-v3.1.0',
         signals=[ThreatSignal(
             code='content_credential_request', category='content', severity='high',
             title='Credentials', description='Credentials requested', score=30,
@@ -160,7 +172,7 @@ def test_positive_authentication_does_not_override_strong_malicious_evidence():
 
 def test_low_severity_rules_cannot_combine_with_ml_alone_into_phishing():
     rule = AnalysisResult(
-        classification='safe', risk_score=8, confidence=0.65, engine_version='rules-v3.0.0',
+        classification='safe', risk_score=8, confidence=0.65, engine_version='rules-v3.1.0',
         signals=[ThreatSignal(
             code='url_sender_domain_mismatch', category='url', severity='low',
             title='Mismatch', description='Different domain', score=8,
@@ -169,6 +181,55 @@ def test_low_severity_rules_cannot_combine_with_ml_alone_into_phishing():
     )
     decision = fuse_analysis_results(rule, 'phishing', 0.99)
     assert decision.classification == ThreatClassification.suspicious
+
+
+def test_marginal_band_is_configurable_and_does_not_lower_threshold():
+    rule = AnalysisResult(
+        classification='safe', risk_score=5, confidence=0.60, engine_version='rules-v3.1.0',
+        signals=[ThreatSignal(
+            code='header_missing_authentication', category='header', severity='low',
+            title='Missing authentication', description='Authentication unavailable', score=5,
+            evidence='Authentication-Results absent', recommendation='Verify.',
+        )],
+    )
+    inside = fuse_analysis_results(
+        rule, 'phishing', 0.531410, ml_threshold=0.50, marginal_alert_band=0.04,
+        marginal_alert_eligible=True,
+    )
+    outside = fuse_analysis_results(
+        rule, 'phishing', 0.531410, ml_threshold=0.50, marginal_alert_band=0.02,
+        marginal_alert_eligible=True,
+    )
+    assert inside.classification == ThreatClassification.safe
+    assert inside.limited_authentication_evidence is True
+    assert outside.classification == ThreatClassification.suspicious
+
+
+@pytest.mark.parametrize('mutation', ['auth_fail', 'unrelated_link', 'credential_request', 'hidden_destination'])
+def test_marginal_exception_rejects_corroborating_malicious_evidence(mutation):
+    raw = (FIXTURE_DIR / 'gmail_inbox_welcome_missing_auth.eml').read_text(encoding='utf-8')
+    if mutation == 'auth_fail':
+        raw = raw.replace('MIME-Version:', 'Authentication-Results: mx.example.net; spf=fail; dkim=fail; dmarc=fail\nMIME-Version:')
+    elif mutation == 'unrelated_link':
+        raw = raw.replace('https://support.google.com/mail/answer/intro', 'https://unrelated.example/login')
+    elif mutation == 'credential_request':
+        raw = raw.replace('Welcome to Gmail.', 'Welcome to Gmail. Please verify your password.')
+    else:
+        raw = raw.replace(
+            '<a href="https://support.google.com/mail/answer/intro">Explore Gmail help</a>',
+            '<a href="https://unrelated.example/login">https://support.google.com</a>',
+        )
+    pipeline = AnalysisPipeline(ml_required=False)
+    with patch('app.services.analysis_pipeline.LocalInferenceService') as mock_class:
+        service = mock_class.return_value
+        service.predict.return_value = MagicMock(
+            predicted_label='phishing', phishing_probability=0.531410, legitimate_probability=0.468590,
+        )
+        service.model_version = 'ml-english-template-robust-v3.0.0'
+        service.decision_threshold = 0.5
+        result = pipeline.run(raw)
+    assert result.decision.classification != ThreatClassification.safe
+    assert result.decision.limited_authentication_evidence is False
 
 
 def test_markup_urls_and_encoding_controls_do_not_affect_visible_text_features():

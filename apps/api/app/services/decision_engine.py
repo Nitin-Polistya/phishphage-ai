@@ -12,6 +12,9 @@ def fuse_analysis_results(
     *,
     authenticated_sender: bool = False,
     strong_malicious_evidence: bool = False,
+    ml_threshold: float = 0.5,
+    marginal_alert_band: float = 0.08,
+    marginal_alert_eligible: bool = False,
 ) -> DecisionResult:
     """Fuse independently useful evidence, treating modest ML scores as uncertain.
 
@@ -42,6 +45,16 @@ def fuse_analysis_results(
     ):
         classification = ThreatClassification.safe
         reason = 'A modest model-only alert was not corroborated, while aligned authentication supported the sender identity.'
+    elif (
+        marginal_alert_eligible
+        and ml_prediction == 'phishing'
+        and ml_threshold < ml_probability <= ml_threshold + marginal_alert_band
+    ):
+        classification = ThreatClassification.safe
+        reason = (
+            'The marginal ML alert was not corroborated: rules found only missing authentication evidence, '
+            'and all actionable links align with the sender organization.'
+        )
     elif ml_probability > 0.95 and has_medium_or_high_rule:
         classification = ThreatClassification.phishing
         reason = 'Overwhelming ML probability is corroborated by actionable rule evidence.'
@@ -65,10 +78,17 @@ def fuse_analysis_results(
     final_confidence = (rule_result.confidence + ml_confidence + agreement) / 3.0
     if authenticated_sender and classification == ThreatClassification.safe and ml_class == 'phishing':
         final_confidence = min(0.82, final_confidence + 0.08)
+    limited_authentication_evidence = bool(
+        classification == ThreatClassification.safe and marginal_alert_eligible
+        and ml_prediction == 'phishing' and ml_threshold < ml_probability <= ml_threshold + marginal_alert_band
+    )
+    if limited_authentication_evidence:
+        final_confidence = min(0.60, final_confidence)
 
     return DecisionResult(
         classification=classification,
         risk_score=final_score,
         confidence=round(final_confidence, 2),
         fusion_reason=reason,
+        limited_authentication_evidence=limited_authentication_evidence,
     )

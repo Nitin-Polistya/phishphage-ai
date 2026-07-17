@@ -96,6 +96,8 @@ export interface FinalDecision {
   classification: ThreatClassification;
   risk_score: number;
   confidence: number;
+  fusion_reason?: string | null;
+  limited_authentication_evidence?: boolean;
 }
 
 export interface UnifiedAnalysisResponse {
@@ -120,6 +122,9 @@ export interface UnifiedAnalysisResponse {
     domain: string | null;
     aligned_with_from: boolean | null;
   }>;
+  authentication_evidence_status?: 'available' | 'unavailable' | 'failed' | 'inconclusive';
+  analysis_freshness?: 'current' | 'stale';
+  stale_reason?: string | null;
 }
 
 export interface AnalysisRequest {

@@ -15,7 +15,12 @@ Expected outcomes:
 | `cline_hubspot_newsletter.eml` | safe |
 | `github_education_approval.eml` | safe |
 | `gmail_inbox_welcome.eml` | safe |
+| `gmail_inbox_welcome_missing_auth.eml` | safe, qualified as limited authentication evidence |
 | `openai_mandrill_subscription.eml` | safe |
 | `unstop_moengage_promotion.eml` | safe or suspicious |
 
 None may be classified as phishing.
+
+The missing-authentication Gmail fixture is intentionally separate from the
+authenticated structural fixture. It preserves transport headers while omitting
+`Authentication-Results`, `Received-SPF`, and `DKIM-Signature`.

@@ -38,6 +38,7 @@ export interface ScanReportData {
     domain: string | null;
     aligned_with_from: boolean | null;
   }>;
+  authentication_evidence_status: 'available' | 'unavailable' | 'failed' | 'inconclusive';
   url_evidence: Array<{ url: string; source_type: string; user_actionable: boolean }>;
   analysis_freshness: 'current' | 'stale';
   stale_reason: string | null;

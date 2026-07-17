@@ -48,6 +48,7 @@ export interface ScanDetails {
     domain: string | null;
     alignedWithFrom: boolean | null;
   }>;
+  authenticationEvidenceStatus?: 'available' | 'unavailable' | 'failed' | 'inconclusive';
   analysisFreshness?: 'current' | 'stale';
   staleReason?: string | null;
 }

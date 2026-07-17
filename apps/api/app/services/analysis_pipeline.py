@@ -6,6 +6,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     from phishshield_ml.inference import LocalInferenceService
@@ -20,24 +21,35 @@ if ML_SRC_PATH not in sys.path:
 # Runtime import handled after sys.path modification
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
-from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, parse_email, parse_email_address, validate_rfc822_source
+from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
 from app.analyzers.header_analyzer import evaluate_authentication
 from app.services.phishing_analyzer import analyze_parsed_email
 from app.services.decision_engine import fuse_analysis_results
 from app.schemas.analysis import (
     AnalysisCompleteness,
     AnalysisCompletenessState,
+    AnalysisFreshness,
     EngineAgreement,
     UnifiedAnalysisResponse,
     MLAnalysisResult,
 )
 from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, EmailUrlEvidence, ParsedEmail, UrlSourceType
 from app.services.risk_scoring import calculate_raw_risk_score
+from app.services.domain_utils import domains_align
 
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ML_UNAVAILABLE_REASON = "Machine-learning analysis is unavailable."
+CURRENT_RULE_VERSION = 'rules-v3.1.0'
+CURRENT_MODEL_VERSION = 'ml-english-template-robust-v3.0.0'
+LIMITED_AUTH_WARNING = (
+    'Safe based on limited authentication evidence: SPF, DKIM, and DMARC results were unavailable, '
+    'and a marginal ML alert had no corroborating malicious rule evidence.'
+)
+SENSITIVE_ACTION_RECOMMENDATION = (
+    'If the message requests a sensitive action, open the official service independently rather than using the email link.'
+)
 
 
 class MLUnavailableError(RuntimeError):
@@ -49,6 +61,7 @@ class AnalysisPipeline:
         configured_path = Path(model_path or settings.ml_model_path)
         self.model_path = configured_path if configured_path.is_absolute() else PROJECT_ROOT / configured_path
         self.ml_required = settings.ml_required if ml_required is None else ml_required
+        self.ml_marginal_alert_band = settings.ml_marginal_alert_band
         self._ml_service: LocalInferenceService | None = None
 
     def _get_ml_service(self) -> LocalInferenceService:
@@ -112,6 +125,7 @@ class AnalysisPipeline:
         positive_authentication = [
             item for item in authentication.evidence if item.state.value == 'pass'
         ]
+        authentication_status = self._authentication_evidence_status(authentication.evidence)
         
         # Step 2: Run rule-based analyzer
         rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
@@ -173,6 +187,9 @@ class AnalysisPipeline:
                 rule_ml_agreement=EngineAgreement.ml_unavailable,
                 fusion_reason='ML was unavailable; the decision uses deterministic rule evidence only.',
                 positive_authentication_evidence=positive_authentication,
+                authentication_evidence_status=authentication_status,
+                analysis_freshness=AnalysisFreshness.stale,
+                stale_reason=ML_UNAVAILABLE_REASON,
             )
 
         # Step 4: Final Decision Fusion
@@ -181,12 +198,16 @@ class AnalysisPipeline:
         strong_malicious_evidence = any(
             signal.severity.value == 'high' and signal.score > 0 for signal in rule_result.signals
         )
+        marginal_alert_eligible = self._marginal_alert_eligible(parsed_email, rule_result)
         decision = fuse_analysis_results(
             rule_result=rule_result,
             ml_prediction=ml_result.prediction,
             ml_probability=ml_result.phishing_probability,
             authenticated_sender=authentication.trusted_sender,
             strong_malicious_evidence=strong_malicious_evidence,
+            ml_threshold=ml_result.decision_threshold or 0.5,
+            marginal_alert_band=self.ml_marginal_alert_band,
+            marginal_alert_eligible=marginal_alert_eligible,
         )
         if completeness.limited_evidence and str(decision.classification.value) == 'safe':
             decision = decision.model_copy(update={'confidence': min(decision.confidence, 0.65)})
@@ -196,6 +217,18 @@ class AnalysisPipeline:
         response_completeness = self._qualify_safe_warning(
             completeness, str(decision.classification.value) == 'safe'
         )
+        recommendations = list(rule_result.recommendations)
+        if decision.limited_authentication_evidence:
+            response_completeness = response_completeness.model_copy(update={
+                'limited_evidence': True,
+                'warning': LIMITED_AUTH_WARNING,
+            })
+            if SENSITIVE_ACTION_RECOMMENDATION not in recommendations:
+                recommendations.append(SENSITIVE_ACTION_RECOMMENDATION)
+
+        freshness, stale_reason = self._engine_freshness(
+            rule_result.engine_version, ml_result.status.value, ml_result.model_version
+        )
         
         # Step 5: Generate unified response
         return UnifiedAnalysisResponse(
@@ -203,7 +236,7 @@ class AnalysisPipeline:
             rule_analysis=rule_result,
             ml_analysis=ml_result,
             decision=decision,
-            recommendations=rule_result.recommendations,
+            recommendations=recommendations,
             analysis_completeness=response_completeness,
             engine_agreement=agreement,
             rule_raw_score=calculate_raw_risk_score(rule_result.signals),
@@ -215,7 +248,51 @@ class AnalysisPipeline:
             rule_ml_agreement=agreement,
             fusion_reason=decision.fusion_reason,
             positive_authentication_evidence=positive_authentication,
+            authentication_evidence_status=authentication_status,
+            analysis_freshness=freshness,
+            stale_reason=stale_reason,
         )
+
+    @staticmethod
+    def _authentication_evidence_status(evidence) -> str:
+        states = {item.state.value for item in evidence}
+        if 'fail' in states:
+            return 'failed'
+        if 'pass' in states:
+            return 'available'
+        if 'inconclusive' in states:
+            return 'inconclusive'
+        return 'unavailable'
+
+    @staticmethod
+    def _marginal_alert_eligible(parsed_email: ParsedEmail, rule_result) -> bool:
+        positive_signals = [signal for signal in rule_result.signals if signal.score > 0]
+        if rule_result.risk_score > 8 or {signal.code for signal in positive_signals} != {'header_missing_authentication'}:
+            return False
+        if any(signal.severity.value in {'medium', 'high'} for signal in positive_signals):
+            return False
+        if any(link.domain_mismatch for link in parsed_email.html_links):
+            return False
+        if not parsed_email.sender:
+            return False
+        sender_domain = str(parsed_email.sender.address).rsplit('@', 1)[-1]
+        for evidence in parsed_email.url_evidence:
+            if not evidence.user_actionable:
+                continue
+            hostname = urlparse(normalize_defanged_indicator(evidence.url)).hostname
+            if not hostname or not domains_align(sender_domain, hostname):
+                return False
+        return True
+
+    @staticmethod
+    def _engine_freshness(rule_version: str, ml_status: str, model_version: str | None):
+        if rule_version != CURRENT_RULE_VERSION:
+            return AnalysisFreshness.stale, f'Expected rule engine {CURRENT_RULE_VERSION}; received {rule_version}.'
+        if ml_status != 'available':
+            return AnalysisFreshness.stale, ML_UNAVAILABLE_REASON
+        if model_version != CURRENT_MODEL_VERSION:
+            return AnalysisFreshness.stale, f'Expected ML model {CURRENT_MODEL_VERSION}; received {model_version or "none"}.'
+        return AnalysisFreshness.current, None
 
     @staticmethod
     def _analysis_completeness(request: AnalysisPreviewRequest, parsed_email: ParsedEmail) -> AnalysisCompleteness:

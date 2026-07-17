@@ -1,0 +1,27 @@
+From: Gmail Team <mail-noreply@google.com>
+Reply-To: Gmail Team <mail-noreply@google.com>
+To: Example User <recipient@example.net>
+Return-Path: <mail-noreply@google.com>
+Received: from mail.google.com (mail.google.com [192.0.2.22]) by mx.example.net with ESMTPS; Thu, 16 Jul 2026 11:00:00 +0000
+Date: Thu, 16 Jul 2026 11:00:00 +0000
+Message-ID: <gmail-welcome-missing-auth-sanitized@google.com>
+Subject: Welcome to your new Gmail inbox
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="gmail-missing-auth-boundary"
+
+--gmail-missing-auth-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Welcome to Gmail. Your inbox is ready. Learn how account security and password
+recovery settings work at https://support.google.com/mail/answer/intro.
+
+--gmail-missing-auth-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html><head><link rel="stylesheet" href="http://fonts.example/gmail.css"></head><body>
+<h1>Welcome to Gmail</h1>
+<p>Your inbox is ready. Learn how account security and password recovery settings work.</p>
+<a href="https://support.google.com/mail/answer/intro">Explore Gmail help</a>
+<img src="http://images.example/accounts/welcome.png" alt="Gmail inbox illustration">
+</body></html>
+--gmail-missing-auth-boundary--

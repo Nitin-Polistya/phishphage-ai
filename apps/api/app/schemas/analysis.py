@@ -90,6 +90,11 @@ class EngineAgreement(str, Enum):
     ml_unavailable = 'ml_unavailable'
 
 
+class AnalysisFreshness(str, Enum):
+    current = 'current'
+    stale = 'stale'
+
+
 class AuthenticationState(str, Enum):
     passed = 'pass'
     failed = 'fail'
@@ -109,6 +114,7 @@ class DecisionResult(BaseModel):
     risk_score: Annotated[int, Field(ge=0, le=100)] = Field(...)
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(...)
     fusion_reason: str | None = None
+    limited_authentication_evidence: bool = False
 
 
 class UnifiedAnalysisResponse(BaseModel):
@@ -128,3 +134,6 @@ class UnifiedAnalysisResponse(BaseModel):
     rule_ml_agreement: EngineAgreement | None = None
     fusion_reason: str | None = None
     positive_authentication_evidence: list[AuthenticationEvidence] = Field(default_factory=list)
+    authentication_evidence_status: str = 'unavailable'
+    analysis_freshness: AnalysisFreshness
+    stale_reason: str | None = None

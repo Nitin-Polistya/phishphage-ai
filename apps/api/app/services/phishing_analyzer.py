@@ -15,7 +15,7 @@ from app.schemas.email import AnalysisInputMode
 from app.services.risk_scoring import calculate_risk_score, classify_risk_score, calculate_confidence
 
 
-ENGINE_VERSION = 'rules-v3.0.0'
+ENGINE_VERSION = 'rules-v3.1.0'
 
 
 def _recommendations_from_signals(signals: List[ThreatSignal]) -> List[str]:

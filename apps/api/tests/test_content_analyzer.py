@@ -23,3 +23,22 @@ def test_excessive_caps_and_punct():
     signals = analyze_content(subj, None, None, None)
     codes = {s.code for s in signals}
     assert 'content_excessive_caps' in codes or 'content_excessive_punct' in codes
+
+
+def test_capitalization_ignores_urls_domains_acronyms_and_encoded_tokens():
+    prose = (
+        'Cline AI monthly update is ready for the community. '
+        'Read https://CLINE.BOT/ACCOUNT/ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '
+        'and reference MIME DKIM SPF HTML QP =3DTRACKINGTOKEN.'
+    )
+    codes = {signal.code for signal in analyze_content('CLINE AI UPDATE', prose, '', None)}
+    assert 'content_excessive_caps' not in codes
+
+
+def test_multiple_meaningful_all_caps_words_remain_detectable():
+    prose = (
+        'URGENTLY VERIFY ACCOUNT ACCESS IMMEDIATELY BEFORE SERVICES TERMINATE '
+        'because this security notice requires your attention today.'
+    )
+    codes = {signal.code for signal in analyze_content(None, prose, '', None)}
+    assert 'content_excessive_caps' in codes

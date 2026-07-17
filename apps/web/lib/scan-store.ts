@@ -3,7 +3,7 @@ import type { AnalysisInputMode, ThreatSeverity, UnifiedAnalysisResponse } from 
 
 const SCAN_STORAGE_KEY = 'phishphage.scan-records.v1';
 const SCAN_STORAGE_EVENT = 'phishphage:scan-records-changed';
-export const CURRENT_RULE_ENGINE_VERSION = 'rules-v3.0.0';
+export const CURRENT_RULE_ENGINE_VERSION = 'rules-v3.1.0';
 export const CURRENT_ML_MODEL_VERSION = 'ml-english-template-robust-v3.0.0';
 
 const severityRank: Record<ThreatSeverity, number> = {
@@ -109,6 +109,11 @@ export function assessScanFreshness(scan: ScanRecord): { status: 'current' | 'st
 }
 
 export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: AnalysisInputMode): ScanRecord {
+  const analysisFreshness = result.analysis_freshness ?? (
+    result.rule_analysis.engine_version === CURRENT_RULE_ENGINE_VERSION
+      && result.ml_analysis.status === 'available'
+      && result.ml_analysis.model_version === CURRENT_ML_MODEL_VERSION ? 'current' : 'stale'
+  );
   return {
     id: createId(),
     timestamp: new Date().toISOString(),
@@ -166,13 +171,11 @@ export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: An
         domain: item.domain,
         alignedWithFrom: item.aligned_with_from,
       })),
-      analysisFreshness: result.rule_analysis.engine_version === CURRENT_RULE_ENGINE_VERSION
-        && result.ml_analysis.status === 'available'
-        && result.ml_analysis.model_version === CURRENT_ML_MODEL_VERSION ? 'current' : 'stale',
-      staleReason: result.rule_analysis.engine_version === CURRENT_RULE_ENGINE_VERSION
-        && result.ml_analysis.status === 'available'
-        && result.ml_analysis.model_version === CURRENT_ML_MODEL_VERSION
-        ? null : 'This scan was produced by an unavailable or superseded analysis engine. Re-scan the original email.',
+      authenticationEvidenceStatus: result.authentication_evidence_status ?? 'unavailable',
+      analysisFreshness,
+      staleReason: analysisFreshness === 'current' ? null : (
+        result.stale_reason ?? 'This scan was produced by an unavailable or superseded analysis engine. Re-scan the original email.'
+      ),
     },
   };
 }

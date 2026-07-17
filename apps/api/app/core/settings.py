@@ -16,6 +16,12 @@ class Settings(BaseSettings):
         alias='ML_MODEL_PATH',
     )
     ml_required: bool = Field(default=False, alias='ML_REQUIRED')
+    ml_marginal_alert_band: float = Field(
+        default=0.08,
+        ge=0.0,
+        le=0.25,
+        alias='ML_MARGINAL_ALERT_BAND',
+    )
     firebase_project_id: str | None = Field(default=None, alias='FIREBASE_PROJECT_ID')
     firebase_client_email: str | None = Field(default=None, alias='FIREBASE_CLIENT_EMAIL')
     firebase_private_key: str | None = Field(default=None, alias='FIREBASE_PRIVATE_KEY')

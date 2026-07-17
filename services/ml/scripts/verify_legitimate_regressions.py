@@ -20,14 +20,23 @@ from app.services.analysis_pipeline import pipeline
 
 
 FIXTURE_DIR = PROJECT_ROOT / 'apps' / 'api' / 'tests' / 'fixtures' / 'legitimate_regression'
-RULE_VERSION = 'rules-v3.0.0'
+RULE_VERSION = 'rules-v3.1.0'
 MODEL_VERSION = 'ml-english-template-robust-v3.0.0'
-BEFORE_REPAIR = {
-    'cline_hubspot_newsletter.eml': {'rule': 'suspicious', 'rule_score': 51, 'final': 'suspicious'},
-    'github_education_approval.eml': {'rule': 'safe', 'rule_score': 8, 'final': 'suspicious'},
-    'gmail_inbox_welcome.eml': {'rule': 'suspicious', 'rule_score': 31, 'final': 'suspicious'},
-    'openai_mandrill_subscription.eml': {'rule': 'suspicious', 'rule_score': 67, 'final': 'suspicious'},
-    'unstop_moengage_promotion.eml': {'rule': 'suspicious', 'rule_score': 67, 'final': 'suspicious'},
+FIXTURE_NAMES = (
+    'cline_hubspot_newsletter.eml',
+    'github_education_approval.eml',
+    'gmail_inbox_welcome_missing_auth.eml',
+    'openai_mandrill_subscription.eml',
+    'unstop_moengage_promotion.eml',
+)
+FOLLOWUP_BEFORE = {
+    'cline_hubspot_newsletter.eml': {'final': 'safe'},
+    'github_education_approval.eml': {'final': 'safe'},
+    'gmail_inbox_welcome_missing_auth.eml': {
+        'rule_score': 5, 'ml_phishing_probability_observed': 0.569407, 'final': 'suspicious',
+    },
+    'openai_mandrill_subscription.eml': {'final': 'safe'},
+    'unstop_moengage_promotion.eml': {'final': 'safe'},
 }
 
 
@@ -53,7 +62,8 @@ def main() -> int:
     rows = []
     failures = []
 
-    for fixture in sorted(FIXTURE_DIR.glob('*.eml')):
+    for fixture_name in FIXTURE_NAMES:
+        fixture = FIXTURE_DIR / fixture_name
         response = client.post('/api/v1/analysis/preview', json={
             'input_mode': 'raw_email',
             'raw_email': fixture.read_text(encoding='utf-8'),
@@ -64,7 +74,7 @@ def main() -> int:
         data = response.json()
         row = {
             'fixture': fixture.name,
-            'expected': 'safe_or_suspicious' if fixture.name.startswith('unstop_') else 'safe',
+            'expected': 'safe',
             'rule_classification': data['rule_analysis']['classification'],
             'rule_raw_score': data['rule_raw_score'],
             'rule_adjusted_score': data['rule_adjusted_score'],
@@ -79,19 +89,30 @@ def main() -> int:
             'rule_ml_agreement': data['rule_ml_agreement'],
             'fusion_reason': data['fusion_reason'],
             'analysis_completeness': data['analysis_completeness']['state'],
+            'limited_evidence': data['analysis_completeness']['limited_evidence'],
+            'limited_evidence_warning': data['analysis_completeness']['warning'],
+            'authentication_evidence_status': data['authentication_evidence_status'],
+            'analysis_freshness': data['analysis_freshness'],
+            'stale_reason': data['stale_reason'],
             'rule_version': data['rule_analysis']['engine_version'],
             'ml_version': data['ml_analysis']['model_version'],
             'positive_authentication_evidence': data['positive_authentication_evidence'],
             'url_source_types': sorted({item['source_type'] for item in data['parser']['url_evidence']}),
         }
         rows.append(row)
-        allowed = {'safe', 'suspicious'} if fixture.name.startswith('unstop_') else {'safe'}
-        if row['final_classification'] not in allowed:
+        if row['final_classification'] != 'safe':
             failures.append(f"{fixture.name}: final={row['final_classification']}")
         if row['ml_status'] != 'available':
             failures.append(f'{fixture.name}: ML unavailable')
         if row['rule_version'] != RULE_VERSION or row['ml_version'] != MODEL_VERSION:
             failures.append(f'{fixture.name}: stale engine version')
+        if row['analysis_freshness'] != 'current' or row['stale_reason'] is not None:
+            failures.append(f'{fixture.name}: contradictory freshness metadata')
+        if fixture.name == 'gmail_inbox_welcome_missing_auth.eml':
+            if not row['limited_evidence'] or row['authentication_evidence_status'] != 'unavailable':
+                failures.append(f'{fixture.name}: missing limited-authentication qualification')
+            if row['rule_ml_agreement'] != 'disagreement':
+                failures.append(f'{fixture.name}: expected rule/ML disagreement')
 
     payload = {
         'report_schema_version': '1.0',
@@ -99,8 +120,8 @@ def main() -> int:
         'fixtures_are_training_data': False,
         'required_rule_version': RULE_VERSION,
         'required_model_version': MODEL_VERSION,
-        'baseline_observed_before_repair': BEFORE_REPAIR,
-        'before_summary': {'safe': 0, 'suspicious': 5, 'phishing': 0},
+        'followup_before': FOLLOWUP_BEFORE,
+        'before_summary': {'safe': 4, 'suspicious': 1, 'phishing': 0},
         'after_summary': {
             verdict: sum(row['final_classification'] == verdict for row in rows)
             for verdict in ('safe', 'suspicious', 'phishing')
