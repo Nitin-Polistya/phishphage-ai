@@ -67,6 +67,8 @@ Environment variables are loaded with `pydantic-settings` from `apps/api/.env`.
 
 The optional fallback does not manufacture a prediction: prediction, probabilities, and model version are `null`. Its final classification, risk score, confidence, and recommendations come directly from the rule engine.
 
+The currently provisioned academic baseline is trained at `services/ml/models/phishshield_model.joblib` and stores a validated phishing threshold of `0.35`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present.
+
 ### Firebase Setup (Optional)
 
 Firebase Admin SDK is included. To enable Firebase:
@@ -141,4 +143,16 @@ Run the full suite, including pipeline integration tests:
 ```powershell
 pytest tests/ -v
 ```
+
+### Real local ML verification
+
+After training, run this from `services/ml`:
+
+```powershell
+python scripts/verify_api_integration.py
+```
+
+The script uses FastAPI's test client to send eight non-mocked requests through `POST /api/v1/analysis/preview` with `ML_REQUIRED=true`. It verifies that ML is available, both probabilities are within `[0,1]` and sum to one, fusion runs, and rule-only fallback is not used. Results are written to `services/ml/reports/api_verification.json` without raw email bodies.
+
+Current verification includes ordinary project and support mail, credential phishing, invoice and delivery scams, an account-suspension lure, legitimate security/password wording, and explicit rule/ML disagreement. It exposes expected baseline limitations: some legitimate English support/security examples are false positives at the recall-oriented threshold, and one delivery scam is a false negative. See `services/ml/README.md` for dataset provenance, exact configuration, metrics, and the academic-baseline disclaimer.
 

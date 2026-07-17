@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         "train_rows": summary.split_summary.train_rows,
         "validation_rows": summary.split_summary.validation_rows,
         "test_rows": summary.split_summary.test_rows,
+        "selected_threshold": summary.selected_threshold,
     }, indent=2))
     return 0
 

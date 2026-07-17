@@ -9,9 +9,11 @@ from typing import Any
 
 @dataclass(frozen=True)
 class DatasetSummary:
+    input_rows: int
     total_rows: int
     legitimate_count: int
     phishing_count: int
+    empty_rows_removed: int
     duplicate_rows_removed: int
 
 
@@ -42,6 +44,7 @@ class TrainingSummary:
     split_summary: SplitSummary
     validation_metrics: Metrics
     test_metrics: Metrics
+    selected_threshold: float
     model_path: str
     metadata_path: str
 
@@ -72,3 +75,4 @@ class LoadedModelBundle:
     training_timestamp: str
     dataset_summary: dict[str, Any]
     evaluation_metrics: dict[str, Any]
+    decision_threshold: float = 0.5

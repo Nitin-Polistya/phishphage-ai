@@ -41,6 +41,15 @@ def test_probabilities_sum_to_one(tmp_path):
     assert pytest.approx(result.phishing_probability + result.legitimate_probability, rel=1e-3) == 1.0
 
 
+def test_bundle_threshold_is_used(tmp_path):
+    path = _trained_bundle(tmp_path)
+    import joblib
+    bundle = joblib.load(path)
+    bundle["decision_threshold"] = 0.0
+    joblib.dump(bundle, path)
+    assert LocalInferenceService(path).predict("Ordinary project update").predicted_label == "phishing"
+
+
 def test_empty_input_rejected(tmp_path):
     service = LocalInferenceService(_trained_bundle(tmp_path))
     with pytest.raises(ValueError):

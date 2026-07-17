@@ -23,6 +23,11 @@ def test_model_trains_and_saves_bundle(tmp_path):
     assert model_path.exists()
     assert metrics_path.exists()
     assert summary.model_version.startswith("ml-baseline")
+    assert 0.0 < summary.selected_threshold < 1.0
+    assert (metrics_path.parent / "metadata.json").exists()
+    assert (metrics_path.parent / "threshold_analysis.json").exists()
+    assert (metrics_path.parent / "error_analysis.md").exists()
+    assert (metrics_path.parent / "training_summary.md").exists()
 
 
 def test_metadata_excludes_raw_text(tmp_path):

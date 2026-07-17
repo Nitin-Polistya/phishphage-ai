@@ -35,7 +35,11 @@ def load_and_validate_dataset(dataset_path: str | Path) -> pd.DataFrame:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
 
     frame = frame.copy()
-    frame["text"] = frame["text"].map(validate_training_text)
+    input_rows = len(frame)
+    frame["text"] = frame["text"].map(normalize_email_text)
+    empty_mask = frame["text"].eq("")
+    empty_rows_removed = int(empty_mask.sum())
+    frame = frame.loc[~empty_mask].copy()
 
     labels = []
     for label in frame["label"]:
@@ -56,9 +60,11 @@ def load_and_validate_dataset(dataset_path: str | Path) -> pd.DataFrame:
         raise ValueError("Dataset must contain both legitimate and phishing classes")
 
     summary = DatasetSummary(
+        input_rows=input_rows,
         total_rows=len(frame),
         legitimate_count=counts[0],
         phishing_count=counts[1],
+        empty_rows_removed=empty_rows_removed,
         duplicate_rows_removed=removed,
     )
     frame.attrs["dataset_summary"] = summary

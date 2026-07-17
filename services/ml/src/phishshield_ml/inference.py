@@ -30,6 +30,7 @@ def load_model_bundle(model_path: str | Path) -> LoadedModelBundle:
         training_timestamp=bundle["training_timestamp"],
         dataset_summary=bundle["training_dataset_summary"],
         evaluation_metrics=bundle["evaluation_metrics"],
+        decision_threshold=float(bundle.get("decision_threshold", 0.5)),
     )
 
 
@@ -49,7 +50,7 @@ class LocalInferenceService:
         probabilities = self._pipeline.predict_proba([normalized])[0]
         legitimate_probability = float(probabilities[0])
         phishing_probability = float(probabilities[1])
-        predicted_label = "phishing" if phishing_probability >= 0.5 else "legitimate"
+        predicted_label = "phishing" if phishing_probability >= self._bundle.decision_threshold else "legitimate"
         phishing_terms, legitimate_terms = self._explain(normalized, top_k=top_k)
         return InferenceResult(
             predicted_label=predicted_label,

@@ -1,150 +1,117 @@
-# PhishPhage ML Baseline
+# PhishPhage ML Academic Baseline
 
-Offline internship-ready machine learning baseline for phishing classification.
+This package trains and provisions the local text classifier used by the existing API pipeline. It is an explainable academic baseline, not production-grade phishing protection.
 
-## Architecture
+## Dataset sources
 
-This package implements a reproducible local workflow:
+The provisioned model uses two public, license-clear datasets:
 
-1. Load a labeled CSV dataset.
-2. Validate required columns and label values.
-3. Normalize text conservatively.
-4. Remove exact duplicate texts before splitting.
-5. Split into train, validation, and test sets.
-6. Train a `TF-IDF + Logistic Regression` pipeline.
-7. Evaluate metrics.
-8. Save a model bundle and metadata JSON.
-9. Load the bundle locally for inference.
+1. [SpaPhish v5](https://doi.org/10.17632/hz2d6gz7pc.5), CC BY 4.0: 1,395 anonymized real-world Spanish emails collected from 2014–2025, with 664 legitimate and 731 phishing messages. Subject and body are combined; derived technical and persuasion fields are not model features.
+2. [Phishing validation emails](https://doi.org/10.5281/zenodo.13474746), CC BY 4.0: 2,000 English messages advertised as an even safe/phishing mix. It combines real-world and artificial examples and was published for validation. Exact-text cleaning leaves only 100 unique messages (77 legitimate and 23 phishing), so it is used only as a small English supplement.
 
-This baseline is intentionally simple, explainable, and not production-grade protection.
+The Mendeley “Spam E-mail and Phishing Detection” dataset (DOI `10.17632/shj94nrczy.1`) was inspected but rejected: its email file is the 5,572-message ham/spam SMS-style corpus, not a phishing-email corpus. URL-only and license-unclear aggregations are also excluded.
 
-## CSV Format
+Raw and processed datasets are Git-ignored. Do not commit email corpora.
 
-Required columns:
+## Preparation and split
+
+The preparation command maps both sources to:
 
 - `text`
-- `label`
+- `label`, where `0 = legitimate` and `1 = phishing`
 
-Accepted label values:
+It combines SpaPhish subject/body, applies Unicode and whitespace normalization, removes empty text, and removes exact duplicate normalized text before any split. The current preparation result is:
 
-- `legitimate`
-- `phishing`
-- `0`
-- `1`
+- source rows: 3,395 (1,664 legitimate, 1,731 phishing)
+- empty rows removed: 0
+- exact duplicate texts removed: 1,900
+- clean rows: 1,495 (741 legitimate, 754 phishing)
 
-Normalized mapping:
+Training uses a deterministic, label-stratified 70/15/15 split with random seed `42`: 1,046 train, 224 validation, and 225 test rows. Deduplication precedes splitting, and the split helper also checks for text overlap.
 
-- `0` = legitimate
-- `1` = phishing
-
-Optional columns:
-
-- `subject`
-- `sender`
-- `source`
-- `dataset_split`
-
-## Preprocessing
-
-The baseline uses conservative preprocessing only:
-
-- Unicode normalization
-- line-ending normalization
-- whitespace collapsing
-- safe string conversion
-
-It preserves URLs, domains, email addresses, numbers, punctuation, and currency symbols.
-
-## Model Configuration
+## Exact model configuration
 
 - `TfidfVectorizer`
   - lowercase: `True`
-  - ngram_range: `(1, 2)`
-  - min_df: configurable
-  - max_df: configurable
-  - max_features: configurable
-  - sublinear_tf: `True`
-  - strip_accents: `unicode`
+  - n-grams: unigrams and bigrams `(1, 2)`
+  - `min_df=1`
+  - `max_df=0.95`
+  - `max_features=20000`
+  - `sublinear_tf=True`
+  - `strip_accents="unicode"`
 - `LogisticRegression`
-  - class_weight: `balanced`
-  - random_state: `42`
-  - solver: `liblinear`
-  - max_iter: configurable
+  - `class_weight="balanced"`
+  - `random_state=42`
+  - `solver="liblinear"`
+  - `max_iter=1000`
 
-## Split Strategy
+Phishing is always the positive class.
 
-- train: 70%
-- validation: 15%
-- test: 15%
-- random_state: `42`
-- stratified by label
+## Evaluation and selected threshold
 
-Exact duplicate texts are removed before splitting, and duplicate leakage across splits is prevented.
+Threshold selection is performed on validation data only. Thresholds from `0.10` through `0.90` are evaluated in `0.05` increments. The policy first limits validation false-positive rate to at most 10%, then minimizes false-negative rate, then maximizes F1.
 
-## Metrics
+The selected threshold is `0.35`:
 
-Implemented metrics:
+| Split | Accuracy | Precision | Recall | F1 | ROC-AUC | FPR | FNR | Confusion matrix `[[TN,FP],[FN,TP]]` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Train | 0.9723 | 0.9479 | 1.0000 | 0.9733 | 0.9996 | 0.0560 | 0.0000 | `[[489,29],[0,528]]` |
+| Validation | 0.9375 | 0.9091 | 0.9735 | 0.9402 | 0.9908 | 0.0991 | 0.0265 | `[[100,11],[3,110]]` |
+| Test | 0.9289 | 0.8943 | 0.9735 | 0.9322 | 0.9905 | 0.1161 | 0.0265 | `[[99,13],[3,110]]` |
 
-- accuracy
-- precision
-- recall
-- F1
-- ROC-AUC when probabilities and both classes are available
-- confusion matrix
-- false-positive rate
-- false-negative rate
+At the default `0.50` test threshold, recall falls to `0.8319` and FNR rises to `0.1681`, although FPR falls to `0.0089`. The `0.35` choice intentionally trades more false positives for substantially fewer dangerous false negatives.
 
-Phishing is the positive class.
-
-## Model Artifacts
-
-Saved bundle contents:
-
-- fitted pipeline
-- model version
-- label mapping
-- preprocessing version
-- feature configuration
-- training timestamp
-- training dataset summary
-- evaluation metrics
-
-Artifacts are written locally and should not be committed.
+These scores are strongly affected by source/language artifacts and the highly duplicated English source. They must not be presented as production accuracy.
 
 ## Commands
 
-Training:
+Run from `services/ml` using the ML environment (the current checkout can also use `apps/api/.venv`):
 
 ```powershell
-python scripts/train_model.py --dataset data/raw/dataset.csv --model-output models/phishshield_model.joblib --metrics-output reports/metrics.json
+python scripts/prepare_dataset.py `
+  --source data/raw/phishing_validation_emails.csv `
+  --spaphish-source data/raw/spaphish_v5.csv `
+  --output data/processed/phishing_email_dataset.csv `
+  --summary-output reports/dataset_summary.json
+
+python scripts/train_model.py `
+  --dataset data/processed/phishing_email_dataset.csv `
+  --model-output models/phishshield_model.joblib `
+  --metrics-output reports/evaluation_metrics.json
+
+python scripts/verify_api_integration.py
 ```
 
-Evaluation:
+Validation:
 
 ```powershell
-python scripts/evaluate_model.py --dataset data/raw/dataset.csv --model models/phishshield_model.joblib --output reports/evaluation.json
+pytest tests/ -v
+python -m compileall src scripts
 ```
 
-Prediction:
+## Generated local artifacts
 
-```powershell
-python scripts/predict_email.py --model models/phishshield_model.joblib --text "Urgent: verify your password"
-```
+- `models/phishshield_model.joblib` — compatible pipeline bundle, selected threshold included
+- `reports/metadata.json`
+- `reports/evaluation_metrics.json`
+- `reports/threshold_analysis.json`
+- `reports/dataset_summary.json`
+- `reports/error_analysis.md` — safe summaries only; no raw bodies, addresses, or URLs
+- `reports/training_summary.md`
+- `reports/api_verification.json`
 
-## Privacy and Security Limitations
+All paths are Git-ignored. The default compatibility filename remains `phishshield_model.joblib`.
 
-- No automatic dataset download
-- No network calls
-- No external reputation checks
-- No Firebase writes
-- No authentication integration
-- No background workers
+## Limitations
 
-Performance depends entirely on the supplied dataset quality and coverage.
+- The training mix is mostly Spanish real-world email plus a very small set of unique English messages.
+- The English source mixes synthetic and real examples and has extreme duplication.
+- Random row splits can overestimate generalization when messages share campaign/source style; future work should use source-, time-, and campaign-separated external evaluation.
+- The model sees text only. It does not inspect email authentication, sender reputation, rendered HTML, attachment content, or URL destinations.
+- Balanced evaluation does not represent a production inbox's class prevalence.
+- Legitimate support/security vocabulary can produce false positives, and short delivery/invoice scams can be missed.
+- No external threat intelligence, deep learning, or additional model family is used in this phase.
 
-## FastAPI integration
+## API integration
 
-The API reads the model location from `ML_MODEL_PATH`. No model bundle is committed by default. With the API's default `ML_REQUIRED=false`, a missing or invalid bundle produces a transparent rule-only response. Set `ML_REQUIRED=true` only in environments where a validated bundle is provisioned and ML must be available.
-# ML Service
-
-Initial ML scaffold for PhishPhage AI.
+The API resolves `ML_MODEL_PATH` from the repository root; its default is `services/ml/models/phishshield_model.joblib`. Older compatible bundles without a saved threshold use `0.50`; this bundle uses its validated `0.35` threshold. For deployments that require ML, set `ML_REQUIRED=true` so missing or invalid artifacts return HTTP 503 instead of rule-only fallback.

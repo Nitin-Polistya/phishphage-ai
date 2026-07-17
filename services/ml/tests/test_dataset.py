@@ -36,9 +36,14 @@ def test_unsupported_labels(tmp_path):
 
 
 def test_empty_rows(tmp_path):
-    dataset = _write_csv(tmp_path / "dataset.csv", [{"text": " ", "label": "legitimate"}, {"text": "Bad", "label": "phishing"}])
-    with pytest.raises(ValueError):
-        load_and_validate_dataset(dataset)
+    dataset = _write_csv(tmp_path / "dataset.csv", [
+        {"text": " ", "label": "legitimate"},
+        {"text": "Normal", "label": "legitimate"},
+        {"text": "Bad", "label": "phishing"},
+    ])
+    frame = load_and_validate_dataset(dataset)
+    assert len(frame) == 2
+    assert frame.attrs["dataset_summary"].empty_rows_removed == 1
 
 
 def test_duplicate_removal(tmp_path):
@@ -72,3 +77,16 @@ def test_dataset_too_small_for_split(tmp_path):
     frame = load_and_validate_dataset(dataset)
     with pytest.raises(ValueError):
         split_dataset(frame)
+
+
+def test_split_text_sets_are_disjoint(tmp_path):
+    dataset = _write_csv(tmp_path / "dataset.csv", [
+        {"text": f"Legitimate unique message {i}", "label": 0} for i in range(20)
+    ] + [
+        {"text": f"Phishing unique message {i}", "label": 1} for i in range(20)
+    ])
+    frame = load_and_validate_dataset(dataset)
+    train, validation, test, _ = split_dataset(frame)
+    assert set(train["text"]).isdisjoint(validation["text"])
+    assert set(train["text"]).isdisjoint(test["text"])
+    assert set(validation["text"]).isdisjoint(test["text"])

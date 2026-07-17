@@ -48,14 +48,14 @@ def evaluate_predictions(y_true: Iterable[int], y_pred: Iterable[int], y_proba: 
     )
 
 
-def evaluate_thresholds(y_true: Iterable[int], y_proba: Iterable[float], thresholds: Iterable[float]) -> list[dict[str, float]]:
+def evaluate_thresholds(y_true: Iterable[int], y_proba: Iterable[float], thresholds: Iterable[float]) -> list[dict]:
     true_values = list(y_true)
     proba_values = list(y_proba)
     results = []
     for threshold in thresholds:
         predictions = [1 if prob >= threshold else 0 for prob in proba_values]
         metrics = evaluate_predictions(true_values, predictions, proba_values)
-        results.append({"threshold": float(threshold), "precision": metrics.precision, "recall": metrics.recall, "f1": metrics.f1})
+        results.append({"threshold": float(threshold), **metrics.__dict__})
     return results
 
 
