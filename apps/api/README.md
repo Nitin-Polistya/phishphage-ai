@@ -67,7 +67,7 @@ Environment variables are loaded with `pydantic-settings` from `apps/api/.env`.
 
 The optional fallback does not manufacture a prediction: prediction, probabilities, threshold, and model version are `null`. Classification, risk score, and recommendations come from rules; incomplete Safe evidence is explicitly qualified and its displayed confidence is capped at 0.65.
 
-The English-first academic baseline is provisioned at `services/ml/models/phishshield_model.joblib` and stores a validation-selected phishing threshold of `0.50`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present. See `services/ml/README.md` for sources, grouped splits, calibration, external evaluation, and limitations.
+The template-robust English-first academic baseline is provisioned at `services/ml/models/phishshield_model.joblib` and stores a fixed phishing threshold of `0.50`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present. See `services/ml/README.md` for source gates, grouped template-shift evaluation, candidate comparison, external evaluation, and limitations.
 
 ### Firebase Setup (Optional)
 
@@ -115,7 +115,7 @@ The API now features a unified analysis pipeline that integrates the email parse
 ### Pipeline Workflow
 1. **Parsing**: Raw email is normalized into a structured format.
 2. **Rule Analysis**: A deterministic engine identifies threat signals across content, URLs, and headers.
-3. **ML Inference**: The selected calibrated word/character TF-IDF + LinearSVC candidate provides a phishing probability and saved decision threshold.
+3. **ML Inference**: The selected word TF-IDF + balanced Logistic Regression candidate provides a phishing probability and fixed saved decision threshold.
 4. **Decision Fusion**: A decision engine fuses both outputs into a final classification.
 
 ### Decision Engine Logic

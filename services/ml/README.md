@@ -10,7 +10,35 @@ As of the 2026-07-17 audit, only the two Zenodo sources are enabled. CMU Enron i
 
 Run acquisition and corpus auditing as a separate review phase. Do **not** run `train_model.py` until `preparation_audit.json`, `language_audit.json`, and `deduplication_and_split_audit.json` have been reviewed and an adequately licensed legitimate English source has been approved. The scripts always report `ready_for_training: false`; they do not invoke training.
 
-## Dataset strategy and language gate
+## Step 3: template-shift generalization
+
+Step 3 operates on the already provisioned v2 academic corpus; it does not override the acquisition review gate for future source additions. The existing 178-row grouped diagnostic is reproduced before cleaning. Development data excludes its exact text, removes 428 canonical-template duplicates and 5 close semantic duplicates, removes 2 non-English rows, and reduces synthetic contribution from 68.5% to 22.15%.
+
+Six fixed-threshold candidates were compared: feature sets A (word TF-IDF), B (word + character TF-IDF), and C (word + character TF-IDF + text-derived security indicators), each with balanced Logistic Regression and calibrated LinearSVC. Structured indicators include URL, shortened-domain, punycode, suspicious-TLD, sender/Reply-To, sender/link, visible-link/target, urgency, credential-language, HTML, and attachment signals. They are extracted locally and do not contact URLs or domains.
+
+The selected `ml-english-template-robust-v3.0.0` model is word TF-IDF (1,2) + balanced Logistic Regression with seed 42 and a fixed threshold of 0.50. Candidates had to achieve grouped OOF validation F1 >= 0.85; the fixed grouped diagnostic was then used transparently as a Step 3 development robustness benchmark. Its after-result is selection-aware, not untouched. The 80-row external benchmark was evaluated once after model lock.
+
+| Evaluation | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | FPR | FNR | Matrix |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Grouped before | 0.5674 | 0.5283 | 0.6747 | 0.5926 | 0.7973 | 0.8269 | 0.5263 | 0.3253 | `[[45,50],[27,56]]` |
+| Grouped after | 0.8483 | 1.0000 | 0.6747 | 0.8058 | 0.7542 | 0.8434 | 0.0000 | 0.3253 | `[[95,0],[27,56]]` |
+| External before | 0.9125 | 0.8837 | 0.9500 | 0.9157 | 0.9831 | 0.9829 | 0.1250 | 0.0500 | `[[35,5],[2,38]]` |
+| External after | 0.9000 | 1.0000 | 0.8000 | 0.8889 | 0.9944 | 0.9941 | 0.0000 | 0.2000 | `[[40,0],[8,32]]` |
+
+Grouped robustness improved substantially and external accuracy declined by 1.25 percentage points. The external recall loss from 95% to 80% is material: the model is more conservative and still misses unfamiliar phishing messages. Richer features did not win because most corpus rows contain body text rather than complete RFC822/HTML/header context. See generated `reports/generalization_diagnosis.md`, `model_comparison.json`, `corpus_diversity_v3.json`, and `feature_importance.json` for details.
+
+Reproduce Step 3 only after the v2 baseline corpus and benchmark files exist:
+
+```powershell
+python services/ml/scripts/improve_generalization.py
+python services/ml/scripts/evaluate_model.py `
+  --dataset services/ml/data/processed/final_external_benchmark.csv `
+  --model services/ml/models/phishshield_model.joblib `
+  --output services/ml/reports/external_evaluation_v3.json
+python services/ml/scripts/finalize_generalization_report.py
+```
+
+## Step 2 historical dataset strategy and language gate
 
 The full corpora, generated CSVs, reports, and model are Git-ignored.
 
@@ -36,7 +64,7 @@ Every sample receives a deterministic `langdetect` estimate. The hard gate requi
 - The internal grouped diagnostic was inspected during development and is not called untouched. The reset CC0 external benchmark was sealed after corpus construction and evaluated once after the model and threshold were locked.
 - `reports/split_manifest.json` stores SHA-256 text hashes, never raw bodies.
 
-## Candidates and selected configuration
+## Step 2 historical candidates and selected configuration
 
 All candidates use balanced class weights and seed 42:
 
@@ -48,7 +76,7 @@ Both feature branches use lowercase text, Unicode accent stripping, sublinear TF
 
 The selected threshold is 0.500. Thresholds 0.200–0.700 in 0.025 steps were compared on validation only. The policy minimizes false negatives subject to FPR <= 12%, then considers PR-AUC and F1. The retired Step 1 threshold 0.35 was validation-selected, but its Spanish-heavy corpus and repeatedly inspected test output make it unsuitable for Step 2 claims.
 
-## Results
+## Step 2 historical results
 
 Phishing is the positive class. `[[TN, FP], [FN, TP]]` is used below.
 
@@ -92,12 +120,12 @@ python services/ml/scripts/evaluate_safe_fixtures.py
 
 Generated artifacts include the compatible Joblib bundle, `metadata.json`, `evaluation_metrics.json`, `threshold_analysis.json`, `calibration_analysis.json`, `corpus_audit.json`, `split_manifest.json`, `error_analysis.md`, `training_summary.md`, `api_verification.json`, and `fixture_evaluation.json`.
 
-The current model is 1,343,473 bytes at `services/ml/models/phishshield_model.joblib`. Do not commit it automatically. Deployment artifact/object storage with checksums and version promotion is preferred; Git LFS is acceptable only if the team intentionally versions model binaries with source.
+The current Step 3 model is 454,776 bytes at `services/ml/models/phishshield_model.joblib`. Do not commit it automatically. Deployment artifact/object storage with checksums and version promotion is preferred; Git LFS is acceptable only if the team intentionally versions model binaries with source.
 
 ## Analysis completeness and limitations
 
 The API now reports `body_text_only`, `structured_fields`, `html_content`, or `complete_raw_email`, plus evidence-availability booleans. A Safe decision based on incomplete evidence is explicitly qualified and capped at 0.65 confidence. HTML anchors are parsed locally; visible-domain versus real-`href` mismatches and defanged indicators are analyzed without fetching, resolving, or executing any destination.
 
-The model remains text-only. It does not establish sender reputation, validate SPF/DKIM/DMARC, inspect attachment content, render HTML, follow redirects, or use external threat intelligence. Real inbox prevalence, multilingual mail, thread history, image-only lures, compromised legitimate accounts, and novel campaigns can behave very differently.
+The selected model remains text-only because feature set A won. Candidate C can derive structured indicators from supplied raw text/headers, but it does not establish sender reputation, validate SPF/DKIM/DMARC, inspect attachment content, render HTML, follow redirects, or use external threat intelligence. Real inbox prevalence, multilingual mail, thread history, image-only lures, compromised legitimate accounts, and novel campaigns can behave very differently.
 
 See `REGRESSION_REPORT.md` for the Facebook impersonation before/after record.

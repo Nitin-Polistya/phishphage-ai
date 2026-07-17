@@ -27,12 +27,13 @@ def main(argv: list[str] | None = None) -> int:
     frame = load_and_validate_dataset(args.dataset)
     bundle = load_model_bundle(args.model)
     pipeline = bundle.pipeline
-    predictions = pipeline.predict(frame["text"].tolist())
     probabilities = pipeline.predict_proba(frame["text"].tolist())[:, 1].tolist()
-    metrics = evaluate_predictions(frame["label"].tolist(), predictions.tolist() if hasattr(predictions, "tolist") else list(predictions), probabilities)
+    predictions = [int(probability >= bundle.decision_threshold) for probability in probabilities]
+    metrics = evaluate_predictions(frame["label"].tolist(), predictions, probabilities)
     payload = {
         "model_version": bundle.model_version,
         "dataset_rows": len(frame),
+        "decision_threshold": bundle.decision_threshold,
         "metrics": json.loads(json.dumps(metrics, default=lambda o: o.__dict__)),
     }
     write_metrics_json(payload, args.output)
