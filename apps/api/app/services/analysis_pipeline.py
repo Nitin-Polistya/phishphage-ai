@@ -21,6 +21,7 @@ if ML_SRC_PATH not in sys.path:
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
 from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, parse_email, parse_email_address, validate_rfc822_source
+from app.analyzers.header_analyzer import evaluate_authentication
 from app.services.phishing_analyzer import analyze_parsed_email
 from app.services.decision_engine import fuse_analysis_results
 from app.schemas.analysis import (
@@ -30,7 +31,8 @@ from app.schemas.analysis import (
     UnifiedAnalysisResponse,
     MLAnalysisResult,
 )
-from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, ParsedEmail
+from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, EmailUrlEvidence, ParsedEmail, UrlSourceType
+from app.services.risk_scoring import calculate_raw_risk_score
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,10 @@ class AnalysisPipeline:
                 recipients=[parsed for parsed in [parse_email_address(recipient_value)] if parsed] if recipient_value else [],
                 body_text=request.body or '',
                 extracted_urls=extract_urls(f'{request.subject or ""}\n{request.body or ""}'),
+                url_evidence=[
+                    EmailUrlEvidence(url=url, source_type=UrlSourceType.plain_text, user_actionable=True)
+                    for url in extract_urls(f'{request.subject or ""}\n{request.body or ""}')
+                ],
                 attachments=request.attachments,
             )
         else:
@@ -99,6 +105,13 @@ class AnalysisPipeline:
             parsed_email = parse_email(request.raw_email or '')
 
         completeness = self._analysis_completeness(request, parsed_email)
+        authentication = evaluate_authentication(
+            parsed_email.headers,
+            str(parsed_email.sender.address) if parsed_email.sender else None,
+        )
+        positive_authentication = [
+            item for item in authentication.evidence if item.state.value == 'pass'
+        ]
         
         # Step 2: Run rule-based analyzer
         rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
@@ -151,15 +164,29 @@ class AnalysisPipeline:
                 recommendations=rule_result.recommendations,
                 analysis_completeness=response_completeness,
                 engine_agreement=EngineAgreement.ml_unavailable,
+                rule_raw_score=calculate_raw_risk_score(rule_result.signals),
+                rule_adjusted_score=rule_result.risk_score,
+                ml_prediction=None,
+                ml_phishing_probability=None,
+                ml_threshold=None,
+                final_decision_confidence=fallback_decision['confidence'],
+                rule_ml_agreement=EngineAgreement.ml_unavailable,
+                fusion_reason='ML was unavailable; the decision uses deterministic rule evidence only.',
+                positive_authentication_evidence=positive_authentication,
             )
 
         # Step 4: Final Decision Fusion
         if ml_result.prediction is None or ml_result.phishing_probability is None:
             raise RuntimeError('Available ML analysis did not produce a prediction')
+        strong_malicious_evidence = any(
+            signal.severity.value == 'high' and signal.score > 0 for signal in rule_result.signals
+        )
         decision = fuse_analysis_results(
             rule_result=rule_result,
             ml_prediction=ml_result.prediction,
             ml_probability=ml_result.phishing_probability,
+            authenticated_sender=authentication.trusted_sender,
+            strong_malicious_evidence=strong_malicious_evidence,
         )
         if completeness.limited_evidence and str(decision.classification.value) == 'safe':
             decision = decision.model_copy(update={'confidence': min(decision.confidence, 0.65)})
@@ -179,6 +206,15 @@ class AnalysisPipeline:
             recommendations=rule_result.recommendations,
             analysis_completeness=response_completeness,
             engine_agreement=agreement,
+            rule_raw_score=calculate_raw_risk_score(rule_result.signals),
+            rule_adjusted_score=rule_result.risk_score,
+            ml_prediction=ml_result.prediction,
+            ml_phishing_probability=ml_result.phishing_probability,
+            ml_threshold=ml_result.decision_threshold,
+            final_decision_confidence=decision.confidence,
+            rule_ml_agreement=agreement,
+            fusion_reason=decision.fusion_reason,
+            positive_authentication_evidence=positive_authentication,
         )
 
     @staticmethod

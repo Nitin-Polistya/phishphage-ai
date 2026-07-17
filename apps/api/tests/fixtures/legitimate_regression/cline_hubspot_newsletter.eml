@@ -1,0 +1,39 @@
+From: Cline <updates@cline.bot>
+Reply-To: Cline <hello@cline.bot>
+To: Example Recipient <recipient@example.net>
+Return-Path: <bounce+sanitized@mailer.hubspot.example>
+Date: Thu, 16 Jul 2026 09:00:00 +0000
+Message-ID: <cline-newsletter-sanitized@cline.bot>
+Subject: Cline monthly product update
+MIME-Version: 1.0
+List-Unsubscribe: <mailto:unsubscribe@cline.bot>, <https://email.cline.bot/preferences>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=mailer.hubspot.example; dkim=pass header.d=cline.bot; dmarc=pass header.from=cline.bot
+Received-SPF: pass (mx.example.net: domain of mailer.hubspot.example permits 192.0.2.20)
+DKIM-Signature: v=1; a=rsa-sha256; d=cline.bot; s=marketing; bh=SANITIZED; b=SANITIZED
+Content-Type: multipart/alternative; boundary="cline-boundary"
+
+--cline-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Hello,
+
+This month in Cline: new project workflows, release notes, and community events.
+Read the update at https://email.cline.bot/monthly-update or manage preferences at
+https://email.cline.bot/preferences. No account or password action is required.
+
+--cline-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html xmlns="http://www.w3.org/1999/xhtml"><head>
+<meta property="og:url" content="http://schemas.example/metadata">
+<style>.account-card{background-image:url(http://assets.hubspot.example/newsletter.css)}</style>
+</head><body>
+<h1>Cline monthly product update</h1>
+<p>Explore new project workflows, release notes, and community events.</p>
+<a href="https://email.cline.bot/monthly-update">Read the update</a>
+<a href="https://email.cline.bot/preferences">Manage preferences</a>
+<img src="http://images.hubspot.example/accounts/banner.png" alt="Cline product banner">
+<img src="http://track.hubspot.example/pixel.gif?id=SANITIZED" width="1" height="1" alt="">
+</body></html>
+--cline-boundary--

@@ -1,0 +1,29 @@
+From: GitHub Education <education@github.com>
+Reply-To: GitHub Education <education@github.com>
+To: Example Student <student@example.edu>
+Return-Path: <bounce+sanitized@github.com>
+Date: Thu, 16 Jul 2026 10:00:00 +0000
+Message-ID: <education-approval-sanitized@github.com>
+Subject: Your GitHub Education application was approved
+MIME-Version: 1.0
+Authentication-Results: mx.example.edu; spf=pass smtp.mailfrom=github.com; dkim=pass header.d=github.com; dmarc=pass header.from=github.com
+Received-SPF: pass (mx.example.edu: domain of github.com permits 192.0.2.21)
+DKIM-Signature: v=1; a=rsa-sha256; d=github.com; s=education; bh=SANITIZED; b=SANITIZED
+Content-Type: multipart/alternative; boundary="github-boundary"
+
+--github-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Congratulations. Your GitHub Education application has been approved.
+Visit https://education.github.com/benefits to review your benefits when convenient.
+
+--github-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html><body>
+<h1>Application approved</h1>
+<p>Your GitHub Education application has been approved.</p>
+<a href="https://education.github.com/benefits">Review education benefits</a>
+<img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub">
+</body></html>
+--github-boundary--

@@ -38,6 +38,23 @@ python services/ml/scripts/evaluate_model.py `
 python services/ml/scripts/finalize_generalization_report.py
 ```
 
+## Legitimate HTML hard-negative regression
+
+Five synthetic, privacy-safe `.eml` fixtures cover a HubSpot-style newsletter, GitHub Education approval, Gmail welcome message, Mandrill-style OpenAI subscription notice, and MoEngage-style Unstop promotion. They preserve representative MIME/header/HTML structure but contain no personal identifiers or usable provider tokens. They are regression-only inputs under `apps/api/tests/fixtures/legitimate_regression/` and are never read by training.
+
+The rules engine is `rules-v3.0.0`; the unchanged provisioned model is `ml-english-template-robust-v3.0.0` at threshold `0.50`. Before the repair, final results were 0 Safe / 5 Suspicious / 0 Phishing. After URL-source semantics, offline PSL domain comparison, aligned-authentication correlation, visible-text-only content features, and contextual fusion, the real API result is 5 Safe / 0 Suspicious / 0 Phishing. The GitHub and Gmail fixtures still expose their modest model-only probabilities (0.502895 and 0.569407) in diagnostics; aligned authentication and no actionable rule findings resolve the final verdict without changing the ML threshold.
+
+The existing 15 phishing fixtures remain non-Safe after fusion (15 Suspicious / 0 Safe), while the model-only fixture confusion matrix remains `[[24,1],[3,12]]` with FPR 0.04 and FNR 0.20. This targeted repair does not establish general inbox accuracy.
+
+Run from the repository root:
+
+```powershell
+python services/ml/scripts/verify_legitimate_regressions.py
+python services/ml/scripts/evaluate_safe_fixtures.py
+```
+
+The first command requires the real model and exact current engine versions; it fails on ML-unavailable or stale results. Its report contains scores, probabilities, URL source types, authentication evidence, and fusion reasons, but no raw email bodies.
+
 ## Step 2 historical dataset strategy and language gate
 
 The full corpora, generated CSVs, reports, and model are Git-ignored.
@@ -88,7 +105,7 @@ Phishing is the positive class. `[[TN, FP], [FN, TP]]` is used below.
 
 The sharp validation/internal gap is important evidence of template/source shift. The external result is encouraging but comes from only 80 unique synthetic templates. None of these numbers establish production accuracy.
 
-The 50 tracked safe fixtures contain 15 phishing, 15 legitimate, 10 hard negatives, 5 planned disagreement cases, and 5 incomplete inputs. They include fake jobs, banking, government/tax, cryptocurrency, MFA/OTP, QR-lure, and support scenarios even where core-corpus coverage is thin. Model-only fixture results are `[[18,7],[0,15]]`: 0% FNR and 28% FPR, with 21 rule/ML disagreements. This deliberately difficult set reinforces the false-positive limitation.
+The 50 tracked fixtures contain 15 phishing, 15 legitimate, 10 hard negatives, 5 planned disagreement cases, and 5 incomplete inputs. They include fake jobs, banking, government/tax, cryptocurrency, MFA/OTP, QR-lure, and support scenarios even where core-corpus coverage is thin. Current model-only fixture results are `[[24,1],[3,12]]`: 20% FNR and 4% FPR, with 16 rule/ML disagreements after the rules/fusion repair. This deliberately difficult set reinforces both false-negative and distribution-shift limitations.
 
 ## Rebuild and provision
 
@@ -116,9 +133,10 @@ python services/ml/scripts/evaluate_model.py `
 
 python services/ml/scripts/verify_api_integration.py
 python services/ml/scripts/evaluate_safe_fixtures.py
+python services/ml/scripts/verify_legitimate_regressions.py
 ```
 
-Generated artifacts include the compatible Joblib bundle, `metadata.json`, `evaluation_metrics.json`, `threshold_analysis.json`, `calibration_analysis.json`, `corpus_audit.json`, `split_manifest.json`, `error_analysis.md`, `training_summary.md`, `api_verification.json`, and `fixture_evaluation.json`.
+Generated artifacts include the compatible Joblib bundle, `metadata.json`, `evaluation_metrics.json`, `threshold_analysis.json`, `calibration_analysis.json`, `corpus_audit.json`, `split_manifest.json`, `error_analysis.md`, `training_summary.md`, `api_verification.json`, `fixture_evaluation.json`, and `legitimate_regression.json`.
 
 The current Step 3 model is 454,776 bytes at `services/ml/models/phishshield_model.joblib`. Do not commit it automatically. Deployment artifact/object storage with checksums and version promotion is preferred; Git LFS is acceptable only if the team intentionally versions model binaries with source.
 

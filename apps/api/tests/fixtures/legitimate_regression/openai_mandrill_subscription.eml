@@ -1,0 +1,31 @@
+From: OpenAI <noreply@tm.openai.com>
+Reply-To: OpenAI Support <support@openai.com>
+To: Example Subscriber <recipient@example.net>
+Return-Path: <bounce+sanitized@mandrill.example>
+Date: Thu, 16 Jul 2026 12:00:00 +0000
+Message-ID: <subscription-sanitized@tm.openai.com>
+Subject: Your ChatGPT subscription is active
+MIME-Version: 1.0
+X-MC-Tags: subscription-confirmation
+Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=mandrill.example; dkim=pass header.d=openai.com; dmarc=pass header.from=tm.openai.com
+Received-SPF: pass (mx.example.net: domain of mandrill.example permits 192.0.2.23)
+DKIM-Signature: v=1; a=rsa-sha256; d=openai.com; s=mandrill; bh=SANITIZED; b=SANITIZED
+Content-Type: multipart/alternative; boundary="openai-boundary"
+
+--openai-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Your ChatGPT subscription is active. You can view plan information at
+https://chatgpt.com/account/manage. No reply is required.
+
+--openai-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html xmlns="http://www.w3.org/1999/xhtml"><body>
+<h1>Subscription active</h1>
+<p>Your ChatGPT subscription is active.</p>
+<a href="https://chatgpt.com/account/manage">Manage subscription</a>
+<img src="http://images.mandrill.example/accounts/subscription.png" alt="Subscription illustration">
+<img src="http://track.mandrill.example/open.gif?id=SANITIZED" width="1" height="1" alt="">
+</body></html>
+--openai-boundary--

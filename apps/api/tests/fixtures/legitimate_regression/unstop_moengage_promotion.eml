@@ -1,0 +1,35 @@
+From: Unstop <updates@delivery.unstop.news>
+Reply-To: Unstop <support@unstop.news>
+To: Example Candidate <recipient@example.net>
+Return-Path: <bounce+sanitized@moengage.example>
+Date: Thu, 16 Jul 2026 13:00:00 +0000
+Message-ID: <promotion-sanitized@delivery.unstop.news>
+Subject: New challenges and opportunities on Unstop
+MIME-Version: 1.0
+List-ID: Unstop opportunities <updates.unstop.news>
+List-Unsubscribe: <mailto:unsubscribe@unstop.news>, <https://delivery.unstop.news/preferences>
+List-Unsubscribe-Post: List-Unsubscribe=One-Click
+Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=moengage.example; dkim=pass header.d=unstop.news; dmarc=pass header.from=delivery.unstop.news
+Received-SPF: pass (mx.example.net: domain of moengage.example permits 192.0.2.24)
+DKIM-Signature: v=1; a=rsa-sha256; d=unstop.news; s=campaign; bh=SANITIZED; b=SANITIZED
+Content-Type: multipart/alternative; boundary="unstop-boundary"
+
+--unstop-boundary
+Content-Type: text/plain; charset="utf-8"
+
+New challenges, internships, and hiring opportunities are available this week.
+Browse at https://delivery.unstop.news/opportunities or update preferences at
+https://delivery.unstop.news/preferences.
+
+--unstop-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html><head><style>.hero{background:url(http://cdn.moengage.example/campaign.css)}</style></head><body>
+<h1>Explore this week's opportunities</h1>
+<p>New challenges, internships, and hiring opportunities are available.</p>
+<a href="https://delivery.unstop.news/opportunities">Browse opportunities</a>
+<a href="https://delivery.unstop.news/preferences">Update preferences</a>
+<img src="http://cdn.moengage.example/accounts/opportunities.jpg" alt="Opportunities">
+<img src="http://track.moengage.example/open.gif?id=SANITIZED" width="1" height="1" alt="">
+</body></html>
+--unstop-boundary--

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from email.utils import parseaddr
 from typing import Dict, Optional
 
-from app.schemas.analysis import ThreatSeverity, ThreatSignal
+from app.schemas.analysis import AuthenticationEvidence, AuthenticationState, ThreatSeverity, ThreatSignal
+from app.services.domain_utils import domains_align
 
 
 BRAND_DOMAINS = {
@@ -40,6 +42,58 @@ def _auth_result(auth: str, mechanism: str) -> str | None:
     return match.group(1).lower() if match else None
 
 
+def _auth_domain(auth: str, mechanism: str) -> str | None:
+    segment_match = re.search(rf'\b{mechanism}\s*[=:][^;]*', auth, re.IGNORECASE)
+    if not segment_match:
+        return None
+    segment = segment_match.group(0)
+    field = {'spf': 'smtp.mailfrom', 'dkim': 'header.d', 'dmarc': 'header.from'}[mechanism]
+    match = re.search(rf'\b{re.escape(field)}\s*=\s*([^\s;]+)', segment, re.IGNORECASE)
+    if not match:
+        return None
+    value = match.group(1).strip('<>')
+    return value.rsplit('@', 1)[-1].lower().rstrip('.')
+
+
+@dataclass(frozen=True)
+class AuthenticationAssessment:
+    evidence: tuple[AuthenticationEvidence, ...]
+    trusted_sender: bool
+
+
+def evaluate_authentication(parsed_headers: Dict[str, str], sender_address: Optional[str]) -> AuthenticationAssessment:
+    headers = {key.lower().replace('_', '-'): value for key, value in parsed_headers.items()}
+    auth = headers.get('authentication-results', '')
+    sender_domain = _domain(sender_address)
+    evidence: list[AuthenticationEvidence] = []
+    for mechanism in ('spf', 'dkim', 'dmarc'):
+        result = _auth_result(auth, mechanism)
+        if result == 'pass':
+            state = AuthenticationState.passed
+        elif result in {'fail', 'hardfail'}:
+            state = AuthenticationState.failed
+        elif result in {'softfail', 'neutral', 'temperror', 'permerror', 'none', 'policy'}:
+            state = AuthenticationState.inconclusive
+        else:
+            state = AuthenticationState.missing
+        domain = _auth_domain(auth, mechanism)
+        evidence.append(AuthenticationEvidence(
+            mechanism=mechanism,
+            state=state,
+            domain=domain,
+            aligned_with_from=domains_align(sender_domain, domain) if sender_domain and domain else None,
+        ))
+    aligned_identity_pass = any(
+        item.mechanism in {'dkim', 'dmarc'} and item.state == AuthenticationState.passed
+        and item.aligned_with_from is True for item in evidence
+    )
+    explicit_identity_failure = any(
+        item.mechanism in {'dkim', 'dmarc'} and item.state == AuthenticationState.failed
+        for item in evidence
+    )
+    return AuthenticationAssessment(tuple(evidence), aligned_identity_pass and not explicit_identity_failure)
+
+
 def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optional[str],
                     parsed_sender_name: Optional[str], return_path: Optional[str],
                     message_id: Optional[str]) -> list[ThreatSignal]:
@@ -52,6 +106,7 @@ def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optio
                         'The message has no parsable From address.', 28, 'From header absent', verify_sender)]
 
     sender_domain = _domain(parsed_sender_address)
+    authentication = evaluate_authentication(headers, parsed_sender_address)
     if not sender_domain:
         signals['header_malformed_sender'] = _signal(
             'header_malformed_sender', ThreatSeverity.high, 'Malformed sender address',
@@ -59,7 +114,7 @@ def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optio
 
     reply_to = headers.get('reply-to')
     reply_domain = _domain(reply_to)
-    if reply_domain and sender_domain and reply_domain != sender_domain:
+    if reply_domain and sender_domain and not domains_align(reply_domain, sender_domain):
         signals['header_replyto_mismatch'] = _signal(
             'header_replyto_mismatch', ThreatSeverity.medium, 'Reply-To domain mismatch',
             'Replies are redirected to a domain different from the visible sender.', 20,
@@ -122,7 +177,9 @@ def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optio
         signals['header_invalid_returnpath'] = _signal(
             'header_invalid_returnpath', ThreatSeverity.medium, 'Malformed Return-Path',
             'The envelope return address cannot be parsed as a mailbox.', 12, actual_return_path[:200], verify_sender)
-    elif return_domain and sender_domain and return_domain != sender_domain:
+    elif return_domain and sender_domain and not domains_align(return_domain, sender_domain) and not (
+        authentication.trusted_sender and (not reply_domain or domains_align(reply_domain, sender_domain))
+    ):
         signals['header_returnpath_mismatch'] = _signal(
             'header_returnpath_mismatch', ThreatSeverity.medium, 'Return-Path domain mismatch',
             'Delivery failures are routed to a domain different from the visible From address.', 16,

@@ -1,72 +1,74 @@
-"""Decision engine for fusing rule-based and ML analysis results."""
+"""Decision engine for fusing rule and ML evidence without double-counting."""
 
 from __future__ import annotations
 
 from app.schemas.analysis import AnalysisResult, DecisionResult, ThreatClassification
 
 
-def fuse_analysis_results(rule_result: AnalysisResult, ml_prediction: str, ml_probability: float) -> DecisionResult:
+def fuse_analysis_results(
+    rule_result: AnalysisResult,
+    ml_prediction: str,
+    ml_probability: float,
+    *,
+    authenticated_sender: bool = False,
+    strong_malicious_evidence: bool = False,
+) -> DecisionResult:
+    """Fuse independently useful evidence, treating modest ML scores as uncertain.
+
+    Positive authentication can resolve a weak model-only alert, but never suppresses
+    high-severity malicious content, deceptive destinations, or overwhelming ML evidence
+    that is corroborated by rule evidence.
     """
-    Fuses rule-based analysis and ML inference into a final decision.
-    
-    Fusion Algorithm:
-    1. Convert ML probability to a 0-100 scale.
-    2. Compute a weighted average of the risk scores.
-    3. Determine classification based on agreement and score thresholds.
-    
-    Decision Logic:
-    - If both agree on 'phishing' (Rule >= 70 and ML >= 0.7) -> phishing
-    - If both agree on 'safe' (Rule < 30 and ML < 0.3) -> safe
-    - If they disagree:
-        - If either is overwhelmingly certain (Rule > 90 or ML > 0.95) -> follow the certain one
-        - Otherwise -> suspicious (conservative approach)
-    """
-    rule_score: int = rule_result.risk_score
-    ml_score: float = ml_probability * 100
-    
-    # Calculate final risk score as average
-    final_score: int = int((rule_score + ml_score) / 2)
-    
-    # Determine classification
+    rule_score = rule_result.risk_score
+    ml_score = ml_probability * 100
     rule_class = rule_result.classification
-    ml_class = "phishing" if ml_prediction == "phishing" else "safe"
-    
-    if rule_class == ThreatClassification.phishing and ml_class == "phishing":
-        final_classification = ThreatClassification.phishing
-    elif rule_class == ThreatClassification.safe and ml_class == "safe":
-        final_classification = ThreatClassification.safe
+    ml_class = 'phishing' if ml_prediction == 'phishing' else 'safe'
+    has_medium_or_high_rule = any(
+        signal.score > 0 and signal.severity.value in {'medium', 'high'}
+        for signal in rule_result.signals
+    )
+
+    if rule_class == ThreatClassification.phishing and ml_class == 'phishing':
+        classification = ThreatClassification.phishing
+        reason = 'Independent rule and ML evidence agree on phishing.'
+    elif rule_class == ThreatClassification.safe and ml_class == 'safe':
+        classification = ThreatClassification.safe
+        reason = 'Rule and ML evidence agree on a safe result.'
+    elif (
+        rule_class == ThreatClassification.safe
+        and authenticated_sender
+        and not strong_malicious_evidence
+        and ml_probability < 0.70
+    ):
+        classification = ThreatClassification.safe
+        reason = 'A modest model-only alert was not corroborated, while aligned authentication supported the sender identity.'
+    elif ml_probability > 0.95 and has_medium_or_high_rule:
+        classification = ThreatClassification.phishing
+        reason = 'Overwhelming ML probability is corroborated by actionable rule evidence.'
+    elif rule_score > 90 and strong_malicious_evidence:
+        classification = ThreatClassification.phishing
+        reason = 'Multiple strong malicious rule findings outweigh the ML disagreement.'
     else:
-        # Disagreement case: be conservative
-        if rule_score > 90 or ml_probability > 0.95:
-            final_classification = ThreatClassification.phishing if (rule_score > 90 or ml_probability > 0.95) else ThreatClassification.suspicious
-            # If rule was the strong one
-            if rule_score > 90: final_classification = ThreatClassification.phishing
-            # If ML was the strong one
-            if ml_probability > 0.95: final_classification = ThreatClassification.phishing
-        elif rule_score < 10 and ml_probability < 0.1:
-            final_classification = ThreatClassification.safe
-        else:
-            final_classification = ThreatClassification.suspicious
+        classification = ThreatClassification.suspicious
+        reason = 'Rule and ML evidence disagree or lack enough independent corroboration for a definitive verdict.'
 
-    # Final score adjustment for classification consistency
-    # Ensure phishing classification has a high score and safe has a low score
-    if final_classification == ThreatClassification.phishing and final_score < 70:
-        # We don't force the score, but the classification takes priority
-        pass
+    final_score = int((rule_score + ml_score) / 2)
+    if classification == ThreatClassification.phishing:
+        final_score = max(70, final_score)
+    elif classification == ThreatClassification.safe:
+        final_score = min(29, final_score)
 
-    # Confidence is based on agreement
-    # If they agree, confidence is higher. If they disagree, confidence is lower.
-    agreement = 1.0 if (rule_class == ThreatClassification.phishing and ml_class == "phishing") or \
-                      (rule_class == ThreatClassification.safe and ml_class == "safe") else 0.5
-    
-    # Combine agreement with the average of individual confidences
-    # Rule confidence is in rule_result.confidence, ML confidence is ml_probability (for phishing) 
-    # or (1-ml_probability) for legitimate.
-    ml_conf: float = ml_probability if ml_prediction == "phishing" else (1.0 - ml_probability)
-    final_confidence: float = (rule_result.confidence + ml_conf + agreement) / 3.0
+    agreement = 1.0 if (
+        rule_class == ThreatClassification.phishing and ml_class == 'phishing'
+    ) or (rule_class == ThreatClassification.safe and ml_class == 'safe') else 0.5
+    ml_confidence = ml_probability if ml_prediction == 'phishing' else 1.0 - ml_probability
+    final_confidence = (rule_result.confidence + ml_confidence + agreement) / 3.0
+    if authenticated_sender and classification == ThreatClassification.safe and ml_class == 'phishing':
+        final_confidence = min(0.82, final_confidence + 0.08)
 
     return DecisionResult(
-        classification=final_classification,
+        classification=classification,
         risk_score=final_score,
-        confidence=round(final_confidence, 2)
+        confidence=round(final_confidence, 2),
+        fusion_reason=reason,
     )

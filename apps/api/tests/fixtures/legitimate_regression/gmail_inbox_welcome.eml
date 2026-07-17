@@ -1,0 +1,29 @@
+From: Gmail Team <mail-noreply@google.com>
+Reply-To: Gmail Team <mail-noreply@google.com>
+To: Example User <recipient@example.net>
+Return-Path: <mail-noreply@google.com>
+Date: Thu, 16 Jul 2026 11:00:00 +0000
+Message-ID: <gmail-welcome-sanitized@google.com>
+Subject: Welcome to your new Gmail inbox
+MIME-Version: 1.0
+Authentication-Results: mx.example.net; spf=pass smtp.mailfrom=google.com; dkim=pass header.d=google.com; dmarc=pass header.from=google.com
+Received-SPF: pass (mx.example.net: domain of google.com permits 192.0.2.22)
+DKIM-Signature: v=1; a=rsa-sha256; d=google.com; s=welcome; bh=SANITIZED; b=SANITIZED
+Content-Type: multipart/alternative; boundary="gmail-boundary"
+
+--gmail-boundary
+Content-Type: text/plain; charset="utf-8"
+
+Welcome to Gmail. Your inbox is ready. Learn how account security and password
+recovery settings work at https://support.google.com/mail/answer/intro.
+
+--gmail-boundary
+Content-Type: text/html; charset="utf-8"
+
+<!doctype html><html><head><link rel="stylesheet" href="http://fonts.example/gmail.css"></head><body>
+<h1>Welcome to Gmail</h1>
+<p>Your inbox is ready. Learn how account security and password recovery settings work.</p>
+<a href="https://support.google.com/mail/answer/intro">Explore Gmail help</a>
+<img src="http://images.example/accounts/welcome.png" alt="Gmail inbox illustration">
+</body></html>
+--gmail-boundary--

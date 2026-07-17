@@ -19,6 +19,17 @@ class AnalysisInputMode(str, Enum):
     eml_upload = 'eml_upload'
 
 
+class UrlSourceType(str, Enum):
+    anchor_href = 'anchor_href'
+    plain_text = 'plain_text'
+    form_action = 'form_action'
+    image_src = 'image_src'
+    css_resource = 'css_resource'
+    tracking_pixel = 'tracking_pixel'
+    document_metadata = 'document_metadata'
+    namespace_or_dtd = 'namespace_or_dtd'
+
+
 class EmailAddress(BaseModel):
     """Email address with optional display name."""
 
@@ -57,6 +68,14 @@ class EmailHtmlLink(BaseModel):
     domain_mismatch: bool = False
 
 
+class EmailUrlEvidence(BaseModel):
+    """A locally extracted URL with the HTML/text context where it appeared."""
+
+    url: str
+    source_type: UrlSourceType
+    user_actionable: bool = False
+
+
 class ParsedEmail(BaseModel):
     """Normalized parsed email structure."""
 
@@ -69,8 +88,10 @@ class ParsedEmail(BaseModel):
     message_id: str | None = Field(default=None, description='Message-ID header value')
     body_text: str = Field(default='', description='Plain text body')
     body_html: str | None = Field(default=None, description='HTML body content')
+    body_visible_text: str = Field(default='', description='Decoded visible text extracted from HTML')
     headers: dict[str, str] = Field(default_factory=dict, description='All email headers')
     extracted_urls: list[str] = Field(default_factory=list, description='URLs found in email')
+    url_evidence: list[EmailUrlEvidence] = Field(default_factory=list, description='URLs with source semantics')
     html_links: list[EmailHtmlLink] = Field(default_factory=list, description='Locally parsed HTML anchors')
     attachments: list[EmailAttachmentMetadata] = Field(
         default_factory=list, description='Attachment metadata'

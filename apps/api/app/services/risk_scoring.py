@@ -12,6 +12,11 @@ DIMINISHING_FACTORS = (1.0, 0.75, 0.55, 0.40, 0.30)
 CATEGORY_CAPS = {'url': 65, 'content': 65, 'header': 60, 'attachment': 55, 'metadata': 10}
 
 
+def calculate_raw_risk_score(signals: Iterable[ThreatSignal]) -> int:
+    unique = {signal.code: signal for signal in signals}
+    return int(min(100, sum(signal.score for signal in unique.values())))
+
+
 def calculate_risk_score(signals: Iterable[ThreatSignal]) -> int:
     unique = {s.code: s for s in signals}
     # Preserve simple additive behavior for third-party/legacy categories. Built-in analyzers

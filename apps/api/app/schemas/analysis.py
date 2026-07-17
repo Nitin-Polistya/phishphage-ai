@@ -90,10 +90,25 @@ class EngineAgreement(str, Enum):
     ml_unavailable = 'ml_unavailable'
 
 
+class AuthenticationState(str, Enum):
+    passed = 'pass'
+    failed = 'fail'
+    inconclusive = 'inconclusive'
+    missing = 'missing'
+
+
+class AuthenticationEvidence(BaseModel):
+    mechanism: str
+    state: AuthenticationState
+    domain: str | None = None
+    aligned_with_from: bool | None = None
+
+
 class DecisionResult(BaseModel):
     classification: ThreatClassification = Field(...)
     risk_score: Annotated[int, Field(ge=0, le=100)] = Field(...)
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(...)
+    fusion_reason: str | None = None
 
 
 class UnifiedAnalysisResponse(BaseModel):
@@ -104,3 +119,12 @@ class UnifiedAnalysisResponse(BaseModel):
     recommendations: list[str] = Field(default_factory=list)
     analysis_completeness: AnalysisCompleteness
     engine_agreement: EngineAgreement
+    rule_raw_score: Annotated[int | None, Field(ge=0, le=100)] = None
+    rule_adjusted_score: Annotated[int | None, Field(ge=0, le=100)] = None
+    ml_prediction: str | None = None
+    ml_phishing_probability: Annotated[float | None, Field(ge=0.0, le=1.0)] = None
+    ml_threshold: Annotated[float | None, Field(ge=0.0, le=1.0)] = None
+    final_decision_confidence: Annotated[float | None, Field(ge=0.0, le=1.0)] = None
+    rule_ml_agreement: EngineAgreement | None = None
+    fusion_reason: str | None = None
+    positive_authentication_evidence: list[AuthenticationEvidence] = Field(default_factory=list)

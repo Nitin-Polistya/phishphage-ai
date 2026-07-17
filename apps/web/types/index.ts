@@ -1,4 +1,4 @@
-import type { AnalysisInputMode, EmailAttachmentMetadata, ThreatClassification, ThreatSeverity } from './analysis';
+import type { AnalysisCompletenessState, AnalysisInputMode, EmailAttachmentMetadata, ThreatClassification, ThreatSeverity } from './analysis';
 
 export interface ScanIndicator {
   code: string;
@@ -18,6 +18,11 @@ export interface ScanDetails {
   messageId: string | null;
   recommendations: string[];
   urls: string[];
+  urlEvidence?: Array<{
+    url: string;
+    sourceType: string;
+    userActionable: boolean;
+  }>;
   attachments: EmailAttachmentMetadata[];
   inputMode?: AnalysisInputMode;
   ruleEngine?: {
@@ -28,6 +33,23 @@ export interface ScanDetails {
     status: 'available' | 'unavailable';
     version: string | null;
   };
+  ruleRawScore?: number | null;
+  ruleAdjustedScore?: number | null;
+  mlPrediction?: string | null;
+  mlPhishingProbability?: number | null;
+  mlThreshold?: number | null;
+  finalDecisionConfidence?: number | null;
+  ruleMlAgreement?: string | null;
+  fusionReason?: string | null;
+  analysisCompleteness?: AnalysisCompletenessState;
+  positiveAuthenticationEvidence?: Array<{
+    mechanism: string;
+    state: string;
+    domain: string | null;
+    alignedWithFrom: boolean | null;
+  }>;
+  analysisFreshness?: 'current' | 'stale';
+  staleReason?: string | null;
 }
 
 export interface ScanRecord {

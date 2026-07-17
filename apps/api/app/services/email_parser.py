@@ -14,8 +14,11 @@ from app.schemas.email import (
     EmailAddress,
     EmailAttachmentMetadata,
     EmailHtmlLink,
+    EmailUrlEvidence,
     ParsedEmail,
+    UrlSourceType,
 )
+from app.services.domain_utils import domains_align
 
 logger = logging.getLogger(__name__)
 
@@ -47,31 +50,75 @@ def _domain_from_indicator(value: str) -> str | None:
         return None
 
 
-def _base_domain(hostname: str | None) -> str | None:
-    if not hostname:
-        return None
-    parts = hostname.lower().rstrip('.').split('.')
-    return '.'.join(parts[-2:]) if len(parts) >= 2 else hostname.lower()
-
-
 class _AnchorParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.links: list[EmailHtmlLink] = []
+        self.url_evidence: list[EmailUrlEvidence] = []
+        self.visible_text_parts: list[str] = []
         self._href: str | None = None
         self._text: list[str] = []
+        self._hidden_tags: list[str] = []
+
+    def _add_url(self, value: str | None, source_type: UrlSourceType, user_actionable: bool = False) -> None:
+        if not value:
+            return
+        for url in extract_urls(value):
+            evidence = EmailUrlEvidence(url=url, source_type=source_type, user_actionable=user_actionable)
+            if evidence not in self.url_evidence:
+                self.url_evidence.append(evidence)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() == 'a':
-            self._href = dict(attrs).get('href')
+        tag = tag.lower()
+        attributes = {key.lower(): value for key, value in attrs}
+        if tag in {'script', 'style', 'head', 'title', 'noscript', 'template'}:
+            self._hidden_tags.append(tag)
+        for key, value in attributes.items():
+            if key == 'xmlns' or key.startswith('xmlns:'):
+                self._add_url(value, UrlSourceType.namespace_or_dtd)
+        if tag == 'a':
+            self._href = attributes.get('href')
             self._text = []
+            self._add_url(self._href, UrlSourceType.anchor_href, user_actionable=True)
+        elif tag == 'form':
+            self._add_url(attributes.get('action'), UrlSourceType.form_action, user_actionable=True)
+        elif tag == 'img':
+            source = attributes.get('src')
+            width = attributes.get('width', '').strip()
+            height = attributes.get('height', '').strip()
+            style = (attributes.get('style') or '').lower()
+            likely_pixel = (
+                (bool(width or height) and width in {'', '0', '1'} and height in {'', '0', '1'})
+                or 'display:none' in style or 'display: none' in style
+                or bool(source and re.search(r'(?:pixel|track|open\.(?:gif|png))', source, re.IGNORECASE))
+            )
+            self._add_url(source, UrlSourceType.tracking_pixel if likely_pixel else UrlSourceType.image_src)
+        elif tag == 'link':
+            self._add_url(attributes.get('href'), UrlSourceType.css_resource)
+        elif tag == 'meta':
+            self._add_url(attributes.get('content'), UrlSourceType.document_metadata)
+        elif tag in {'script', 'iframe', 'source'}:
+            self._add_url(attributes.get('src'), UrlSourceType.document_metadata)
+        self._add_url(attributes.get('style'), UrlSourceType.css_resource)
 
     def handle_data(self, data: str) -> None:
         if self._href is not None:
             self._text.append(data)
+        if self._hidden_tags:
+            if self._hidden_tags[-1] == 'style':
+                self._add_url(data, UrlSourceType.css_resource)
+            return
+        normalized = re.sub(r'\s+', ' ', data).strip()
+        if normalized:
+            self.visible_text_parts.append(normalized)
+            if self._href is None:
+                self._add_url(normalized, UrlSourceType.plain_text, user_actionable=True)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag.lower() != 'a' or self._href is None:
+        tag = tag.lower()
+        if self._hidden_tags and tag == self._hidden_tags[-1]:
+            self._hidden_tags.pop()
+        if tag != 'a' or self._href is None:
             return
         visible = re.sub(r'\s+', ' ', ''.join(self._text)).strip()
         visible_domain = _domain_from_indicator(visible) if visible else None
@@ -79,9 +126,12 @@ class _AnchorParser(HTMLParser):
         self.links.append(EmailHtmlLink(
             visible_text=visible[:300], href=self._href[:1000], visible_domain=visible_domain,
             href_domain=href_domain,
-            domain_mismatch=bool(visible_domain and href_domain and _base_domain(visible_domain) != _base_domain(href_domain)),
+            domain_mismatch=bool(visible_domain and href_domain and not domains_align(visible_domain, href_domain)),
         ))
         self._href, self._text = None, []
+
+    def handle_decl(self, decl: str) -> None:
+        self._add_url(decl, UrlSourceType.namespace_or_dtd)
 
 
 def extract_html_links(html: str | None) -> list[EmailHtmlLink]:
@@ -93,6 +143,18 @@ def extract_html_links(html: str | None) -> list[EmailHtmlLink]:
     except Exception:
         logger.debug('Failed to parse HTML anchors', exc_info=True)
     return parser.links
+
+
+def extract_html_semantics(html: str | None) -> tuple[list[EmailHtmlLink], list[EmailUrlEvidence], str]:
+    if not html:
+        return [], [], ''
+    parser = _AnchorParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        logger.debug('Failed to parse HTML semantics', exc_info=True)
+    visible_text = re.sub(r'\s+', ' ', ' '.join(parser.visible_text_parts)).strip()
+    return parser.links, parser.url_evidence, visible_text
 
 
 def validate_email_input(raw_email: str) -> None:
@@ -286,7 +348,8 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
 
     all_urls.extend(extract_urls(body_text))
     if body_html:
-        all_urls.extend(extract_urls(body_html))
+        _, html_evidence, _ = extract_html_semantics(body_html)
+        all_urls.extend(evidence.url for evidence in html_evidence)
 
     return body_text, body_html, list(dict.fromkeys(all_urls))
 
@@ -367,7 +430,14 @@ def parse_email(raw_email: str) -> ParsedEmail:
     message_id = get_header_value(message, 'Message-ID')
 
     body_text, body_html, urls = extract_body_and_urls(message)
-    html_links = extract_html_links(body_html)
+    html_links, html_url_evidence, body_visible_text = extract_html_semantics(body_html)
+    plain_url_evidence = [
+        EmailUrlEvidence(url=url, source_type=UrlSourceType.plain_text, user_actionable=True)
+        for url in extract_urls(body_text)
+    ]
+    url_evidence = list(dict.fromkeys(
+        (item.url, item.source_type, item.user_actionable) for item in plain_url_evidence + html_url_evidence
+    ))
     attachments = extract_attachment_metadata(message)
 
     headers = {
@@ -386,8 +456,13 @@ def parse_email(raw_email: str) -> ParsedEmail:
         message_id=message_id,
         body_text=body_text,
         body_html=body_html,
+        body_visible_text=body_visible_text,
         headers=headers,
         extracted_urls=urls,
+        url_evidence=[
+            EmailUrlEvidence(url=url, source_type=source_type, user_actionable=user_actionable)
+            for url, source_type, user_actionable in url_evidence
+        ],
         html_links=html_links,
         attachments=attachments,
     )

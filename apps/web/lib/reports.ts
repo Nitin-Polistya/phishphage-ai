@@ -51,7 +51,7 @@ function printableList(items: string[], emptyMessage: string) {
 export function createScanReport(scan: ScanRecord, generatedAt = new Date().toISOString()): ScanReportData {
   const details = scan.details;
   return {
-    report_schema_version: '1.0',
+    report_schema_version: '1.1',
     product: 'PhishPhage AI',
     report_generated_at: generatedAt,
     scan_id: scan.id,
@@ -63,6 +63,28 @@ export function createScanReport(scan: ScanRecord, generatedAt = new Date().toIS
     final_classification: scan.classification,
     risk_score: scan.riskScore,
     confidence: scan.confidence,
+    final_decision_confidence: details?.finalDecisionConfidence ?? null,
+    rule_raw_score: details?.ruleRawScore ?? null,
+    rule_adjusted_score: details?.ruleAdjustedScore ?? null,
+    ml_prediction: details?.mlPrediction ?? null,
+    ml_phishing_probability: details?.mlPhishingProbability ?? null,
+    ml_threshold: details?.mlThreshold ?? null,
+    rule_ml_agreement: details?.ruleMlAgreement ?? null,
+    fusion_reason: details?.fusionReason ?? null,
+    analysis_completeness: details?.analysisCompleteness ?? 'not_recorded',
+    positive_authentication_evidence: (details?.positiveAuthenticationEvidence ?? []).map((item) => ({
+      mechanism: item.mechanism,
+      state: item.state,
+      domain: item.domain,
+      aligned_with_from: item.alignedWithFrom,
+    })),
+    url_evidence: (details?.urlEvidence ?? []).map((item) => ({
+      url: item.url,
+      source_type: item.sourceType,
+      user_actionable: item.userActionable,
+    })),
+    analysis_freshness: details?.analysisFreshness ?? 'stale',
+    stale_reason: details?.staleReason ?? 'Engine-version metadata was not recorded; re-scan the original email.',
     rule_engine: {
       status: details?.ruleEngine?.status ?? 'unknown',
       version: details?.ruleEngine?.version ?? null,

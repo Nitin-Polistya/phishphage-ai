@@ -3,6 +3,8 @@ import type { AnalysisInputMode, ThreatSeverity, UnifiedAnalysisResponse } from 
 
 const SCAN_STORAGE_KEY = 'phishphage.scan-records.v1';
 const SCAN_STORAGE_EVENT = 'phishphage:scan-records-changed';
+export const CURRENT_RULE_ENGINE_VERSION = 'rules-v3.0.0';
+export const CURRENT_ML_MODEL_VERSION = 'ml-english-template-robust-v3.0.0';
 
 const severityRank: Record<ThreatSeverity, number> = {
   low: 1,
@@ -94,6 +96,18 @@ function createId() {
   return `scan_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
 
+export function assessScanFreshness(scan: ScanRecord): { status: 'current' | 'stale'; reason: string | null } {
+  const rules = scan.details?.ruleEngine;
+  const ml = scan.details?.mlEngine;
+  if (!rules?.version || rules.version !== CURRENT_RULE_ENGINE_VERSION) {
+    return { status: 'stale', reason: `Rule result is not from ${CURRENT_RULE_ENGINE_VERSION}. Re-scan the original email.` };
+  }
+  if (ml?.status !== 'available' || ml.version !== CURRENT_ML_MODEL_VERSION) {
+    return { status: 'stale', reason: `ML result is unavailable or not from ${CURRENT_ML_MODEL_VERSION}. Re-scan with the provisioned model.` };
+  }
+  return { status: 'current', reason: null };
+}
+
 export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: AnalysisInputMode): ScanRecord {
   return {
     id: createId(),
@@ -122,6 +136,11 @@ export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: An
       messageId: result.parser.message_id,
       recommendations: [...result.recommendations],
       urls: [...result.parser.extracted_urls],
+      urlEvidence: (result.parser.url_evidence ?? []).map((item) => ({
+        url: item.url,
+        sourceType: item.source_type,
+        userActionable: item.user_actionable,
+      })),
       attachments: result.parser.attachments.map((attachment) => ({ ...attachment })),
       inputMode,
       ruleEngine: {
@@ -132,6 +151,28 @@ export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: An
         status: result.ml_analysis.status,
         version: result.ml_analysis.model_version,
       },
+      ruleRawScore: result.rule_raw_score ?? result.rule_analysis.risk_score,
+      ruleAdjustedScore: result.rule_adjusted_score ?? result.rule_analysis.risk_score,
+      mlPrediction: result.ml_prediction ?? result.ml_analysis.prediction,
+      mlPhishingProbability: result.ml_phishing_probability ?? result.ml_analysis.phishing_probability,
+      mlThreshold: result.ml_threshold ?? result.ml_analysis.decision_threshold ?? null,
+      finalDecisionConfidence: result.final_decision_confidence ?? result.decision.confidence,
+      ruleMlAgreement: result.rule_ml_agreement ?? result.engine_agreement ?? null,
+      fusionReason: result.fusion_reason ?? null,
+      analysisCompleteness: result.analysis_completeness?.state,
+      positiveAuthenticationEvidence: (result.positive_authentication_evidence ?? []).map((item) => ({
+        mechanism: item.mechanism,
+        state: item.state,
+        domain: item.domain,
+        alignedWithFrom: item.aligned_with_from,
+      })),
+      analysisFreshness: result.rule_analysis.engine_version === CURRENT_RULE_ENGINE_VERSION
+        && result.ml_analysis.status === 'available'
+        && result.ml_analysis.model_version === CURRENT_ML_MODEL_VERSION ? 'current' : 'stale',
+      staleReason: result.rule_analysis.engine_version === CURRENT_RULE_ENGINE_VERSION
+        && result.ml_analysis.status === 'available'
+        && result.ml_analysis.model_version === CURRENT_ML_MODEL_VERSION
+        ? null : 'This scan was produced by an unavailable or superseded analysis engine. Re-scan the original email.',
     },
   };
 }
@@ -145,6 +186,17 @@ export function readScans(): ScanRecord[] {
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter(isScanRecord)
+      .map((scan) => {
+        const freshness = assessScanFreshness(scan);
+        return {
+          ...scan,
+          details: scan.details ? {
+            ...scan.details,
+            analysisFreshness: freshness.status,
+            staleReason: freshness.reason,
+          } : scan.details,
+        };
+      })
       .sort((left, right) => new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime());
   } catch {
     return [];

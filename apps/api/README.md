@@ -42,8 +42,10 @@ The email parser endpoint (`POST /api/v1/parser/preview`) accepts raw email cont
   "message_id": "<abc123@example.com>",
   "body_text": "Body text",
   "body_html": null,
+  "body_visible_text": "",
   "headers": { ... },
   "extracted_urls": [],
+  "url_evidence": [],
   "attachments": []
 }
 ```
@@ -119,10 +121,12 @@ The API now features a unified analysis pipeline that integrates the email parse
 4. **Decision Fusion**: A decision engine fuses both outputs into a final classification.
 
 ### Decision Engine Logic
-The final decision is based on a fusion of Rule-Based and ML results:
-- **Agreement**: If both Rule-Based and ML engines agree (both 'phishing' or both 'safe'), the result is high-confidence.
-- **Disagreement**: If the engines disagree, the system defaults to a **conservative 'suspicious'** classification unless one engine provides an overwhelmingly strong signal (e.g., Rule Score > 90 or ML Prob > 0.95).
-- **Risk Score**: The final score is a weighted average of the rule-based risk score and the ML probability.
+The final decision uses correlation-aware fusion:
+- Rule categories use diminishing returns, so several tracking-infrastructure observations do not add linearly.
+- A modest model-only alert can resolve to Safe only when aligned DKIM/DMARC supports the visible sender and no strong malicious rule evidence exists.
+- Authentication never suppresses credential harvesting, payment fraud, deceptive destinations, or other high-severity evidence.
+- A high ML probability requires medium/high actionable rule corroboration before reaching Phishing; low-severity infrastructure observations alone cannot do so.
+- The final risk score combines the adjusted rule score and ML probability. `fusion_reason` explains the selected branch.
 
 ### Endpoint
 - `POST /api/v1/analysis/preview`
@@ -134,8 +138,11 @@ The final decision is based on a fusion of Rule-Based and ML results:
     - `decision`: Final unified classification, risk score, and confidence.
     - `analysis_completeness`: `body_text_only`, `structured_fields`, `html_content`, or `complete_raw_email`, evidence-availability booleans, and any limited-evidence warning.
     - `engine_agreement`: explicit rule/ML agreement, disagreement, or ML-unavailable state.
+    - additive diagnostics: `rule_raw_score`, `rule_adjusted_score`, `ml_prediction`, `ml_phishing_probability`, `ml_threshold`, `final_decision_confidence`, `rule_ml_agreement`, `fusion_reason`, and `positive_authentication_evidence`.
 
-HTML anchors are parsed locally. Visible link text and actual `href` domains are compared, including common defanged forms, without fetching, resolving, or executing a URL. Full raw source remains preferred because copied body text cannot expose authentication headers or hidden link destinations.
+HTML is parsed locally and never rendered. URL evidence records `anchor_href`, `plain_text`, `form_action`, `image_src`, `css_resource`, `tracking_pixel`, `document_metadata`, or `namespace_or_dtd`. Only user-actionable sources receive transport, sensitive-action, and visible-destination analysis. Domain comparison uses an offline bundled Public Suffix List snapshot, so parent/subdomain relationships and multipart suffixes are handled without network access. Content rules receive decoded visible text only, excluding headers, transfer encodings, markup, CSS, URLs, scripts, and attachment payloads.
+
+Authentication is represented as pass, fail, inconclusive, or missing. Missing evidence is not treated as failure. Aligned positive evidence is reported explicitly, and third-party Return-Path infrastructure is contextual only when DKIM/DMARC aligns, Reply-To is aligned, and no stronger malicious evidence exists. This is evidence correlation, not a provider allowlist.
 
 ### Sample Request
 ```json
@@ -154,9 +161,12 @@ After training, run this from `services/ml`:
 
 ```powershell
 python scripts/verify_api_integration.py
+python scripts/verify_legitimate_regressions.py
 ```
 
 The script uses FastAPI's test client to send eight non-mocked requests through `POST /api/v1/analysis/preview` with `ML_REQUIRED=true`. It verifies that ML is available, both probabilities are within `[0,1]` and sum to one, fusion runs, and rule-only fallback is not used. Results are written to `services/ml/reports/api_verification.json` without raw email bodies.
 
 Current verification includes ordinary project and support mail, credential phishing, invoice and delivery scams, an account-suspension lure, legitimate security/password wording, explicit rule/ML disagreement, and the Facebook hidden-destination regression. See `services/ml/README.md` for provenance, exact configuration, calibration, metrics, and the academic-baseline disclaimer.
+
+`verify_legitimate_regressions.py` additionally sends five sanitized authenticated `.eml` fixtures through the real endpoint and provisioned model. It rejects ML-unavailable, `rules-v1`, `ml-baseline`, or otherwise stale version results and writes metadata-only evidence to `services/ml/reports/legitimate_regression.json`.
 

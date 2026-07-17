@@ -116,21 +116,26 @@ def _matching_phrases(text: str, phrases: tuple[str, ...]) -> list[str]:
 def analyze_content(subject: str | None, body_text: str | None, body_html: str | None,
                     sender_name: str | None) -> list[ThreatSignal]:
     del sender_name  # Reserved for future sender-aware language rules.
+    # ``body_html`` is retained as a compatibility parameter, but callers pass only
+    # decoded visible HTML text. Markup, URLs, CSS, scripts, and encodings are excluded.
     text = _normalize_text((subject or '', body_text or '', body_html or ''))
     signals: list[ThreatSignal] = []
 
     for rule in RULES:
         matches = _matching_phrases(text, rule.phrases)
         if matches:
+            # Several independent phrases supporting the same intent are stronger than a
+            # single keyword hit, while category damping still prevents linear inflation.
+            contextual_score = min(100, rule.score + max(0, len(matches) - 1) * 6)
             signals.append(ThreatSignal(
                 code=rule.code, category='content', severity=rule.severity, title=rule.title,
-                description=rule.description, score=rule.score, evidence=', '.join(matches[:3]),
+                description=rule.description, score=contextual_score, evidence=', '.join(matches[:3]),
                 recommendation=rule.recommendation,
             ))
 
     raw = ' '.join((subject or '', body_text or ''))
     raw_letters = [char for char in raw if char.isalpha()]
-    if len(raw_letters) >= 10:
+    if len(raw_letters) >= 20:
         upper_fraction = sum(char.isupper() for char in raw_letters) / len(raw_letters)
         if upper_fraction > UPPERCASE_RATIO_THRESHOLD:
             signals.append(ThreatSignal(

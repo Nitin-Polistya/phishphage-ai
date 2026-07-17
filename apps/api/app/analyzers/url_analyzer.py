@@ -9,6 +9,8 @@ from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
 from app.schemas.analysis import ThreatSignal, ThreatSeverity
+from app.schemas.email import EmailUrlEvidence
+from app.services.domain_utils import domains_align, registrable_domain
 from app.services.email_parser import normalize_defanged_indicator
 
 SHORTENERS = {
@@ -49,11 +51,6 @@ def _signal(code: str, severity: ThreatSeverity, title: str, description: str, s
                         description=description, score=score, evidence=evidence, recommendation=recommendation)
 
 
-def _base_domain(hostname: str) -> str:
-    parts = hostname.rstrip('.').lower().split('.')
-    return '.'.join(parts[-2:]) if len(parts) >= 2 else hostname.lower()
-
-
 def _skeleton(value: str) -> str:
     substitutions = str.maketrans({'0': 'o', '1': 'l', '3': 'e', '4': 'a', '5': 's', '7': 't'})
     return re.sub(r'[^a-z0-9]', '', value.lower()).translate(substitutions)
@@ -90,11 +87,22 @@ def _hostname_from_url(url: str) -> str | None:
         return None
 
 
-def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_links: Iterable[Any] | None = None) -> list[ThreatSignal]:
+def analyze_urls(
+    urls: Iterable[str],
+    sender_domain: str | None = None,
+    html_links: Iterable[Any] | None = None,
+    url_evidence: Iterable[EmailUrlEvidence] | None = None,
+    authenticated_sender: bool = False,
+    strong_action_context: bool = False,
+) -> list[ThreatSignal]:
     signals: dict[str, ThreatSignal] = {}
     schemes: set[str] = set()
+    evidence_items = list(url_evidence or [])
+    actionable_urls = {
+        item.url for item in evidence_items if item.user_actionable
+    } if evidence_items else set(urls or [])
 
-    for raw in set(urls or []):
+    for raw in actionable_urls:
         normalized = normalize_defanged_indicator(raw)
         try:
             p = urlparse(normalized)
@@ -142,7 +150,7 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_lin
                 'Mixed-script hostname', 'The hostname mixes writing systems and may visually imitate a trusted domain.', 32, hostname))
 
         if hostname:
-            base = _base_domain(hostname)
+            base = registrable_domain(hostname) or hostname.lower()
             label = base.split('.')[0]
             candidate = _skeleton(label)
             for brand in PROTECTED_BRANDS:
@@ -182,7 +190,10 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_lin
 
         # Suspicious keywords
         path_query = (p.path or '') + (p.query or '')
-        if any(k in path_query.lower() for k in SUSPICIOUS_KEYWORDS):
+        domain_mismatch = bool(sender_domain and hostname and not domains_align(sender_domain, hostname))
+        if any(k in path_query.lower() for k in SUSPICIOUS_KEYWORDS) and (
+            strong_action_context or not authenticated_sender
+        ):
             signals.setdefault('url_suspicious_keyword', _signal('url_suspicious_keyword', ThreatSeverity.medium,
                 'Sensitive-action keyword in URL', 'The path asks for a login, verification, billing, or account action.', 14, raw[:200]))
 
@@ -196,18 +207,14 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_lin
             signals.setdefault('url_suspicious_port', _signal('url_suspicious_port', ThreatSeverity.medium,
                 'Non-standard web port', 'The link explicitly uses a port other than standard HTTP or HTTPS.', 12, str(port)))
 
-        # Sender-domain mismatch (conservative): compare last two labels
+        # Sender-domain mismatch is contextual when the sender is strongly authenticated.
         if sender_domain and hostname:
             try:
-                s_parts = sender_domain.lower().split('.')
-                h_parts = hostname.lower().split('.')
-                if len(s_parts) >= 2 and len(h_parts) >= 2:
-                    s_base = '.'.join(s_parts[-2:])
-                    h_base = '.'.join(h_parts[-2:])
-                    if s_base != h_base:
-                        signals.setdefault('url_sender_domain_mismatch', _signal('url_sender_domain_mismatch', ThreatSeverity.low,
-                            'Link domain differs from sender', 'The destination domain is unrelated to the sender domain; this can be legitimate but needs context.', 8,
-                            f'sender={sender_domain}, url={hostname}'))
+                if not domains_align(sender_domain, hostname):
+                    contextual_score = 4 if authenticated_sender and not strong_action_context else 8
+                    signals.setdefault('url_sender_domain_mismatch', _signal('url_sender_domain_mismatch', ThreatSeverity.low,
+                        'Link domain differs from sender', 'The destination domain is unrelated to the sender domain; aligned authentication lowers but does not erase this context.', contextual_score,
+                        f'sender={sender_domain}, url={hostname}'))
             except Exception:
                 pass
 
@@ -221,7 +228,8 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_lin
         href_domain = getattr(link, 'href_domain', None)
         if not getattr(link, 'domain_mismatch', False) or not visible_domain or not href_domain:
             continue
-        visible_base, href_base = _base_domain(visible_domain), _base_domain(href_domain)
+        visible_base = registrable_domain(visible_domain) or visible_domain
+        href_base = registrable_domain(href_domain) or href_domain
         claimed_brand = next((brand for brand, domains in OFFICIAL_DOMAINS.items() if visible_base in domains), None)
         if claimed_brand:
             signals['url_trusted_text_unrelated_destination'] = _signal(

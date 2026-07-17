@@ -7,6 +7,7 @@ from typing import List
 
 from app.analyzers.content_analyzer import analyze_content
 from app.analyzers.header_analyzer import analyze_headers
+from app.analyzers.header_analyzer import evaluate_authentication
 from app.analyzers.url_analyzer import analyze_urls
 from app.schemas.analysis import AnalysisResult, ThreatSignal, ThreatClassification
 from app.schemas.analysis import ThreatSeverity
@@ -14,7 +15,7 @@ from app.schemas.email import AnalysisInputMode
 from app.services.risk_scoring import calculate_risk_score, classify_risk_score, calculate_confidence
 
 
-ENGINE_VERSION = 'rules-v2.0.0'
+ENGINE_VERSION = 'rules-v3.0.0'
 
 
 def _recommendations_from_signals(signals: List[ThreatSignal]) -> List[str]:
@@ -107,7 +108,7 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
     content_signals = analyze_content(
         subject=parsed_email.subject,
         body_text=parsed_email.body_text,
-        body_html=parsed_email.body_html,
+        body_html=getattr(parsed_email, 'body_visible_text', ''),
         sender_name=(parsed_email.sender.name if getattr(parsed_email, 'sender', None) else None)
     )
 
@@ -118,14 +119,23 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
     except Exception:
         sender_domain = None
 
+    headers = getattr(parsed_email, 'headers', {}) or {}
+    sender_addr = parsed_email.sender.address if parsed_email.sender else None
+    authentication = evaluate_authentication(headers, sender_addr)
+    strong_action_context = any(signal.code in {
+        'content_credential_request', 'content_payment_request', 'content_mfa_bypass',
+        'content_account_verification', 'content_fear_tactics', 'content_banking_alert',
+    } for signal in content_signals)
+
     url_signals = analyze_urls(
         url_list,
         sender_domain=sender_domain,
         html_links=getattr(parsed_email, 'html_links', []) or [],
+        url_evidence=getattr(parsed_email, 'url_evidence', []) or [],
+        authenticated_sender=authentication.trusted_sender,
+        strong_action_context=strong_action_context,
     )
 
-    headers = getattr(parsed_email, 'headers', {}) or {}
-    sender_addr = parsed_email.sender.address if parsed_email.sender else None
     sender_name = parsed_email.sender.name if parsed_email.sender else None
     return_path = headers.get('return-path') or headers.get('return_path')
     message_id = parsed_email.message_id

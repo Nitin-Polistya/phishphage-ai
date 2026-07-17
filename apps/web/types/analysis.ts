@@ -26,8 +26,14 @@ export interface ParsedEmail {
   message_id: string | null;
   body_text: string;
   body_html: string | null;
+  body_visible_text?: string;
   headers: Record<string, string>;
   extracted_urls: string[];
+  url_evidence?: Array<{
+    url: string;
+    source_type: 'anchor_href' | 'plain_text' | 'form_action' | 'image_src' | 'css_resource' | 'tracking_pixel' | 'document_metadata' | 'namespace_or_dtd';
+    user_actionable: boolean;
+  }>;
   html_links?: Array<{
     visible_text: string;
     href: string;
@@ -100,6 +106,20 @@ export interface UnifiedAnalysisResponse {
   recommendations: string[];
   analysis_completeness?: AnalysisCompleteness;
   engine_agreement?: 'agreement' | 'disagreement' | 'ml_unavailable';
+  rule_raw_score?: number | null;
+  rule_adjusted_score?: number | null;
+  ml_prediction?: 'phishing' | 'legitimate' | null;
+  ml_phishing_probability?: number | null;
+  ml_threshold?: number | null;
+  final_decision_confidence?: number | null;
+  rule_ml_agreement?: 'agreement' | 'disagreement' | 'ml_unavailable' | null;
+  fusion_reason?: string | null;
+  positive_authentication_evidence?: Array<{
+    mechanism: string;
+    state: 'pass' | 'fail' | 'inconclusive' | 'missing';
+    domain: string | null;
+    aligned_with_from: boolean | null;
+  }>;
 }
 
 export interface AnalysisRequest {
