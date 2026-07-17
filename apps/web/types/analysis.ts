@@ -28,6 +28,13 @@ export interface ParsedEmail {
   body_html: string | null;
   headers: Record<string, string>;
   extracted_urls: string[];
+  html_links?: Array<{
+    visible_text: string;
+    href: string;
+    visible_domain: string | null;
+    href_domain: string | null;
+    domain_mismatch: boolean;
+  }>;
   attachments: EmailAttachmentMetadata[];
 }
 
@@ -57,6 +64,26 @@ export interface MLAnalysis {
   legitimate_probability: number | null;
   model_version: string | null;
   reason: string | null;
+  decision_threshold?: number | null;
+}
+
+export type AnalysisCompletenessState = 'body_text_only' | 'structured_fields' | 'html_content' | 'complete_raw_email';
+
+export interface AnalysisCompleteness {
+  state: AnalysisCompletenessState;
+  limited_evidence: boolean;
+  warning: string | null;
+  has_from_header: boolean;
+  has_reply_to: boolean;
+  has_return_path: boolean;
+  has_authentication_results: boolean;
+  has_spf_result: boolean;
+  has_dkim_result: boolean;
+  has_dmarc_result: boolean;
+  has_html_source: boolean;
+  has_real_href_destinations: boolean;
+  has_attachment_metadata: boolean;
+  has_complete_raw_headers: boolean;
 }
 
 export interface FinalDecision {
@@ -71,6 +98,8 @@ export interface UnifiedAnalysisResponse {
   ml_analysis: MLAnalysis;
   decision: FinalDecision;
   recommendations: string[];
+  analysis_completeness?: AnalysisCompleteness;
+  engine_agreement?: 'agreement' | 'disagreement' | 'ml_unavailable';
 }
 
 export interface AnalysisRequest {

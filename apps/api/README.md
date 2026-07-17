@@ -65,9 +65,9 @@ Environment variables are loaded with `pydantic-settings` from `apps/api/.env`.
 - `ML_REQUIRED=false` is the local MVP default. If the model cannot be loaded or inference fails, analysis returns HTTP 200 with the deterministic rule result and `ml_analysis.status` set to `unavailable`.
 - `ML_REQUIRED=true` makes ML mandatory. Model load or inference failure returns HTTP 503 with a safe client message.
 
-The optional fallback does not manufacture a prediction: prediction, probabilities, and model version are `null`. Its final classification, risk score, confidence, and recommendations come directly from the rule engine.
+The optional fallback does not manufacture a prediction: prediction, probabilities, threshold, and model version are `null`. Classification, risk score, and recommendations come from rules; incomplete Safe evidence is explicitly qualified and its displayed confidence is capped at 0.65.
 
-The currently provisioned academic baseline is trained at `services/ml/models/phishshield_model.joblib` and stores a validated phishing threshold of `0.35`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present.
+The English-first academic baseline is provisioned at `services/ml/models/phishshield_model.joblib` and stores a validation-selected phishing threshold of `0.50`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present. See `services/ml/README.md` for sources, grouped splits, calibration, external evaluation, and limitations.
 
 ### Firebase Setup (Optional)
 
@@ -115,7 +115,7 @@ The API now features a unified analysis pipeline that integrates the email parse
 ### Pipeline Workflow
 1. **Parsing**: Raw email is normalized into a structured format.
 2. **Rule Analysis**: A deterministic engine identifies threat signals across content, URLs, and headers.
-3. **ML Inference**: A TF-IDF + Logistic Regression model provides a probabilistic phishing prediction.
+3. **ML Inference**: The selected calibrated word/character TF-IDF + LinearSVC candidate provides a phishing probability and saved decision threshold.
 4. **Decision Fusion**: A decision engine fuses both outputs into a final classification.
 
 ### Decision Engine Logic
@@ -130,8 +130,12 @@ The final decision is based on a fusion of Rule-Based and ML results:
 - **Response**: A `UnifiedAnalysisResponse` containing:
     - `parser`: Normalized email data.
     - `rule_analysis`: Signals, rule risk score, and recommendations.
-    - `ml_analysis`: Availability status, prediction, class probabilities, model version, and an optional safe reason.
+    - `ml_analysis`: Availability status, prediction, class probabilities, decision threshold, model version, and an optional safe reason.
     - `decision`: Final unified classification, risk score, and confidence.
+    - `analysis_completeness`: `body_text_only`, `structured_fields`, `html_content`, or `complete_raw_email`, evidence-availability booleans, and any limited-evidence warning.
+    - `engine_agreement`: explicit rule/ML agreement, disagreement, or ML-unavailable state.
+
+HTML anchors are parsed locally. Visible link text and actual `href` domains are compared, including common defanged forms, without fetching, resolving, or executing a URL. Full raw source remains preferred because copied body text cannot expose authentication headers or hidden link destinations.
 
 ### Sample Request
 ```json
@@ -154,5 +158,5 @@ python scripts/verify_api_integration.py
 
 The script uses FastAPI's test client to send eight non-mocked requests through `POST /api/v1/analysis/preview` with `ML_REQUIRED=true`. It verifies that ML is available, both probabilities are within `[0,1]` and sum to one, fusion runs, and rule-only fallback is not used. Results are written to `services/ml/reports/api_verification.json` without raw email bodies.
 
-Current verification includes ordinary project and support mail, credential phishing, invoice and delivery scams, an account-suspension lure, legitimate security/password wording, and explicit rule/ML disagreement. It exposes expected baseline limitations: some legitimate English support/security examples are false positives at the recall-oriented threshold, and one delivery scam is a false negative. See `services/ml/README.md` for dataset provenance, exact configuration, metrics, and the academic-baseline disclaimer.
+Current verification includes ordinary project and support mail, credential phishing, invoice and delivery scams, an account-suspension lure, legitimate security/password wording, explicit rule/ML disagreement, and the Facebook hidden-destination regression. See `services/ml/README.md` for provenance, exact configuration, calibration, metrics, and the academic-baseline disclaimer.
 

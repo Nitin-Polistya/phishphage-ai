@@ -47,6 +47,16 @@ class EmailAttachmentMetadata(BaseModel):
         return self
 
 
+class EmailHtmlLink(BaseModel):
+    """Locally parsed anchor evidence; no destination is fetched."""
+
+    visible_text: str = ''
+    href: str
+    visible_domain: str | None = None
+    href_domain: str | None = None
+    domain_mismatch: bool = False
+
+
 class ParsedEmail(BaseModel):
     """Normalized parsed email structure."""
 
@@ -61,6 +71,7 @@ class ParsedEmail(BaseModel):
     body_html: str | None = Field(default=None, description='HTML body content')
     headers: dict[str, str] = Field(default_factory=dict, description='All email headers')
     extracted_urls: list[str] = Field(default_factory=list, description='URLs found in email')
+    html_links: list[EmailHtmlLink] = Field(default_factory=list, description='Locally parsed HTML anchors')
     attachments: list[EmailAttachmentMetadata] = Field(
         default_factory=list, description='Attachment metadata'
     )

@@ -1,4 +1,8 @@
-"""Convert the selected Zenodo CSV into the PhishPhage training contract."""
+"""Legacy Step 1 converter retained for compatibility.
+
+Step 2 production of the English-first corpus uses scripts/build_english_corpus.py.
+Spanish corpus mixing is intentionally rejected here to prevent accidental reuse.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from phishshield_ml.preprocessing import combine_email_fields, normalize_email_text
+from phishshield_ml.preprocessing import normalize_email_text
 
 
 SOURCE_LABELS = {"Safe Email": 0, "Phishing Email": 1}
@@ -43,32 +47,7 @@ def prepare_source(source: Path, output: Path, summary_output: Path, spaphish_so
     }]
     frames = [zenodo_prepared]
     if spaphish_source is not None:
-        spaphish = pd.read_csv(spaphish_source)
-        spaphish_required = {"subject", "body", "Label"}
-        spaphish_missing = spaphish_required - set(spaphish.columns)
-        if spaphish_missing:
-            raise ValueError(f"Missing SpaPhish columns: {sorted(spaphish_missing)}")
-        if not set(spaphish["Label"].dropna().unique()).issubset({0, 1}):
-            raise ValueError("SpaPhish Label must contain only 0 and 1")
-        frames.append(pd.DataFrame({
-            "text": [
-                combine_email_fields(subject, body)
-                for subject, body in zip(spaphish["subject"].fillna(""), spaphish["body"].fillna(""), strict=True)
-            ],
-            "label": spaphish["Label"],
-        }))
-        spaphish_counts = spaphish["Label"].value_counts().to_dict()
-        source_summaries.append({
-            "title": "SpaPhish: A Spanish Dataset for Phishing and Psychological Pattern Detection",
-            "doi": "10.17632/hz2d6gz7pc.5",
-            "license": "CC BY 4.0",
-            "language": "Spanish",
-            "input_rows": int(len(spaphish)),
-            "input_class_counts": {
-                "legitimate": int(spaphish_counts.get(0, 0)),
-                "phishing": int(spaphish_counts.get(1, 0)),
-            },
-        })
+        raise ValueError("SpaPhish mixing was retired in Step 2; use build_english_corpus.py")
 
     prepared = pd.concat(frames, ignore_index=True)
     empty_mask = prepared["text"].eq("") | prepared["label"].isna()

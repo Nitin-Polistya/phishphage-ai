@@ -118,7 +118,11 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
     except Exception:
         sender_domain = None
 
-    url_signals = analyze_urls(url_list, sender_domain=sender_domain)
+    url_signals = analyze_urls(
+        url_list,
+        sender_domain=sender_domain,
+        html_links=getattr(parsed_email, 'html_links', []) or [],
+    )
 
     headers = getattr(parsed_email, 'headers', {}) or {}
     sender_addr = parsed_email.sender.address if parsed_email.sender else None

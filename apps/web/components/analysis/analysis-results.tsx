@@ -82,6 +82,9 @@ export function AnalysisResults({ result, isLoading = false }: { result: Unified
   const topSignals = materialSignals.slice(0, 3);
   const remainingSignals = result.rule_analysis.signals.filter((signal) => !topSignals.includes(signal));
   const headerSignals = result.rule_analysis.signals.filter((signal) => signal.category === 'header');
+  const completeness = result.analysis_completeness;
+  const qualifiedSafe = result.decision.classification === 'safe' && completeness?.limited_evidence;
+  const completenessLabel = completeness?.state.replaceAll('_', ' ') ?? 'not reported';
   const timeline = [
     { label: 'Input received', detail: 'Analysis request accepted' },
     { label: 'Parsed', detail: `${result.parser.extracted_urls.length} URLs · ${result.parser.attachments.length} attachments` },
@@ -97,9 +100,10 @@ export function AnalysisResults({ result, isLoading = false }: { result: Unified
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-6 sm:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-4"><span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-950/60', style.text)}><VerdictIcon aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Final verdict</p><h2 className={cn('mt-1 text-3xl font-semibold capitalize tracking-tight sm:text-4xl', style.text)}>{result.decision.classification}</h2></div></div>
+                <div className="flex items-center gap-4"><span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-950/60', style.text)}><VerdictIcon aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Final verdict</p><h2 className={cn('mt-1 text-3xl font-semibold capitalize tracking-tight sm:text-4xl', style.text)}>{qualifiedSafe ? 'Safe based on limited evidence' : result.decision.classification}</h2></div></div>
                 <Badge variant="outline" className={cn('w-fit', style.badge)}>{result.decision.risk_score >= 70 ? 'Immediate action' : result.decision.risk_score >= 30 ? 'Review advised' : 'Low concern'}</Badge>
               </div>
+              {completeness?.warning && <div className="mt-5 flex gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4 text-sm leading-6 text-amber-100"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" /><p>{completeness.warning}</p></div>}
               <div className="mt-7 rounded-lg border border-slate-800 bg-slate-950/45 p-4"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">Recommended action</p><p className="mt-2 text-base font-medium leading-7 text-slate-200">{result.recommendations[0] ?? 'Review with your security team.'}</p></div>
               <div className="mt-6"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">Top reasons</p>{topSignals.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-3">{topSignals.map((signal) => <li key={signal.code} className="flex gap-2 text-sm leading-5 text-slate-300"><CircleDot className={cn('mt-0.5 h-4 w-4 shrink-0', signal.severity === 'high' ? 'text-rose-400' : signal.severity === 'medium' ? 'text-amber-400' : 'text-sky-400')} aria-hidden="true" /><span>{signal.title}</span></li>)}</ul> : <p className="mt-2 text-sm text-slate-400">No material threat signals detected.</p>}</div>
             </div>
@@ -108,6 +112,16 @@ export function AnalysisResults({ result, isLoading = false }: { result: Unified
               <div className="mt-5"><RiskMeter score={result.decision.risk_score} classification={result.decision.classification} /></div>
             </aside>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-800 bg-slate-900/80">
+        <CardHeader className="border-b border-slate-800 pb-5"><h2 className="text-base font-semibold text-slate-100">Decision evidence</h2><p className="mt-1 text-sm text-slate-400">Separate outputs from fusion, rules, machine learning, and input completeness.</p></CardHeader>
+        <CardContent className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
+          <div className="rounded-lg bg-slate-950/45 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Final decision confidence</p><p className="mt-2 text-2xl font-semibold tabular-nums text-slate-100">{Math.round(result.decision.confidence * 100)}%</p></div>
+          <div className="rounded-lg bg-slate-950/45 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Rule-based risk</p><p className="mt-2 text-2xl font-semibold tabular-nums text-slate-100">{result.rule_analysis.risk_score}<span className="text-sm font-normal text-slate-500">/100</span></p></div>
+          <div className="rounded-lg bg-slate-950/45 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">ML phishing probability</p><p className="mt-2 text-2xl font-semibold tabular-nums text-slate-100">{result.ml_analysis.phishing_probability === null ? 'Unavailable' : `${Math.round(result.ml_analysis.phishing_probability * 100)}%`}</p></div>
+          <div className="rounded-lg bg-slate-950/45 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Analysis completeness</p><p className="mt-2 text-sm font-semibold capitalize text-slate-100">{completenessLabel}</p><Badge variant="outline" className={cn('mt-2', result.engine_agreement === 'disagreement' ? 'border-amber-500/30 text-amber-300' : 'border-slate-700 text-slate-400')}>{result.engine_agreement?.replaceAll('_', ' ') ?? 'agreement not reported'}</Badge></div>
         </CardContent>
       </Card>
 

@@ -1,0 +1,29 @@
+From: "Facebook Security" <notification@account-notice.example.com>
+Reply-To: case-review@support-desk.example.net
+Return-Path: <bounce@message-relay.example.org>
+To: recipient@example.com
+Date: Thu, 17 Jul 2026 09:30:00 +0000
+Message-ID: <facebook-security-review-001@account-notice.example.com>
+Subject: Security notice: confirm your recent Facebook login
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="safe-boundary"
+
+--safe-boundary
+Content-Type: text/plain; charset="utf-8"
+
+We noticed recent activity on your Facebook account. Please review the activity using the security page below. If this was you, no further action is needed.
+
+https://www.facebook.com/security
+
+This automated notice was sent to help you keep your account secure.
+
+--safe-boundary
+Content-Type: text/html; charset="utf-8"
+
+<html><body>
+<p>We noticed recent activity on your Facebook account.</p>
+<p>Please review the activity using the Facebook security page below. If this was you, no further action is needed.</p>
+<p><a href="https://account-review.example.net/login">https://www.facebook.com/security</a></p>
+<p>This automated notice was sent to help you keep your account secure.</p>
+</body></html>
+--safe-boundary--

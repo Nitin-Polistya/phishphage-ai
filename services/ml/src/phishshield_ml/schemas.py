@@ -15,6 +15,9 @@ class DatasetSummary:
     phishing_count: int
     empty_rows_removed: int
     duplicate_rows_removed: int
+    near_duplicate_groups: int = 0
+    english_count: int = 0
+    english_percentage: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -34,6 +37,8 @@ class Metrics:
     confusion_matrix: list[list[int]]
     false_positive_rate: float
     false_negative_rate: float
+    pr_auc: float | None = None
+    brier_score: float | None = None
 
 
 @dataclass(frozen=True)

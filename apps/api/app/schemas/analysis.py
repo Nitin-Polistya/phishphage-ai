@@ -57,6 +57,37 @@ class MLAnalysisResult(BaseModel):
     legitimate_probability: Annotated[float | None, Field(ge=0.0, le=1.0)] = None
     model_version: str | None = None
     reason: str | None = None
+    decision_threshold: Annotated[float | None, Field(ge=0.0, le=1.0)] = None
+
+
+class AnalysisCompletenessState(str, Enum):
+    body_text_only = 'body_text_only'
+    structured_fields = 'structured_fields'
+    html_content = 'html_content'
+    complete_raw_email = 'complete_raw_email'
+
+
+class AnalysisCompleteness(BaseModel):
+    state: AnalysisCompletenessState
+    limited_evidence: bool
+    warning: str | None = None
+    has_from_header: bool = False
+    has_reply_to: bool = False
+    has_return_path: bool = False
+    has_authentication_results: bool = False
+    has_spf_result: bool = False
+    has_dkim_result: bool = False
+    has_dmarc_result: bool = False
+    has_html_source: bool = False
+    has_real_href_destinations: bool = False
+    has_attachment_metadata: bool = False
+    has_complete_raw_headers: bool = False
+
+
+class EngineAgreement(str, Enum):
+    agreement = 'agreement'
+    disagreement = 'disagreement'
+    ml_unavailable = 'ml_unavailable'
 
 
 class DecisionResult(BaseModel):
@@ -71,3 +102,5 @@ class UnifiedAnalysisResponse(BaseModel):
     ml_analysis: MLAnalysisResult = Field(...)
     decision: DecisionResult = Field(...)
     recommendations: list[str] = Field(default_factory=list)
+    analysis_completeness: AnalysisCompleteness
+    engine_agreement: EngineAgreement

@@ -23,7 +23,13 @@ from app.core.settings import get_settings
 from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, parse_email, parse_email_address, validate_rfc822_source
 from app.services.phishing_analyzer import analyze_parsed_email
 from app.services.decision_engine import fuse_analysis_results
-from app.schemas.analysis import UnifiedAnalysisResponse, MLAnalysisResult
+from app.schemas.analysis import (
+    AnalysisCompleteness,
+    AnalysisCompletenessState,
+    EngineAgreement,
+    UnifiedAnalysisResponse,
+    MLAnalysisResult,
+)
 from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, ParsedEmail
 
 logger = logging.getLogger(__name__)
@@ -91,6 +97,8 @@ class AnalysisPipeline:
                     raise ValueError('The .eml file does not contain a valid RFC822 message structure.') from None
                 raise error
             parsed_email = parse_email(request.raw_email or '')
+
+        completeness = self._analysis_completeness(request, parsed_email)
         
         # Step 2: Run rule-based analyzer
         rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
@@ -110,6 +118,7 @@ class AnalysisPipeline:
                 legitimate_probability=float(inference.legitimate_probability),
                 model_version=str(ml_service.model_version),
                 reason=None,
+                decision_threshold=float(ml_service.decision_threshold),
             )
         except Exception:
             logger.warning("ML analysis is unavailable; applying configured availability policy")
@@ -122,18 +131,26 @@ class AnalysisPipeline:
                 legitimate_probability=None,
                 model_version=None,
                 reason=ML_UNAVAILABLE_REASON,
+                decision_threshold=None,
             )
-
+            fallback_decision = {
+                'classification': rule_result.classification,
+                'risk_score': rule_result.risk_score,
+                'confidence': rule_result.confidence,
+            }
+            if completeness.limited_evidence and str(rule_result.classification.value) == 'safe':
+                fallback_decision['confidence'] = min(float(rule_result.confidence), 0.65)
+            response_completeness = self._qualify_safe_warning(
+                completeness, str(rule_result.classification.value) == 'safe'
+            )
             return UnifiedAnalysisResponse(
                 parser=parsed_email,
                 rule_analysis=rule_result,
                 ml_analysis=ml_result,
-                decision={
-                    'classification': rule_result.classification,
-                    'risk_score': rule_result.risk_score,
-                    'confidence': rule_result.confidence,
-                },
+                decision=fallback_decision,
                 recommendations=rule_result.recommendations,
+                analysis_completeness=response_completeness,
+                engine_agreement=EngineAgreement.ml_unavailable,
             )
 
         # Step 4: Final Decision Fusion
@@ -144,6 +161,14 @@ class AnalysisPipeline:
             ml_prediction=ml_result.prediction,
             ml_probability=ml_result.phishing_probability,
         )
+        if completeness.limited_evidence and str(decision.classification.value) == 'safe':
+            decision = decision.model_copy(update={'confidence': min(decision.confidence, 0.65)})
+        rule_suspicious = str(rule_result.classification.value) != 'safe'
+        ml_suspicious = ml_result.prediction == 'phishing'
+        agreement = EngineAgreement.agreement if rule_suspicious == ml_suspicious else EngineAgreement.disagreement
+        response_completeness = self._qualify_safe_warning(
+            completeness, str(decision.classification.value) == 'safe'
+        )
         
         # Step 5: Generate unified response
         return UnifiedAnalysisResponse(
@@ -151,8 +176,60 @@ class AnalysisPipeline:
             rule_analysis=rule_result,
             ml_analysis=ml_result,
             decision=decision,
-            recommendations=rule_result.recommendations
+            recommendations=rule_result.recommendations,
+            analysis_completeness=response_completeness,
+            engine_agreement=agreement,
         )
+
+    @staticmethod
+    def _analysis_completeness(request: AnalysisPreviewRequest, parsed_email: ParsedEmail) -> AnalysisCompleteness:
+        headers = {key.lower(): value for key, value in parsed_email.headers.items()}
+        authentication = headers.get('authentication-results', '')
+        has_auth = bool(authentication or headers.get('received-spf'))
+        has_spf = 'spf=' in authentication.lower() or bool(headers.get('received-spf'))
+        has_dkim = 'dkim=' in authentication.lower()
+        has_dmarc = 'dmarc=' in authentication.lower()
+        is_raw = request.input_mode in {AnalysisInputMode.raw_email, AnalysisInputMode.eml_upload}
+        complete_headers = bool(
+            is_raw and parsed_email.sender and headers.get('date') and headers.get('message-id')
+            and (headers.get('return-path') or authentication or headers.get('received'))
+        )
+        has_structured = bool(parsed_email.sender or parsed_email.reply_to or parsed_email.recipients or parsed_email.attachments)
+        if complete_headers:
+            state = AnalysisCompletenessState.complete_raw_email
+            warning = None
+        elif parsed_email.body_html:
+            state = AnalysisCompletenessState.html_content
+            warning = 'Limited evidence: HTML destinations were available, but complete transport and authentication headers were not.'
+        elif has_structured:
+            state = AnalysisCompletenessState.structured_fields
+            warning = 'Limited evidence: some structured fields were available, but complete raw headers and HTML destinations were not.'
+        else:
+            state = AnalysisCompletenessState.body_text_only
+            warning = 'Limited evidence: only subject/body text was available. Sender authentication, real HTML destinations, and transport headers were not analyzed.'
+        return AnalysisCompleteness(
+            state=state,
+            limited_evidence=state != AnalysisCompletenessState.complete_raw_email,
+            warning=warning,
+            has_from_header=bool(is_raw and parsed_email.sender),
+            has_reply_to=bool(parsed_email.reply_to),
+            has_return_path=bool(headers.get('return-path')),
+            has_authentication_results=has_auth,
+            has_spf_result=has_spf,
+            has_dkim_result=has_dkim,
+            has_dmarc_result=has_dmarc,
+            has_html_source=bool(parsed_email.body_html),
+            has_real_href_destinations=bool(parsed_email.html_links),
+            has_attachment_metadata=is_raw or bool(parsed_email.attachments),
+            has_complete_raw_headers=complete_headers,
+        )
+
+    @staticmethod
+    def _qualify_safe_warning(completeness: AnalysisCompleteness, is_safe: bool) -> AnalysisCompleteness:
+        if not is_safe or not completeness.warning:
+            return completeness
+        detail = completeness.warning.removeprefix('Limited evidence:').strip()
+        return completeness.model_copy(update={'warning': f'Safe based on limited evidence: {detail}'})
 
 # Singleton instance for the API
 pipeline = AnalysisPipeline()

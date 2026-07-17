@@ -6,11 +6,14 @@ import logging
 import re
 from email import message_from_string
 from email.header import decode_header
+from html.parser import HTMLParser
 from typing import Any
+from urllib.parse import urlparse
 
 from app.schemas.email import (
     EmailAddress,
     EmailAttachmentMetadata,
+    EmailHtmlLink,
     ParsedEmail,
 )
 
@@ -20,9 +23,76 @@ MAX_EMAIL_SIZE_BYTES = 2 * 1024 * 1024
 RAW_SOURCE_ERROR = "This looks like copied inbox text, not full email source. Use Quick Paste, or paste the message from 'Show original' / 'View source'."
 STANDARD_SOURCE_HEADERS = {'from', 'to', 'subject', 'date', 'message-id', 'mime-version', 'content-type'}
 URL_PATTERN = re.compile(
-    r'https?://[^\s<>"\'\)]+',
+    r'h(?:tt|xx)ps?://[^\s<>"\'\)]+',
     re.IGNORECASE,
 )
+
+
+def normalize_defanged_indicator(value: str) -> str:
+    """Normalize only for local parsing; callers keep the original safe display form."""
+    normalized = re.sub(r'^hxxps://', 'https://', value, flags=re.IGNORECASE)
+    normalized = re.sub(r'^hxxp://', 'http://', normalized, flags=re.IGNORECASE)
+    return re.sub(r'\[\.\]|\(dot\)', '.', normalized, flags=re.IGNORECASE)
+
+
+def _domain_from_indicator(value: str) -> str | None:
+    try:
+        candidate = normalize_defanged_indicator(value.strip())
+        if not re.match(r'^(?:https?://|(?:[a-z0-9-]+\.)+[a-z]{2,}(?:/|$))', candidate, flags=re.IGNORECASE):
+            return None
+        if not re.match(r'^https?://', candidate, flags=re.IGNORECASE):
+            candidate = f'https://{candidate}'
+        return urlparse(candidate).hostname
+    except Exception:
+        return None
+
+
+def _base_domain(hostname: str | None) -> str | None:
+    if not hostname:
+        return None
+    parts = hostname.lower().rstrip('.').split('.')
+    return '.'.join(parts[-2:]) if len(parts) >= 2 else hostname.lower()
+
+
+class _AnchorParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.links: list[EmailHtmlLink] = []
+        self._href: str | None = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == 'a':
+            self._href = dict(attrs).get('href')
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._href is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() != 'a' or self._href is None:
+            return
+        visible = re.sub(r'\s+', ' ', ''.join(self._text)).strip()
+        visible_domain = _domain_from_indicator(visible) if visible else None
+        href_domain = _domain_from_indicator(self._href)
+        self.links.append(EmailHtmlLink(
+            visible_text=visible[:300], href=self._href[:1000], visible_domain=visible_domain,
+            href_domain=href_domain,
+            domain_mismatch=bool(visible_domain and href_domain and _base_domain(visible_domain) != _base_domain(href_domain)),
+        ))
+        self._href, self._text = None, []
+
+
+def extract_html_links(html: str | None) -> list[EmailHtmlLink]:
+    if not html:
+        return []
+    parser = _AnchorParser()
+    try:
+        parser.feed(html)
+    except Exception:
+        logger.debug('Failed to parse HTML anchors', exc_info=True)
+    return parser.links
 
 
 def validate_email_input(raw_email: str) -> None:
@@ -126,7 +196,7 @@ def extract_urls(text: str) -> list[str]:
         return []
 
     urls = URL_PATTERN.findall(text)
-    return list(set(urls))
+    return list(dict.fromkeys(urls))
 
 
 def get_header_value(message: Any, header_name: str) -> str | None:
@@ -204,9 +274,13 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
         try:
             payload = message.get_payload(decode=True)
             if isinstance(payload, bytes):
-                body_text = payload.decode('utf-8', errors='ignore')
+                decoded = payload.decode('utf-8', errors='ignore')
             else:
-                body_text = str(payload)
+                decoded = str(payload)
+            if message.get_content_type() == 'text/html':
+                body_html = decoded
+            else:
+                body_text = decoded
         except Exception as e:
             logger.debug(f'Failed to extract body: {e}')
 
@@ -293,6 +367,7 @@ def parse_email(raw_email: str) -> ParsedEmail:
     message_id = get_header_value(message, 'Message-ID')
 
     body_text, body_html, urls = extract_body_and_urls(message)
+    html_links = extract_html_links(body_html)
     attachments = extract_attachment_metadata(message)
 
     headers = {
@@ -313,5 +388,6 @@ def parse_email(raw_email: str) -> ParsedEmail:
         body_html=body_html,
         headers=headers,
         extracted_urls=urls,
+        html_links=html_links,
         attachments=attachments,
     )

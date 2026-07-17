@@ -5,10 +5,11 @@ from __future__ import annotations
 import ipaddress
 import re
 import unicodedata
-from typing import Iterable
+from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
 
 from app.schemas.analysis import ThreatSignal, ThreatSeverity
+from app.services.email_parser import normalize_defanged_indicator
 
 SHORTENERS = {
     'bit.ly', 'tinyurl.com', 't.co', 'goo.gl', 'is.gd', 'ow.ly', 'buff.ly', 'rebrand.ly',
@@ -89,13 +90,14 @@ def _hostname_from_url(url: str) -> str | None:
         return None
 
 
-def analyze_urls(urls: Iterable[str], sender_domain: str | None = None) -> list[ThreatSignal]:
+def analyze_urls(urls: Iterable[str], sender_domain: str | None = None, html_links: Iterable[Any] | None = None) -> list[ThreatSignal]:
     signals: dict[str, ThreatSignal] = {}
     schemes: set[str] = set()
 
     for raw in set(urls or []):
+        normalized = normalize_defanged_indicator(raw)
         try:
-            p = urlparse(raw)
+            p = urlparse(normalized)
         except Exception:
             signals['url_malformed'] = _signal('url_malformed', ThreatSeverity.low, 'Malformed URL',
                 'The URL could not be parsed safely.', 8, raw[:200])
@@ -160,8 +162,8 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None) -> list[
                 signals.setdefault('url_suspicious_tld', _signal('url_suspicious_tld', ThreatSeverity.medium,
                     'Higher-risk top-level domain', 'The link uses a TLD frequently abused in disposable phishing infrastructure.', 14, f'.{tld}'))
 
-        decoded_once = unquote(raw)
-        if ENCODING_TRICK.search(raw) or unquote(decoded_once) != decoded_once or raw.count('%') >= 4:
+        decoded_once = unquote(normalized)
+        if ENCODING_TRICK.search(normalized) or unquote(decoded_once) != decoded_once or normalized.count('%') >= 4:
             signals.setdefault('url_encoding_trick', _signal('url_encoding_trick', ThreatSeverity.medium,
                 'URL encoding obscures the destination', 'Encoded or double-encoded delimiters make the link harder to inspect.', 18, raw[:200]))
 
@@ -174,9 +176,9 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None) -> list[
                     f'host={hostname}, labels={len(parts)}'))
 
         # Suspicious URL length
-        if len(raw) > SUSPICIOUS_URL_LENGTH:
+        if len(normalized) > SUSPICIOUS_URL_LENGTH:
             signals.setdefault('url_long', _signal('url_long', ThreatSeverity.low, 'Unusually long URL',
-                'The link is long enough to conceal important destination details.', 6, f'length={len(raw)}'))
+                'The link is long enough to conceal important destination details.', 6, f'length={len(normalized)}'))
 
         # Suspicious keywords
         path_query = (p.path or '') + (p.query or '')
@@ -213,5 +215,27 @@ def analyze_urls(urls: Iterable[str], sender_domain: str | None = None) -> list[
         signals['url_mixed_transport'] = _signal('url_mixed_transport', ThreatSeverity.medium,
             'Mixed HTTP and HTTPS links', 'The message mixes protected and unprotected web references.', 12,
             'schemes=http,https', 'Avoid HTTP links and navigate to the trusted site directly.')
+
+    for link in html_links or []:
+        visible_domain = getattr(link, 'visible_domain', None)
+        href_domain = getattr(link, 'href_domain', None)
+        if not getattr(link, 'domain_mismatch', False) or not visible_domain or not href_domain:
+            continue
+        visible_base, href_base = _base_domain(visible_domain), _base_domain(href_domain)
+        claimed_brand = next((brand for brand, domains in OFFICIAL_DOMAINS.items() if visible_base in domains), None)
+        if claimed_brand:
+            signals['url_trusted_text_unrelated_destination'] = _signal(
+                'url_trusted_text_unrelated_destination', ThreatSeverity.high,
+                'Trusted link text hides another destination',
+                'The visible link claims an official brand domain but the HTML destination uses an unrelated domain.',
+                38, f'visible={visible_domain}, destination={href_domain}, brand={claimed_brand}',
+            )
+        else:
+            signals.setdefault('url_visible_href_mismatch', _signal(
+                'url_visible_href_mismatch', ThreatSeverity.high,
+                'Visible link and destination differ',
+                'The domain shown to the reader differs from the actual HTML link destination.',
+                28, f'visible={visible_domain}, destination={href_domain}',
+            ))
 
     return list(signals.values())

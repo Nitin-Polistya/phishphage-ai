@@ -86,7 +86,8 @@ def test_pipeline_missing_model_falls_back_to_rules(tmp_path):
     assert result.ml_analysis.model_version is None
     assert result.decision.classification == result.rule_analysis.classification
     assert result.decision.risk_score == result.rule_analysis.risk_score
-    assert result.decision.confidence == result.rule_analysis.confidence
+    assert result.decision.confidence == min(result.rule_analysis.confidence, 0.65)
+    assert result.analysis_completeness.limited_evidence is True
 
 
 def test_pipeline_missing_model_required_raises_safe_error(tmp_path):

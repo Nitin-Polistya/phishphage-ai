@@ -15,6 +15,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset", required=True, help="Path to a labeled CSV dataset")
     parser.add_argument("--model-output", required=True, help="Path to write the model bundle")
     parser.add_argument("--metrics-output", required=True, help="Path to write metrics JSON")
+    parser.add_argument("--external-dataset", help="Frozen external benchmark CSV")
     parser.add_argument("--min-df", type=int, default=MLConfig.min_df)
     parser.add_argument("--max-df", type=float, default=MLConfig.max_df)
     parser.add_argument("--max-features", type=int, default=MLConfig.max_features)
@@ -33,7 +34,13 @@ def main(argv: list[str] | None = None) -> int:
         model_output=Path(args.model_output),
         metrics_output=Path(args.metrics_output),
     )
-    summary = train_model(args.dataset, args.model_output, args.metrics_output, config=config)
+    summary = train_model(
+        args.dataset,
+        args.model_output,
+        args.metrics_output,
+        config=config,
+        external_dataset_path=args.external_dataset,
+    )
     print(json.dumps({
         "model_version": summary.model_version,
         "model_path": summary.model_path,

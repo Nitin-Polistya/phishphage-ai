@@ -85,10 +85,12 @@ def test_preview_without_model_returns_rule_only_response(tmp_path):
         'legitimate_probability': None,
         'model_version': None,
         'reason': 'Machine-learning analysis is unavailable.',
+        'decision_threshold': None,
     }
     assert data['decision']['classification'] == data['rule_analysis']['classification']
     assert data['decision']['risk_score'] == data['rule_analysis']['risk_score']
-    assert data['decision']['confidence'] == data['rule_analysis']['confidence']
+    assert data['decision']['confidence'] == min(data['rule_analysis']['confidence'], 0.65)
+    assert data['analysis_completeness']['limited_evidence'] is True
     assert 0 <= data['decision']['risk_score'] <= 100
     assert 0 <= data['decision']['confidence'] <= 1
 

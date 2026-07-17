@@ -25,7 +25,7 @@ def test_selected_source_is_converted_and_cleaned(tmp_path: Path):
     assert summary_path.exists()
 
 
-def test_spaphish_subject_and_body_are_combined(tmp_path: Path):
+def test_spaphish_mixing_is_rejected(tmp_path: Path):
     english = tmp_path / "english.csv"
     pd.DataFrame([
         {"Email Text": "Project update", "Email Type": "Safe Email"},
@@ -38,8 +38,6 @@ def test_spaphish_subject_and_body_are_combined(tmp_path: Path):
     ]).to_csv(spaphish, index=False)
     output = tmp_path / "processed.csv"
 
-    summary = prepare_source(english, output, tmp_path / "summary.json", spaphish)
-
-    frame = pd.read_csv(output)
-    assert "Aviso Revisa tu cuenta" in frame["text"].tolist()
-    assert summary["output"]["class_counts"] == {"legitimate": 2, "phishing": 2}
+    import pytest
+    with pytest.raises(ValueError, match="retired in Step 2"):
+        prepare_source(english, output, tmp_path / "summary.json", spaphish)

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Iterable
 
 import joblib
+import numpy as np
 
 from .preprocessing import normalize_email_text, validate_training_text
 from .schemas import ExplainabilityTerm, InferenceResult, LoadedModelBundle
@@ -38,12 +39,16 @@ class LocalInferenceService:
     def __init__(self, model_path: str | Path):
         self._bundle = load_model_bundle(model_path)
         self._pipeline = self._bundle.pipeline
-        self._vectorizer = self._pipeline.named_steps["tfidf"]
+        self._vectorizer = self._pipeline.named_steps.get("features") or self._pipeline.named_steps.get("tfidf")
         self._classifier = self._pipeline.named_steps["clf"]
 
     @property
     def model_version(self) -> str:
         return self._bundle.model_version
+
+    @property
+    def decision_threshold(self) -> float:
+        return self._bundle.decision_threshold
 
     def predict(self, text: str, top_k: int = 5) -> InferenceResult:
         normalized = validate_training_text(text)
@@ -64,13 +69,22 @@ class LocalInferenceService:
     def _explain(self, text: str, top_k: int = 5) -> tuple[list[ExplainabilityTerm], list[ExplainabilityTerm]]:
         vector = self._vectorizer.transform([text])
         feature_names = self._vectorizer.get_feature_names_out()
-        coefs = self._classifier.coef_[0]
+        if hasattr(self._classifier, "coef_"):
+            coefs = self._classifier.coef_[0]
+        elif hasattr(self._classifier, "calibrated_classifiers_"):
+            coefs = np.mean(
+                [calibrated.estimator.coef_[0] for calibrated in self._classifier.calibrated_classifiers_],
+                axis=0,
+            )
+        else:
+            return [], []
         indices = vector.nonzero()[1]
         contributions = []
         for index in indices:
             value = vector[0, index]
             contribution = float(value * coefs[index])
-            contributions.append((feature_names[index], contribution))
+            term = str(feature_names[index]).split("__", 1)[-1]
+            contributions.append((term, contribution))
         phishing = [ExplainabilityTerm(term=term, contribution=contrib) for term, contrib in sorted(contributions, key=lambda item: item[1], reverse=True) if contrib > 0][:top_k]
         legitimate = [ExplainabilityTerm(term=term, contribution=contrib) for term, contrib in sorted(contributions, key=lambda item: item[1]) if contrib < 0][:top_k]
         return phishing, legitimate

@@ -8,6 +8,9 @@ from phishshield_ml.dataset import load_and_validate_dataset, prepare_dataset, s
 
 def _write_csv(path: Path, rows: list[dict]) -> Path:
     frame = pd.DataFrame(rows)
+    frame["language"] = "en"
+    frame["language_confidence"] = 1.0
+    frame["template_group"] = [f"fixture-{index}" for index in range(len(frame))]
     frame.to_csv(path, index=False)
     return path
 
@@ -90,3 +93,13 @@ def test_split_text_sets_are_disjoint(tmp_path):
     assert set(train["text"]).isdisjoint(validation["text"])
     assert set(train["text"]).isdisjoint(test["text"])
     assert set(validation["text"]).isdisjoint(test["text"])
+
+
+def test_language_gate_rejects_non_english_corpus(tmp_path):
+    dataset = tmp_path / "spanish.csv"
+    pd.DataFrame([
+        {"text": "Revisa tu cuenta ahora", "label": 0, "language": "es"},
+        {"text": "Confirma tu contrasena ahora", "label": 1, "language": "es"},
+    ]).to_csv(dataset, index=False)
+    with pytest.raises(ValueError, match="English-language gate failed"):
+        load_and_validate_dataset(dataset)

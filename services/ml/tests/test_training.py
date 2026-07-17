@@ -8,9 +8,9 @@ from phishshield_ml.training import train_model
 
 def _balanced_dataset(path: Path) -> Path:
     rows = []
-    for i in range(10):
-        rows.append({"text": f"Legitimate message {i}", "label": "legitimate"})
-        rows.append({"text": f"Urgent verify password {i}", "label": "phishing"})
+    for i in range(15):
+        rows.append({"text": f"The project agenda for team {chr(65+i)} is ready for review and discussion", "label": "legitimate", "language": "en", "template_group": f"legit-{i}"})
+        rows.append({"text": f"Urgent account verification for group {chr(65+i)} requires your password now", "label": "phishing", "language": "en", "template_group": f"phish-{i}"})
     pd.DataFrame(rows).to_csv(path, index=False)
     return path
 
@@ -22,7 +22,7 @@ def test_model_trains_and_saves_bundle(tmp_path):
     summary = train_model(dataset, model_path, metrics_path)
     assert model_path.exists()
     assert metrics_path.exists()
-    assert summary.model_version.startswith("ml-baseline")
+    assert summary.model_version.startswith("ml-english")
     assert 0.0 < summary.selected_threshold < 1.0
     assert (metrics_path.parent / "metadata.json").exists()
     assert (metrics_path.parent / "threshold_analysis.json").exists()

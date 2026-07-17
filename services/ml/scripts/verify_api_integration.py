@@ -23,10 +23,10 @@ from app.services.analysis_pipeline import pipeline
 EXAMPLES = {
     "legitimate_project": "From: lead@example.com\nTo: team@example.com\nSubject: Sprint review\n\nPlease review the project notes before Friday's planning meeting.",
     "customer_support": "From: support@example.com\nTo: customer@example.com\nSubject: Ticket update\n\nWe received your support request. Reply with the ticket number if you need more help.",
-    "credential_phishing": "From: alerts@untrusted.invalid\nTo: user@example.com\nSubject: Urgent credential verification\n\nVerify your password immediately at https://login-check.invalid/account or access will be blocked.",
-    "fake_invoice": "From: billing@untrusted.invalid\nTo: accounts@example.com\nSubject: Overdue invoice\n\nOpen the attached invoice and send payment today to avoid a penalty.",
-    "delivery_scam": "From: parcel@untrusted.invalid\nTo: user@example.com\nSubject: Delivery failed\n\nYour parcel is held. Pay the small redelivery fee at https://parcel-fee.invalid/claim.",
-    "account_suspension": "From: security@untrusted.invalid\nTo: user@example.com\nSubject: Account suspension warning\n\nYour account will be suspended today unless you confirm your login details now.",
+    "credential_phishing": "From: alerts@account-notice.example.net\nTo: user@example.com\nSubject: Urgent credential verification\n\nVerify your password immediately at hxxps://login-check.example[.]org/account or access will be blocked.",
+    "fake_invoice": "From: billing@invoice-desk.example.net\nTo: accounts@example.com\nSubject: Overdue invoice\n\nOpen the attached invoice and send payment today to avoid a penalty.",
+    "delivery_scam": "From: parcel@delivery-desk.example.net\nTo: user@example.com\nSubject: Delivery failed\n\nYour parcel is held. Pay the small redelivery fee at hxxps://parcel-fee.example[.]org/claim.",
+    "account_suspension": "From: security@account-check.example.net\nTo: user@example.com\nSubject: Account suspension warning\n\nYour account will be suspended today unless you confirm your login details now.",
     "legitimate_security": "From: it@example.com\nTo: staff@example.com\nSubject: Security training reminder\n\nOur scheduled security workshop covers account recovery and password-manager use. No password or login response is required.",
     "rule_ml_disagreement": "From: newsletter@example.com\nTo: member@example.com\nSubject: Account security digest\n\nThis month's educational digest explains password safety and common credential phishing tactics.",
 }
@@ -40,6 +40,7 @@ def main() -> int:
     pipeline.ml_required = True
     pipeline._ml_service = None  # type: ignore[protected-access]
     client = TestClient(app)
+    EXAMPLES["facebook_html_impersonation"] = (PROJECT_ROOT / "apps" / "api" / "tests" / "fixtures" / "facebook_security_impersonation.eml").read_text(encoding="utf-8")
     results = []
     for name, raw_email in EXAMPLES.items():
         response = client.post("/api/v1/analysis/preview", json={"raw_email": raw_email})
@@ -56,7 +57,7 @@ def main() -> int:
         if abs((phishing_probability + legitimate_probability) - 1.0) > 1e-6:
             raise RuntimeError(f"{name} probabilities do not sum to one")
         rule_class = data["rule_analysis"]["classification"]
-        ml_class = "phishing" if ml["prediction"] == "phishing" else "safe"
+        engines_agree = (rule_class != "safe") == (ml["prediction"] == "phishing")
         results.append({
             "example": name,
             "http_status": response.status_code,
@@ -67,11 +68,17 @@ def main() -> int:
             "probabilities_sum_to_one": True,
             "rule_classification": rule_class,
             "rule_risk_score": data["rule_analysis"]["risk_score"],
-            "rule_ml_agree": rule_class == ml_class,
+            "rule_ml_agree": engines_agree,
+            "engine_agreement": data["engine_agreement"],
+            "analysis_completeness": data["analysis_completeness"]["state"],
+            "decision_threshold": ml["decision_threshold"],
             "fused_classification": data["decision"]["classification"],
             "fused_risk_score": data["decision"]["risk_score"],
         })
 
+    disagreement_count = sum(row["engine_agreement"] == "disagreement" for row in results)
+    if disagreement_count < 1:
+        raise RuntimeError("Verification suite did not produce a rule/ML disagreement")
     payload = {
         "route": "POST /api/v1/analysis/preview",
         "mocked": False,
@@ -79,6 +86,7 @@ def main() -> int:
         "model_path": "services/ml/models/phishshield_model.joblib",
         "all_ml_available": all(row["ml_status"] == "available" for row in results),
         "rule_only_fallback_used": False,
+        "disagreement_count": disagreement_count,
         "examples": results,
     }
     output = PROJECT_ROOT / "services" / "ml" / "reports" / "api_verification.json"
