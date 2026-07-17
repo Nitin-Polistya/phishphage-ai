@@ -19,6 +19,7 @@ from sklearn.svm import LinearSVC
 
 from .config import MLConfig
 from .dataset import prepare_dataset, split_dataset
+from .acquisition import assert_not_external_path
 from .evaluation import evaluate_predictions, evaluate_thresholds, write_metrics_json
 from .schemas import Metrics, TrainingSummary
 
@@ -114,6 +115,12 @@ def _write_error_analysis(path: Path, frame, probabilities: list[float], thresho
 
 
 def train_model(dataset_path: str | Path, model_output: str | Path, metrics_output: str | Path, config: MLConfig | None = None, external_dataset_path: str | Path | None = None) -> TrainingSummary:
+    assert_not_external_path(dataset_path)
+    if external_dataset_path is not None:
+        raise ValueError(
+            "Training cannot read external-validation data. Train and lock the model first, "
+            "then use evaluate_model.py as a separate evaluation step."
+        )
     cfg = config or MLConfig(model_output=Path(model_output), metrics_output=Path(metrics_output))
     prepared = prepare_dataset(dataset_path)
     train_frame, valid_frame, test_frame, split_summary = split_dataset(prepared.dataframe, random_state=cfg.random_state)
@@ -148,26 +155,18 @@ def train_model(dataset_path: str | Path, model_output: str | Path, metrics_outp
     valid_proba = _probabilities(pipeline, valid_texts)
     validation_metrics = evaluate_predictions(valid_labels, _predictions(valid_proba, selected_threshold), valid_proba)
 
-    # The grouped internal holdout is a development diagnostic. The separately supplied
-    # external benchmark is the final untouched evaluation set.
+    # The grouped internal holdout is a development diagnostic. External validation is
+    # physically isolated and evaluated by the separate evaluation command after locking.
     test_labels, test_texts = test_frame["label"].tolist(), test_frame["text"].tolist()
     test_proba = _probabilities(pipeline, test_texts)
     test_metrics = evaluate_predictions(test_labels, _predictions(test_proba, selected_threshold), test_proba)
     external_payload = None
-    if external_dataset_path:
-        external = prepare_dataset(external_dataset_path).dataframe
-        external_labels, external_texts = external["label"].tolist(), external["text"].tolist()
-        external_proba = _probabilities(pipeline, external_texts)
-        external_payload = {"rows": len(external), "metrics": asdict(evaluate_predictions(external_labels, _predictions(external_proba, selected_threshold), external_proba)), "calibration_buckets": _calibration_buckets(external_labels, external_proba), "used_for_selection": False}
 
     generated_at = datetime.now(timezone.utc).isoformat()
     reports_dir = Path(metrics_output).parent
     reports_dir.mkdir(parents=True, exist_ok=True)
     source_audit_path = reports_dir / "corpus_audit.json"
     source_audit = json.loads(source_audit_path.read_text(encoding="utf-8")) if source_audit_path.exists() else None
-    if external_payload and source_audit and source_audit.get("final_external_benchmark"):
-        source_audit["final_external_benchmark"]["evaluation_status"] = "evaluated once after final model and threshold lock"
-        source_audit_path.write_text(json.dumps(source_audit, indent=2, sort_keys=True), encoding="utf-8")
     feature_config = {"candidate": selected_name, "word_tfidf": {"ngram_range": [1, 2], "max_features": cfg.max_features, "sublinear_tf": True}, "char_tfidf": {"enabled": "word_char" in selected_name, "analyzer": "char_wb", "ngram_range": [3, 5], "max_features": cfg.max_features}, "class_weight": "balanced", "random_state": cfg.random_state, "calibration": "five-fold sigmoid on training" if selected_name.startswith("C_") else "native logistic probability"}
     evaluation_metrics = {"validation_selected_threshold": asdict(validation_metrics), "test_selected_threshold": asdict(test_metrics), "external_benchmark": external_payload}
     bundle = {"pipeline": pipeline, "model_version": cfg.model_version, "label_mapping": {"legitimate": 0, "phishing": 1}, "preprocessing_version": cfg.preprocessing_version, "feature_config": feature_config, "decision_threshold": selected_threshold, "training_timestamp": generated_at, "training_dataset_summary": asdict(prepared.summary), "dataset_provenance": source_audit, "evaluation_metrics": evaluation_metrics}

@@ -2,6 +2,14 @@
 
 This package trains the local text model consumed by the existing API pipeline. It is an academic baseline, not production-grade phishing protection.
 
+## Dataset acquisition review gate
+
+The reproducible acquisition pipeline is documented in [DATASET_ACQUISITION.md](DATASET_ACQUISITION.md). Its reviewed source registry is `dataset_sources.json`. It downloads only exact, HTTPS URLs whose official record states a reusable license and whose label meaning is suitable for the assigned role.
+
+As of the 2026-07-17 audit, only the two Zenodo sources are enabled. CMU Enron is blocked because its official distribution page does not state a reusable content license and asks researchers to handle the real messages sensitively. Apache SpamAssassin is blocked because its official README says copyright remains with the original message senders. SpaPhish remains optional and blocked until a stable unauthenticated official direct download is verified. PhishTank/OpenPhish are excluded because URL reputation is not an email-body label.
+
+Run acquisition and corpus auditing as a separate review phase. Do **not** run `train_model.py` until `preparation_audit.json`, `language_audit.json`, and `deduplication_and_split_audit.json` have been reviewed and an adequately licensed legitimate English source has been approved. The scripts always report `ready_for_training: false`; they do not invoke training.
+
 ## Dataset strategy and language gate
 
 The full corpora, generated CSVs, reports, and model are Git-ignored.
@@ -70,9 +78,13 @@ python services/ml/scripts/build_english_corpus.py `
 
 python services/ml/scripts/train_model.py `
   --dataset services/ml/data/processed/english_core.csv `
-  --external-dataset services/ml/data/processed/final_external_benchmark.csv `
   --model-output services/ml/models/phishshield_model.joblib `
   --metrics-output services/ml/reports/evaluation_metrics.json
+
+python services/ml/scripts/evaluate_model.py `
+  --dataset services/ml/data/external/processed/validation.csv `
+  --model services/ml/models/phishshield_model.joblib `
+  --output services/ml/reports/external_evaluation.json
 
 python services/ml/scripts/verify_api_integration.py
 python services/ml/scripts/evaluate_safe_fixtures.py

@@ -15,7 +15,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dataset", required=True, help="Path to a labeled CSV dataset")
     parser.add_argument("--model-output", required=True, help="Path to write the model bundle")
     parser.add_argument("--metrics-output", required=True, help="Path to write metrics JSON")
-    parser.add_argument("--external-dataset", help="Frozen external benchmark CSV")
+    parser.add_argument(
+        "--external-dataset",
+        help="Deprecated safety gate: external data must be evaluated separately after model lock",
+    )
     parser.add_argument("--min-df", type=int, default=MLConfig.min_df)
     parser.add_argument("--max-df", type=float, default=MLConfig.max_df)
     parser.add_argument("--max-features", type=int, default=MLConfig.max_features)
