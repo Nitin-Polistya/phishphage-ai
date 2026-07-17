@@ -13,7 +13,7 @@ The machine-readable source of truth is `dataset_sources.json`, audited 2026-07-
 | SpamAssassin `hard_ham` | Legitimate hard negatives | Same rights condition as `easy_ham` | Blocked: no dataset-wide reuse license |
 | SpamAssassin `spam` | Generic spam hard negatives | Same rights condition; source label means spam, not phishing | Blocked and never mapped to phishing |
 | [Zenodo 15235123](https://zenodo.org/records/15235123) | English phishing positives | CC BY 4.0; direct XLSX; official MD5 `7213a3ee515a713f4eee2a6948f1756e` | Approved; only explicit `Phishing` rows become label `1` |
-| [Zenodo 13474746](https://zenodo.org/records/13474746) | External validation only | CC BY 4.0; direct CSV; official MD5 `1bf8ec0fe3f67e12dd275ce5b2b91b69` | Approved; physically isolated under `data/external/` |
+| [Zenodo 13474746](https://zenodo.org/records/13474746) | External validation only | CC BY 4.0; direct CSV; official MD5 `1bf8ec0fe3f67e12dd275ce5b2b91b69` | Approved; physically isolated in the flat `data/external/` directory |
 | [SpaPhish](https://data.mendeley.com/datasets/hz2d6gz7pc/5) | Optional Spanish supplement | Version 5 indicates CC BY 4.0, but a stable unauthenticated official direct file URL was not verified | Blocked; excluded from the core English model |
 | PhishTank/OpenPhish | URL reputation only | Not audited as email corpora | Excluded; never converted to email-body labels |
 
@@ -50,7 +50,13 @@ Review these generated, Git-ignored files before any training decision:
 - `data/interim/language_audit.json`
 - `data/interim/deduplication_and_split_audit.json`
 - `data/processed/english_core/review_corpus.csv`
-- `data/external/processed/validation.csv` (full derived external set; never a training input)
+- `data/external/Phishing_validation_emails.csv` (untouched publisher download)
+- `data/external/validation_candidates.jsonl` (locally parsed external candidates)
+- `data/external/validation_language_audit.jsonl` (derived language audit)
+- `data/external/validation.csv` (full derived external set; never a training input)
+- `data/external/development_benchmark.csv` (deduplicated development benchmark)
+- `data/external/contextual_email_deception_cc0.csv` (external benchmark source)
+- `data/external/final_external_benchmark.csv` (sealed final external benchmark)
 
 Every source audit records its official page, exact download URL, license, expected and computed checksums, download date, archive filename, source-label meaning, assigned project label, role, language distribution, and accepted/rejected counts. Missing, changed, authentication-gated, unavailable, or license-unclear sources are reported and not bypassed.
 

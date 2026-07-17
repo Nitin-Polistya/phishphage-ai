@@ -51,9 +51,9 @@ def main() -> int:
     parser.add_argument("--core-input", default=ROOT / "data" / "interim" / "core_candidates.jsonl", type=Path)
     parser.add_argument("--core-output", default=ROOT / "data" / "interim" / "english_candidates.jsonl", type=Path)
     parser.add_argument("--rejected-output", default=ROOT / "data" / "interim" / "non_english_rejected.jsonl", type=Path)
-    parser.add_argument("--external-input", default=ROOT / "data" / "external" / "interim" / "validation_candidates.jsonl", type=Path)
-    parser.add_argument("--external-output", default=ROOT / "data" / "external" / "interim" / "validation_language_audit.jsonl", type=Path)
-    parser.add_argument("--external-csv-output", default=ROOT / "data" / "external" / "processed" / "validation.csv", type=Path)
+    parser.add_argument("--external-input", default=ROOT / "data" / "external" / "validation_candidates.jsonl", type=Path)
+    parser.add_argument("--external-output", default=ROOT / "data" / "external" / "validation_language_audit.jsonl", type=Path)
+    parser.add_argument("--external-csv-output", default=ROOT / "data" / "external" / "validation.csv", type=Path)
     parser.add_argument("--report", default=ROOT / "data" / "interim" / "language_audit.json", type=Path)
     args = parser.parse_args()
 

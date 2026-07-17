@@ -19,7 +19,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", default=ROOT / "dataset_sources.json", type=Path)
     parser.add_argument("--raw-root", default=ROOT / "data" / "raw", type=Path)
-    parser.add_argument("--external-root", default=ROOT / "data" / "external" / "raw", type=Path)
+    parser.add_argument("--external-root", default=ROOT / "data" / "external", type=Path)
     parser.add_argument("--manifest", default=ROOT / "data" / "interim" / "download_manifest.json", type=Path)
     parser.add_argument("--source", action="append", help="Download only this source id; repeat as needed")
     parser.add_argument("--overwrite", action="store_true")
@@ -69,4 +69,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

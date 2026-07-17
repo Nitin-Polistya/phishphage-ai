@@ -48,10 +48,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", default=ROOT / "dataset_sources.json", type=Path)
     parser.add_argument("--raw-root", default=ROOT / "data" / "raw", type=Path)
-    parser.add_argument("--external-root", default=ROOT / "data" / "external" / "raw", type=Path)
+    parser.add_argument("--external-root", default=ROOT / "data" / "external", type=Path)
     parser.add_argument("--core-output", default=ROOT / "data" / "interim" / "core_candidates.jsonl", type=Path)
     parser.add_argument("--spam-output", default=ROOT / "data" / "interim" / "generic_spam_hard_negatives.jsonl", type=Path)
-    parser.add_argument("--external-output", default=ROOT / "data" / "external" / "interim" / "validation_candidates.jsonl", type=Path)
+    parser.add_argument("--external-output", default=ROOT / "data" / "external" / "validation_candidates.jsonl", type=Path)
     parser.add_argument("--audit-output", default=ROOT / "data" / "interim" / "preparation_audit.json", type=Path)
     args = parser.parse_args()
 
@@ -129,4 +129,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

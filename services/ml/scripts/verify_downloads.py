@@ -24,7 +24,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--registry", default=ROOT / "dataset_sources.json", type=Path)
     parser.add_argument("--raw-root", default=ROOT / "data" / "raw", type=Path)
-    parser.add_argument("--external-root", default=ROOT / "data" / "external" / "raw", type=Path)
+    parser.add_argument("--external-root", default=ROOT / "data" / "external", type=Path)
     parser.add_argument("--output", default=ROOT / "data" / "interim" / "verification_report.json", type=Path)
     parser.add_argument("--strict", action="store_true", help="Fail if any approved file is absent")
     args = parser.parse_args()
@@ -83,4 +83,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

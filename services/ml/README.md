@@ -32,7 +32,7 @@ Reproduce Step 3 only after the v2 baseline corpus and benchmark files exist:
 ```powershell
 python services/ml/scripts/improve_generalization.py
 python services/ml/scripts/evaluate_model.py `
-  --dataset services/ml/data/processed/final_external_benchmark.csv `
+  --dataset services/ml/data/external/final_external_benchmark.csv `
   --model services/ml/models/phishshield_model.joblib `
   --output services/ml/reports/external_evaluation_v3.json
 python services/ml/scripts/finalize_generalization_report.py
@@ -98,10 +98,10 @@ Run from the repository root with the ML environment:
 python services/ml/scripts/build_english_corpus.py `
   --core-source services/ml/data/raw/phishing_nlp_dataset.xlsx `
   --external-source services/ml/data/raw/phishing_validation_emails.csv `
-  --final-benchmark-source services/ml/data/raw/contextual_email_deception_cc0/email_dataset.csv `
+  --final-benchmark-source services/ml/data/external/contextual_email_deception_cc0.csv `
   --output services/ml/data/processed/english_core.csv `
-  --external-output services/ml/data/processed/development_benchmark.csv `
-  --final-benchmark-output services/ml/data/processed/final_external_benchmark.csv `
+  --external-output services/ml/data/external/development_benchmark.csv `
+  --final-benchmark-output services/ml/data/external/final_external_benchmark.csv `
   --audit-output services/ml/reports/corpus_audit.json
 
 python services/ml/scripts/train_model.py `
@@ -110,7 +110,7 @@ python services/ml/scripts/train_model.py `
   --metrics-output services/ml/reports/evaluation_metrics.json
 
 python services/ml/scripts/evaluate_model.py `
-  --dataset services/ml/data/external/processed/validation.csv `
+  --dataset services/ml/data/external/validation.csv `
   --model services/ml/models/phishshield_model.joblib `
   --output services/ml/reports/external_evaluation.json
 
