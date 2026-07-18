@@ -10,6 +10,21 @@ As of the 2026-07-17 audit, only the two Zenodo sources are enabled. CMU Enron i
 
 Run acquisition and corpus auditing as a separate review phase. Do **not** run `train_model.py` until `preparation_audit.json`, `language_audit.json`, and `deduplication_and_split_audit.json` have been reviewed and an adequately licensed legitimate English source has been approved. The scripts always report `ready_for_training: false`; they do not invoke training.
 
+## Phase B corpus expansion audit
+
+The pre-acquisition framework is documented in [DATASET_EXPANSION.md](DATASET_EXPANSION.md). It adds a privacy-preserving provenance schema, an expansion taxonomy, a disabled source-manifest template, strict boundary validation, and deterministic corpus/gap reports. It does not download data or retrain the current model.
+
+The active v3 development pool contains 298 English rows: 193 legitimate and 105 phishing, across 271 campaign groups. It contains 232 real/curated rows and 66 synthetic rows (22.15%). One Zenodo source contributes 232 rows (77.85%), so source diversity—not raw volume—is the immediate constraint. The 178-row grouped diagnostic remains selection-aware, while the 100-row development benchmark and 80-row final benchmark remain external evaluation boundaries.
+
+Run from `services/ml`:
+
+```powershell
+python scripts/audit_corpus_inventory.py
+python scripts/analyze_dataset_gaps.py
+```
+
+The generated `reports/corpus_inventory.{json,md}` and `reports/dataset_gap_analysis.{json,md}` files are Git-ignored. They report labels, languages, real/synthetic contribution, sources, campaigns, provenance gaps, duplicate controls, split ratios, overlap checks, taxonomy deficits, and dominance warnings without exporting message content. Corpus size alone does not prove quality; every addition still requires verified licensing, privacy review, independent campaign grouping, source diversity, and external-evaluation isolation.
+
 ## Step 3: template-shift generalization
 
 Step 3 operates on the already provisioned v2 academic corpus; it does not override the acquisition review gate for future source additions. The existing 178-row grouped diagnostic is reproduced before cleaning. Development data excludes its exact text, removes 428 canonical-template duplicates and 5 close semantic duplicates, removes 2 non-English rows, and reduces synthetic contribution from 68.5% to 22.15%.

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "privacy_policy": "Store audit metadata and irreversible content hashes only. Do not retain private recipient addresses or unnecessary personal information in provenance exports.",
+  "fields": {
+    "sample_id": {"required": true, "type": "string", "description": "Stable project-local identifier."},
+    "label": {"required": true, "type": "integer", "allowed": [0, 1]},
+    "source_name": {"required": true, "type": "string"},
+    "source_record_id": {"required": true, "type": ["string", "null"]},
+    "source_url_or_reference": {"required": true, "type": ["string", "null"]},
+    "source_license": {"required": true, "type": ["string", "null"]},
+    "acquisition_date": {"required": true, "type": ["string", "null"]},
+    "language": {"required": true, "type": "string"},
+    "is_synthetic": {"required": true, "type": ["boolean", "null"], "description": "Null is accepted only while auditing legacy rows; new ingestion must populate it."},
+    "is_targeted_synthetic": {"required": true, "type": ["boolean", "null"], "description": "Null is accepted only while auditing legacy rows; new ingestion must populate it."},
+    "campaign_group": {"required": true, "type": ["string", "null"]},
+    "template_group": {"required": true, "type": ["string", "null"]},
+    "message_type": {"required": true, "type": ["string", "null"]},
+    "brand_family": {"required": false, "type": ["string", "null"]},
+    "delivery_provider": {"required": false, "type": ["string", "null"]},
+    "sender_domain": {"required": false, "type": ["string", "null"], "privacy": "Organizational domain only; never retain the sender local part."},
+    "contains_urls": {"required": true, "type": ["boolean", "null"]},
+    "contains_attachments": {"required": true, "type": ["boolean", "null"]},
+    "split": {"required": true, "type": "string"},
+    "external_evaluation_only": {"required": true, "type": "boolean"},
+    "content_hash": {"required": true, "type": "string"},
+    "normalized_content_hash": {"required": true, "type": "string"},
+    "notes": {"required": false, "type": ["string", "null"], "privacy": "Do not copy message content or personal identifiers."}
+  }
+}
