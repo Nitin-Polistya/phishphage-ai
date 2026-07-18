@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "allowed_rejection_classifications": [
+    "spam_not_phishing",
+    "scam_not_phishing",
+    "ambiguous",
+    "reject_privacy",
+    "reject_duplicate",
+    "reject_non_english"
+  ],
+  "rows": []
+}

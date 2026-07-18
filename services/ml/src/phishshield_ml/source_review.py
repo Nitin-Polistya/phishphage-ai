@@ -7,7 +7,12 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from .controlled_acquisition import REGISTRY_FIELDS, STATUS_ENUM
+from .controlled_acquisition import (
+    LICENSE_STATUS_ENUM,
+    PRIVACY_STATUS_ENUM,
+    REGISTRY_FIELDS,
+    STATUS_ENUM,
+)
 
 
 EVIDENCE_FIELDS = {
@@ -46,8 +51,12 @@ def audit_registry_payload(
         if source_id in controlled_ids:
             issues.append("duplicate_source_id")
         controlled_ids.add(source_id)
-        for field in ("license_status", "privacy_status", "approval_status"):
-            if source.get(field) not in STATUS_ENUM:
+        for field, allowed in {
+            "license_status": LICENSE_STATUS_ENUM,
+            "privacy_status": PRIVACY_STATUS_ENUM,
+            "approval_status": STATUS_ENUM,
+        }.items():
+            if source.get(field) not in allowed:
                 issues.append(f"invalid_status:{field}")
         if source.get("external_only"):
             if source.get("approval_status") != "external_only":
@@ -65,6 +74,10 @@ def audit_registry_payload(
                 issues.append("enabled_without_privacy_approval")
             if not source.get("raw_storage_allowed"):
                 issues.append("enabled_without_raw_storage_permission")
+            if source.get("development_allowed") is False:
+                issues.append("enabled_without_development_capability")
+        if source.get("development_allowed") is True and source.get("approval_status") != "approved":
+            issues.append("development_capability_without_approval")
         if source.get("redistribution_allowed") and source.get("license_status") != "approved":
             issues.append("redistribution_without_approved_license")
         if str(source.get("license", "")).lower().startswith("unknown") and source.get("license_status") != "pending":
@@ -100,6 +113,7 @@ def audit_registry_payload(
         suitable_development = all([
             source.get("approval_status") == "approved", source.get("license_status") == "approved",
             source.get("privacy_status") == "approved", source.get("ingestion_enabled") is True,
+            source.get("development_allowed", source.get("ingestion_enabled")) is True,
             source.get("external_only") is False, "development_pool" in source.get("allowed_splits", []),
             source.get("license_evidence_reference"), source.get("privacy_evidence_reference"),
             source.get("acquisition_evidence_reference"), not issues,
@@ -226,6 +240,7 @@ def validate_batch_plan(plan: dict[str, Any], registry_payload: dict[str, Any], 
         and source.get("license_status") == "approved"
         and source.get("privacy_status") == "approved"
         and source.get("ingestion_enabled") is True
+        and source.get("development_allowed", source.get("ingestion_enabled")) is True
         and source.get("external_only") is False
         and "development_pool" in source.get("allowed_splits", [])
     }
@@ -263,13 +278,19 @@ def validate_batch_plan(plan: dict[str, Any], registry_payload: dict[str, Any], 
             blockers.append(f"blocked_source_scheduled:{source_id}")
         elif source.get("approval_status") != "approved":
             blockers.append(f"pending_source_scheduled:{source_id}")
+        if source.get("development_allowed", source.get("ingestion_enabled", False)) is not True:
+            blockers.append(f"development_capability_disabled:{source_id}")
         if source.get("external_only"):
             errors.append(f"external_only_source_scheduled_for_development:{source_id}")
-        if source.get("license_status") != "approved" or not source.get("license_evidence_reference"):
+        if source.get("license_status") not in {"approved", "verified_restricted_noncommercial"} or not source.get("license_evidence_reference"):
             blockers.append(f"license_evidence_not_ready:{source_id}")
         if source.get("privacy_status") != "approved" or not source.get("privacy_evidence_reference"):
             blockers.append(f"privacy_evidence_not_ready:{source_id}")
-        if source.get("approval_status") == "approved" and source.get("ingestion_enabled"):
+        if (
+            source.get("approval_status") == "approved"
+            and source.get("ingestion_enabled")
+            and source.get("development_allowed", source.get("ingestion_enabled"))
+        ):
             approved_families.add(str(distribution.get("independent_source_family") or source_id))
     minimum_sources = int(plan.get("minimum_approved_independent_sources", 2))
     if len(approved_available_sources) < minimum_sources:
@@ -356,6 +377,7 @@ def write_source_review_packets(root: Path, output_directory: Path) -> list[Path
     review_ids = {
         "cmu_enron_20150507", "apache_spamassassin_easy_ham",
         "apache_spamassassin_hard_ham", "spaphish_mendeley",
+        "github_rf_peixoto_phishing_pot",
     }
     output_directory.mkdir(parents=True, exist_ok=True)
     written = []
@@ -363,12 +385,20 @@ def write_source_review_packets(root: Path, output_directory: Path) -> list[Path
         if source["source_id"] not in review_ids:
             continue
         claimed = source["license"]
-        if source["license_status"] != "approved":
+        if source["license_status"] == "verified_restricted_noncommercial":
+            claimed += " (VERIFIED, RESTRICTED TO NON-COMMERCIAL USE; NOT DEVELOPMENT-APPROVED)"
+        elif source["license_status"] != "approved":
             claimed += " (UNVERIFIED OR INSUFFICIENT FOR APPROVAL)"
+        if source["source_id"] == "github_rf_peixoto_phishing_pot":
+            usefulness = "Could add independently collected real phishing campaigns from honeypots; it is never a legitimate-email source."
+        elif "spamassassin" in source["source_id"] or "enron" in source["source_id"]:
+            usefulness = "Could add independently sourced real legitimate English messages."
+        else:
+            usefulness = "Could add multilingual phishing evidence, but not to the primary English batch."
         lines = [
             f"# Source Review: {source['display_name']}", "",
             f"- Source ID: `{source['source_id']}`",
-            f"- Why useful: {'Could add independently sourced real legitimate English messages.' if 'spamassassin' in source['source_id'] or 'enron' in source['source_id'] else 'Could add multilingual phishing evidence, but not to the primary English batch.'}",
+            f"- Why useful: {usefulness}",
             f"- Categories: `{json.dumps(source['permitted_categories'])}`",
             f"- Expected Batch 001 volume: {planned[source['source_id']]}",
             f"- Relationship to existing sources: independent of `{DOMINANT_SOURCE_ID}`",
@@ -387,6 +417,19 @@ def write_source_review_packets(root: Path, output_directory: Path) -> list[Path
             "- Verified official acquisition method and checksum where available.",
             "- Named accountable human reviewer and dated approval decision.", "",
         ]
+        if source["source_id"] == "github_rf_peixoto_phishing_pot":
+            lines.extend([
+                "## Phishing Pot-specific review", "",
+                "- CC BY-NC 4.0 attribution: preserve creator, repository, license name/link, and modification notices in internal provenance and any permitted research output.",
+                "- Non-commercial restriction: obtain a documented determination that every intended training, evaluation, deployment, collaboration, and publication use is non-commercial.",
+                "- Third-party rights: determine whether repository licensing can authorize reuse of message bodies, branding, attachments, and other content authored by unrelated senders.",
+                "- Recipient and URL privacy: inspect headers, visible bodies, HTML, URL query/path parameters, tracking tokens, and account identifiers for honeypot or third-party data.",
+                "- Encoded content: decode MIME/Base64 locally in quarantine for inspection, never execute or render it, redact sensitive spans, and preserve only an authorized normalized derivative.",
+                "- Attachments and malware: do not open, execute, extract, or promote attachment content; record metadata only unless a later isolated malware-handling protocol is approved.",
+                "- Label review: reject generic spam, marketing, malware-only delivery, and non-phishing scams unless the message contains reviewed phishing or social-engineering behavior under the project taxonomy.",
+                "- Language: accept only independently verified English samples for the primary model.",
+                "- Grouping: assign campaign and template groups using normalized lure text, sender infrastructure, linked domains as inert strings, attachment metadata, and kit/brand patterns without contacting any destination.", "",
+            ])
         path = output_directory / f"{source['source_id']}.md"
         path.write_text("\n".join(lines), encoding="utf-8")
         written.append(path)

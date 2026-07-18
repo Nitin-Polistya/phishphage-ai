@@ -24,7 +24,13 @@ from .preprocessing import normalize_email_text
 
 
 STATUS_ENUM = {"approved", "blocked", "pending", "external_only"}
+LICENSE_STATUS_ENUM = STATUS_ENUM | {"verified_restricted_noncommercial"}
+PRIVACY_STATUS_ENUM = STATUS_ENUM | {"pending_sample_review"}
 REVIEW_STATUS_ENUM = {"approve", "reject", "needs_revision", "external_only"}
+PILOT_REVIEW_CLASSIFICATIONS = {
+    "phishing", "spam_not_phishing", "scam_not_phishing", "ambiguous",
+    "reject_privacy", "reject_duplicate", "reject_non_english",
+}
 REGISTRY_FIELDS = {
     "source_id", "display_name", "homepage", "dataset_reference", "license",
     "license_status", "privacy_status", "approval_status", "allowed_languages",
@@ -80,8 +86,13 @@ def load_controlled_registry(path: str | Path) -> tuple[dict[str, Any], dict[str
         source_id = str(source["source_id"])
         if source_id in records:
             raise ValueError(f"Duplicate registry source_id: {source_id}")
-        for field in ("license_status", "privacy_status", "approval_status"):
-            if source[field] not in STATUS_ENUM:
+        status_sets = {
+            "license_status": LICENSE_STATUS_ENUM,
+            "privacy_status": PRIVACY_STATUS_ENUM,
+            "approval_status": STATUS_ENUM,
+        }
+        for field, allowed in status_sets.items():
+            if source[field] not in allowed:
                 raise ValueError(f"Invalid {field} for {source_id}: {source[field]}")
         if str(source["license"]).strip().lower().startswith("unknown") and source["license_status"] != "pending":
             raise ValueError(f"Unknown license must remain pending: {source_id}")
@@ -90,6 +101,7 @@ def load_controlled_registry(path: str | Path) -> tuple[dict[str, Any], dict[str
             or source["license_status"] != "approved"
             or source["privacy_status"] != "approved"
             or source["external_only"]
+            or not source.get("development_allowed", True)
         ):
             raise ValueError(f"Ingestion-enabled source is not fully approved: {source_id}")
         if source["ingestion_enabled"] and (not source["approved_by"] or not source["approved_date"]):
@@ -100,10 +112,65 @@ def load_controlled_registry(path: str | Path) -> tuple[dict[str, Any], dict[str
     return payload, records
 
 
+def validate_source_for_staging_plan(source: dict[str, Any], intended_use: str) -> None:
+    """Allow metadata-only staging preparation without authorizing raw storage."""
+    source_id = source["source_id"]
+    if not source.get("staging_allowed", False):
+        raise PermissionError(f"Source {source_id} staging is disabled")
+    if source["external_only"]:
+        raise PermissionError(f"Source {source_id} is external-only")
+    if source["license_status"] == "verified_restricted_noncommercial" and intended_use != "noncommercial_research":
+        raise PermissionError(f"Source {source_id} is restricted to non-commercial research")
+    if source["license_status"] not in {"approved", "verified_restricted_noncommercial"}:
+        raise PermissionError(f"Source {source_id} license is not verified for staging")
+
+
+def validate_source_for_development(source: dict[str, Any]) -> None:
+    """Require a separate explicit capability before any development promotion."""
+    source_id = source["source_id"]
+    if not source.get("development_allowed", source.get("ingestion_enabled", False)):
+        raise PermissionError(f"Source {source_id} development use is disabled")
+    if source["approval_status"] != "approved":
+        raise PermissionError(f"Source {source_id} approval is not approved")
+    if source["privacy_status"] != "approved":
+        raise PermissionError(f"Source {source_id} privacy review is not approved")
+    if source["license_status"] not in {"approved", "verified_restricted_noncommercial"}:
+        raise PermissionError(f"Source {source_id} license is not verified")
+    if not source["ingestion_enabled"]:
+        raise PermissionError(f"Source {source_id} ingestion is disabled")
+
+
+def pilot_promotion_eligibility(source: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:
+    """Return deterministic reasons why one staged pilot row cannot promote."""
+    classification = review.get("classification")
+    if classification not in PILOT_REVIEW_CLASSIFICATIONS:
+        raise ValueError(f"Invalid pilot classification: {classification}")
+    reasons: list[str] = []
+    checks = (
+        (source.get("development_allowed", False), "development_use_disabled"),
+        (source.get("approval_status") == "approved", "source_approval_incomplete"),
+        (source.get("privacy_status") == "approved", "privacy_review_incomplete"),
+        (source.get("license_status") in {"approved", "verified_restricted_noncommercial"}, "license_not_verified"),
+        (review.get("manual_approved") is True, "manual_approval_missing"),
+        (classification == "phishing", f"classification_not_phishing:{classification}"),
+        (review.get("phishing_confirmed") is True, "phishing_behavior_not_confirmed"),
+        (review.get("language") == "en", "english_language_not_confirmed"),
+        (review.get("privacy_checks_passed") is True, "sample_privacy_check_failed"),
+        (review.get("duplicate_checks_passed") is True, "duplicate_check_failed"),
+        (review.get("overlap_checks_passed") is True, "development_overlap_check_failed"),
+        (bool(review.get("campaign_group")), "campaign_group_missing"),
+        (bool(review.get("template_group")), "template_group_missing"),
+    )
+    reasons.extend(reason for passed, reason in checks if not passed)
+    return {"eligible": not reasons, "reasons": reasons}
+
+
 def validate_source_for_ingestion(source: dict[str, Any], requested_split: str, input_format: str) -> None:
     source_id = source["source_id"]
     if source["external_only"] or source["approval_status"] == "external_only":
         raise PermissionError(f"Source {source_id} is external-only")
+    if not source.get("development_allowed", source.get("ingestion_enabled", False)):
+        raise PermissionError(f"Source {source_id} development use is disabled")
     if source["license_status"] != "approved":
         raise PermissionError(f"Source {source_id} license is not approved")
     if source["privacy_status"] != "approved":

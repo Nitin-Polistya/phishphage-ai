@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "pilot_id": null,
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "planned_count": 22,
+  "reviewed_count": 0,
+  "accepted_phishing_count": 0,
+  "rejected_count": 0,
+  "classification_counts": {},
+  "language_counts": {},
+  "privacy_findings_count": 0,
+  "attachment_metadata_count": 0,
+  "campaign_group_count": 0,
+  "template_group_count": 0,
+  "development_overlap_count": 0,
+  "external_overlap_count": 0,
+  "promotion_eligible": false,
+  "promotion_blockers": ["pilot_not_run", "source_not_approved", "development_use_disabled"]
+}

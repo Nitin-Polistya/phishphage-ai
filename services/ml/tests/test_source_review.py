@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
 
 from phishshield_ml.source_review import audit_registry_payload, validate_batch_plan
 
@@ -11,6 +12,26 @@ TAXONOMY = {
     "phish_credential_theft": 1,
     "phish_banking": 1,
 }
+ML_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_batch_001_assigns_pending_phishing_pot_without_approval() -> None:
+    registry = json.loads((ML_ROOT / "config/dataset_source_registry.json").read_text(encoding="utf-8"))
+    plan = json.loads((ML_ROOT / "config/acquisition_batches/batch_001.json").read_text(encoding="utf-8"))
+    source = next(row for row in registry["sources"] if row["source_id"] == "github_rf_peixoto_phishing_pot")
+    allocation = next(row for row in plan["source_distribution"] if row["source_id"] == source["source_id"])
+    assert source["approval_status"] == "pending"
+    assert source["allowed_labels"] == [1]
+    assert source["allowed_languages"] == ["en"]
+    assert source["redistribution_allowed"] is False
+    assert source["staging_allowed"] is True
+    assert source["development_allowed"] is False
+    assert source["raw_storage_allowed"] is False
+    assert source["commercial_use_allowed"] is False
+    assert source["license_status"] == "verified_restricted_noncommercial"
+    assert source["privacy_status"] == "pending_sample_review"
+    assert source["ingestion_enabled"] is False
+    assert 20 <= allocation["planned_count"] <= 25
 
 
 def _source(source_id: str, label: int, **overrides: object) -> dict:
@@ -21,6 +42,7 @@ def _source(source_id: str, label: int, **overrides: object) -> dict:
         "license_status": "approved", "privacy_status": "approved", "approval_status": "approved",
         "allowed_languages": ["en"], "allowed_labels": [label], "allowed_splits": ["development_pool"],
         "redistribution_allowed": False, "external_only": False, "ingestion_enabled": True,
+        "staging_allowed": True, "development_allowed": True,
         "approval_notes": "fixture", "approved_by": "reviewer", "approved_date": "2026-07-18",
         "required_fields": ["text", "label"], "deduplication_policy": "reject",
         "campaign_policy": "one split", "supported_formats": ["jsonl"],
@@ -149,3 +171,29 @@ def test_readiness_report_is_deterministic() -> None:
     first = validate_batch_plan(copy.deepcopy(plan), copy.deepcopy(_registry(sources)), TAXONOMY)
     second = validate_batch_plan(copy.deepcopy(plan), copy.deepcopy(_registry(sources)), TAXONOMY)
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
+
+
+def test_phishing_pot_pilot_is_empty_planning_only() -> None:
+    pilot = json.loads((ML_ROOT / "config/acquisition_batches/phishing_pot_pilot_001.json").read_text(encoding="utf-8"))
+    templates = ML_ROOT / "config/report_templates/phishing_pot_pilot"
+    queue = json.loads((templates / "pilot_review_queue.json").read_text(encoding="utf-8"))
+    attribution = json.loads((templates / "attribution_record.json").read_text(encoding="utf-8"))
+    assert pilot["planned_candidate_count"] == 22
+    assert pilot["staging_only"] is True
+    assert pilot["development_allowed"] is False
+    assert pilot["raw_storage_allowed"] is False
+    assert pilot["acquisition_status"] == "not_started_requires_separate_authorization"
+    assert queue["samples"] == []
+    assert set(queue["allowed_classifications"]) == {
+        "phishing", "spam_not_phishing", "scam_not_phishing", "ambiguous",
+        "reject_privacy", "reject_duplicate", "reject_non_english",
+    }
+    assert attribution["raw_redistribution_allowed"] is False
+    assert attribution["provenance_rows"] == []
+
+
+def test_batch_001_readiness_names_disabled_development_capability() -> None:
+    registry = json.loads((ML_ROOT / "config/dataset_source_registry.json").read_text(encoding="utf-8"))
+    plan = json.loads((ML_ROOT / "config/acquisition_batches/batch_001.json").read_text(encoding="utf-8"))
+    report = validate_batch_plan(plan, registry, TAXONOMY)
+    assert "development_capability_disabled:github_rf_peixoto_phishing_pot" in report["approval_blockers"]

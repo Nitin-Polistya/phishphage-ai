@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "pilot_id": "phishing_pot_pilot_001",
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "purpose": "Planning-only validation of 22 candidate phishing messages from independent phishing source A",
+  "planned_candidate_count": 22,
+  "usage_mode": "noncommercial_research",
+  "language": "en",
+  "label_scope": ["phishing"],
+  "staging_only": true,
+  "development_allowed": false,
+  "raw_storage_allowed": false,
+  "ingestion_enabled": false,
+  "redistribution_allowed": false,
+  "acquisition_status": "not_started_requires_separate_authorization",
+  "sample_review_required": true,
+  "promotion_requires_explicit_source_approval": true,
+  "safe_handling": {
+    "render_html": false,
+    "execute_attachments": false,
+    "fetch_embedded_urls": false,
+    "contact_embedded_domains": false,
+    "decode_mime_for_local_inspection_only": true,
+    "store_attachment_content": false,
+    "record_attachment_metadata_only": true
+  },
+  "required_checks": [
+    "attribution_and_provenance",
+    "honeypot_and_third_party_identifier_redaction",
+    "url_parameter_privacy",
+    "encoded_content_privacy",
+    "attachment_and_malware_metadata",
+    "english_language",
+    "phishing_behavior",
+    "spam_scam_ambiguity",
+    "exact_near_duplicate_and_campaign_grouping",
+    "development_and_external_overlap"
+  ],
+  "report_templates": [
+    "config/report_templates/phishing_pot_pilot/pilot_validation.json",
+    "config/report_templates/phishing_pot_pilot/pilot_validation.md",
+    "config/report_templates/phishing_pot_pilot/pilot_review_queue.json",
+    "config/report_templates/phishing_pot_pilot/duplicate_report.json",
+    "config/report_templates/phishing_pot_pilot/rejected_rows.json",
+    "config/report_templates/phishing_pot_pilot/attribution_record.json"
+  ],
+  "notes": [
+    "This file does not authorize cloning, downloading, raw storage, ingestion, promotion, or training.",
+    "A later pilot must remain in ignored staging storage and must not expose raw email publicly.",
+    "Source approval alone does not enable development use; development_allowed must be changed explicitly after all promotion checks pass."
+  ]
+}

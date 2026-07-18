@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "source_title": "Phishing Pot",
+  "creator": "rf-peixoto",
+  "repository": "https://github.com/rf-peixoto/phishing_pot",
+  "license_name": "Creative Commons Attribution-NonCommercial 4.0 International",
+  "license_reference": "https://github.com/rf-peixoto/phishing_pot/blob/main/LICENSE",
+  "license_status": "verified_restricted_noncommercial",
+  "usage_mode": "noncommercial_research",
+  "modifications_notice": null,
+  "acquisition_date": null,
+  "archive_or_commit_reference": null,
+  "reviewer": null,
+  "raw_redistribution_allowed": false,
+  "provenance_rows": []
+}

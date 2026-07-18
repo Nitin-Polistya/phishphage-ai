@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "allowed_classifications": [
+    "phishing",
+    "spam_not_phishing",
+    "scam_not_phishing",
+    "ambiguous",
+    "reject_privacy",
+    "reject_duplicate",
+    "reject_non_english"
+  ],
+  "required_review_fields": [
+    "candidate_id",
+    "classification",
+    "language",
+    "phishing_confirmed",
+    "privacy_checks_passed",
+    "duplicate_checks_passed",
+    "overlap_checks_passed",
+    "campaign_group",
+    "template_group",
+    "manual_approved",
+    "reviewer",
+    "reviewed_at",
+    "safe_notes"
+  ],
+  "samples": []
+}

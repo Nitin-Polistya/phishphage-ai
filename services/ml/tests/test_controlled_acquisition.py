@@ -8,11 +8,15 @@ import pandas as pd
 import pytest
 
 from phishshield_ml.controlled_acquisition import (
+    PILOT_REVIEW_CLASSIFICATIONS,
     ingest_batch,
     initialize_batch,
     load_controlled_registry,
+    pilot_promotion_eligibility,
     promote_batch,
     update_review,
+    validate_source_for_ingestion,
+    validate_source_for_staging_plan,
 )
 
 
@@ -27,6 +31,7 @@ def _source(**overrides: object) -> dict:
         "privacy_status": "approved", "approval_status": "approved", "allowed_languages": ["en"],
         "allowed_labels": [0, 1], "allowed_splits": ["development_pool"],
         "redistribution_allowed": False, "external_only": False, "ingestion_enabled": True,
+        "staging_allowed": True, "development_allowed": True,
         "approval_notes": "Test fixture only", "approved_by": "test-reviewer", "approved_date": "2026-07-18",
         "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
         "deduplication_policy": "reject duplicates", "campaign_policy": "one split only",
@@ -81,6 +86,74 @@ def test_repository_registry_is_valid() -> None:
     payload, sources = load_controlled_registry(ML_ROOT / "config/dataset_source_registry.json")
     assert payload["policy"]["direct_development_ingestion"] is False
     assert sources["zenodo_phishing_validation_13474746"]["external_only"] is True
+
+
+def test_pending_phishing_pot_cannot_be_ingested() -> None:
+    _, sources = load_controlled_registry(ML_ROOT / "config/dataset_source_registry.json")
+    source = sources["github_rf_peixoto_phishing_pot"]
+    assert source["approval_status"] == "pending"
+    assert source["ingestion_enabled"] is False
+    assert source["staging_allowed"] is True
+    assert source["development_allowed"] is False
+    assert source["license_status"] == "verified_restricted_noncommercial"
+    assert source["privacy_status"] == "pending_sample_review"
+    validate_source_for_staging_plan(source, "noncommercial_research")
+    with pytest.raises(PermissionError, match="development use is disabled"):
+        validate_source_for_ingestion(source, "development_pool", "eml")
+
+
+def test_restricted_source_staging_rejects_commercial_use() -> None:
+    _, sources = load_controlled_registry(ML_ROOT / "config/dataset_source_registry.json")
+    source = sources["github_rf_peixoto_phishing_pot"]
+    with pytest.raises(PermissionError, match="restricted to non-commercial research"):
+        validate_source_for_staging_plan(source, "commercial")
+
+
+def _pilot_review(**overrides: object) -> dict:
+    review = {
+        "classification": "phishing", "manual_approved": True,
+        "phishing_confirmed": True, "language": "en", "privacy_checks_passed": True,
+        "duplicate_checks_passed": True, "overlap_checks_passed": True,
+        "campaign_group": "campaign-1", "template_group": "template-1",
+    }
+    review.update(overrides)
+    return review
+
+
+@pytest.mark.parametrize(
+    "classification",
+    sorted(PILOT_REVIEW_CLASSIFICATIONS - {"phishing"}),
+)
+def test_non_phishing_or_rejected_pilot_classifications_cannot_promote(classification: str) -> None:
+    source = _source()
+    result = pilot_promotion_eligibility(source, _pilot_review(classification=classification))
+    assert result["eligible"] is False
+    assert f"classification_not_phishing:{classification}" in result["reasons"]
+
+
+@pytest.mark.parametrize(
+    ("field", "reason"),
+    [
+        ("privacy_checks_passed", "sample_privacy_check_failed"),
+        ("duplicate_checks_passed", "duplicate_check_failed"),
+        ("overlap_checks_passed", "development_overlap_check_failed"),
+    ],
+)
+def test_pilot_privacy_duplicate_and_overlap_failures_block_promotion(field: str, reason: str) -> None:
+    result = pilot_promotion_eligibility(_source(), _pilot_review(**{field: False}))
+    assert result["eligible"] is False
+    assert reason in result["reasons"]
+
+
+def test_pending_source_remains_ineligible_even_after_positive_sample_review() -> None:
+    _, sources = load_controlled_registry(ML_ROOT / "config/dataset_source_registry.json")
+    result = pilot_promotion_eligibility(
+        sources["github_rf_peixoto_phishing_pot"], _pilot_review()
+    )
+    assert result["eligible"] is False
+    assert "development_use_disabled" in result["reasons"]
+    assert "source_approval_incomplete" in result["reasons"]
+    assert "privacy_review_incomplete" in result["reasons"]
 
 
 def test_unknown_license_must_remain_pending(tmp_path: Path) -> None:
