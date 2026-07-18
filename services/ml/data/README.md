@@ -6,8 +6,9 @@ All downloaded and generated corpora are local, Git-ignored inputs. Do not commi
 - `interim/`: download manifests, source audits, parsed training candidates, language rejections, and deduplication statistics.
 - `processed/`: review corpora, grouped diagnostics, and model-ready training CSVs.
 - `external/`: flat, physically isolated external-validation downloads and derived evaluation files; never training input.
+- `staging/`: controlled future acquisition batches; each batch contains a manifest plus `raw/`, `normalized/`, `validation/`, and `reports/`. Nothing here is a development input.
 
-The directory layout is intentionally limited to the four sibling directories `raw/`, `interim/`, `processed/`, and `external/`. Do not create lifecycle subdirectories inside `external/`.
+The directory layout contains the lifecycle siblings `raw/`, `interim/`, `processed/`, `external/`, and `staging/`. Do not create lifecycle subdirectories inside `external/`; batch subdirectories are allowed only inside `staging/`.
 
 External benchmark archives, publisher downloads, parsed derivatives, development benchmarks, and final evaluation CSVs all remain flat inside `external/`. Training and corpus-selection scripts must not read that directory; standalone post-lock evaluation may read it explicitly.
 

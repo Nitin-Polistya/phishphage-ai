@@ -19,12 +19,14 @@ services/ml/data/raw/*
 services/ml/data/interim/*
 services/ml/data/processed/*
 services/ml/data/external/*
+services/ml/data/staging/*
 services/ml/models/*
 services/ml/reports/*
 !services/ml/data/raw/.gitkeep
 !services/ml/data/interim/.gitkeep
 !services/ml/data/processed/.gitkeep
 !services/ml/data/external/.gitkeep
+!services/ml/data/staging/.gitkeep
 !services/ml/models/.gitkeep
 !services/ml/reports/.gitkeep
 !services/ml/data/README.md

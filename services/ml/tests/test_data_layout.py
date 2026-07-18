@@ -8,7 +8,7 @@ DATA_ROOT = ROOT / "data"
 
 
 def test_canonical_data_directories_exist_with_gitkeep() -> None:
-    for name in ("raw", "interim", "processed", "external"):
+    for name in ("raw", "interim", "processed", "external", "staging"):
         directory = DATA_ROOT / name
         assert directory.is_dir()
         assert (directory / ".gitkeep").is_file()
@@ -40,7 +40,6 @@ def test_scripts_and_docs_do_not_reference_legacy_external_subdirectories() -> N
 
 def test_all_canonical_data_directories_are_git_ignored_except_gitkeep() -> None:
     ignore = ROOT.parents[1].joinpath(".gitignore").read_text(encoding="utf-8")
-    for name in ("raw", "interim", "processed", "external"):
+    for name in ("raw", "interim", "processed", "external", "staging"):
         assert f"services/ml/data/{name}/*" in ignore
         assert f"!services/ml/data/{name}/.gitkeep" in ignore
-

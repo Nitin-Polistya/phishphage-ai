@@ -74,3 +74,71 @@ Generated reports are Git-ignored:
 - `reports/dataset_gap_analysis.md`
 
 The inventory is read-only and contains aggregate metadata and hashes, never message content.
+
+## Controlled acquisition lifecycle
+
+Future sources must use `config/dataset_source_registry.json`. Registry entries carry explicit approval, license, privacy, language, label, split, format, deduplication, and campaign policies. The only statuses are `approved`, `blocked`, `pending`, and `external_only`. Unknown licensing remains `pending`; an ingestion-enabled entry must have approved source, license, and privacy status and must not be external-only.
+
+No acquisition file enters `processed/` directly. The enforced lifecycle is:
+
+```text
+Source registry -> license validation -> privacy validation -> normalization
+-> duplicate and overlap detection -> campaign/template validation
+-> manual review -> dry-run promotion -> confirmed promotion
+```
+
+Each ignored batch lives at `data/staging/<batch_id>/`:
+
+```text
+manifest.json
+raw/
+normalized/
+validation/
+reports/
+```
+
+`ingest_batch.py` has no network capability. It reads only the exact CSV or JSONL placed under that batch's `raw/` directory. It validates the controlled registry and taxonomy, rejects forbidden private structured fields, normalizes text, calculates SHA-256 content and canonical hashes plus 64-bit SimHash, and checks exact, normalized, near-duplicate, campaign, and template overlap against development and external boundaries. Rejection reports contain identifiers and reasons, never rejected message content or private values.
+
+The review queue records `review_status`, reviewer, UTC review time, notes, approved label/category/campaign/template, and explicit privacy/license checks. Allowed decisions are `approve`, `reject`, `needs_revision`, and `external_only`. Approval requires a named reviewer, both checks, and complete approved metadata.
+
+Promotion always begins with `--dry-run`. The preview reports approved/rejected/duplicate rows, class, source, campaign and taxonomy balance, synthetic percentage, new campaigns, warnings, and blockers. `--confirm` is a separate explicit operation and fails if any normalized row is unapproved, any ingestion rejection or duplicate remains, any review check is incomplete, or a fresh overlap check fails. Destinations are restricted to CSV files under `data/processed/`.
+
+### Example workflow
+
+```powershell
+python scripts/ingest_batch.py init `
+  --batch-id 2026-07-reviewed-source-001 `
+  --source-id zenodo_phishing_nlp_15235123 `
+  --input-filename reviewed.jsonl `
+  --acquisition-date 2026-07-18
+
+# Place the already acquired and reviewed file at:
+# data/staging/2026-07-reviewed-source-001/raw/reviewed.jsonl
+
+python scripts/ingest_batch.py run --batch-id 2026-07-reviewed-source-001
+
+python scripts/review_batch.py `
+  --batch-id 2026-07-reviewed-source-001 `
+  --sample-id SOURCE:SAMPLE `
+  --status approve `
+  --reviewer REVIEWER_ID `
+  --privacy-checked `
+  --license-checked
+
+python scripts/promote_batch.py `
+  --batch-id 2026-07-reviewed-source-001 `
+  --dry-run
+
+# Only after independent review of every generated report:
+python scripts/promote_batch.py `
+  --batch-id 2026-07-reviewed-source-001 `
+  --confirm
+```
+
+This documentation is illustrative; no batch was initialized, ingested, reviewed, or promoted by the Phase B implementation task.
+
+### Reports and rollback
+
+Every ingestion writes `batch_validation.json`, `batch_validation.md`, `rejected_rows.json`, `duplicate_report.json`, the normalized JSONL, and the review queue. Every dry run writes `promotion_preview.json` and `promotion_preview.md`. Confirmed promotion also writes a receipt with destination hashes and, when the destination existed, `promotion_backup.csv` inside the ignored batch reports directory.
+
+Rollback is a controlled manual recovery operation: stop further promotions, verify the receipt's pre/post hashes, copy the recorded backup over the exact receipt destination, rerun the corpus inventory and leakage audit, and record the incident outside message content. If no backup exists, the receipt represents creation of a new destination and rollback means removing that exact created file only after independent authorization. The promotion command never performs automatic rollback and never overwrites a path outside `data/processed/`.

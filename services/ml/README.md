@@ -25,6 +25,8 @@ python scripts/analyze_dataset_gaps.py
 
 The generated `reports/corpus_inventory.{json,md}` and `reports/dataset_gap_analysis.{json,md}` files are Git-ignored. They report labels, languages, real/synthetic contribution, sources, campaigns, provenance gaps, duplicate controls, split ratios, overlap checks, taxonomy deficits, and dominance warnings without exporting message content. Corpus size alone does not prove quality; every addition still requires verified licensing, privacy review, independent campaign grouping, source diversity, and external-evaluation isolation.
 
+Future acquisition is controlled by `config/dataset_source_registry.json` and the ignored `data/staging/<batch_id>/` workflow. Use `scripts/ingest_batch.py` to initialize and validate a local batch, `scripts/review_batch.py` for explicit human decisions, and `scripts/promote_batch.py --dry-run` before any separately confirmed promotion. Blocked, pending, external-only, privacy-unapproved, license-unapproved, duplicated, ungrouped, unsupported, or incompletely reviewed rows cannot promote. Full lifecycle, report, confirmation, and rollback procedures are in [DATASET_EXPANSION.md](DATASET_EXPANSION.md).
+
 ## Step 3: template-shift generalization
 
 Step 3 operates on the already provisioned v2 academic corpus; it does not override the acquisition review gate for future source additions. The existing 178-row grouped diagnostic is reproduced before cleaning. Development data excludes its exact text, removes 428 canonical-template duplicates and 5 close semantic duplicates, removes 2 non-English rows, and reduces synthetic contribution from 68.5% to 22.15%.
