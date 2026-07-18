@@ -28,7 +28,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; group SimHash near duplicates",
       "campaign_policy": "publisher mailbox or independently reviewed campaign; one split only",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": ["legit_workplace_collaboration", "legit_account_notification", "legit_billing_receipt", "legit_invoice", "legit_support_ticket", "legit_university_communication"],
+      "raw_storage_allowed": false,
+      "required_redactions": ["personal names", "email addresses", "phone numbers", "account identifiers", "physical addresses", "organization-sensitive content"],
+      "acquisition_method": {"type": "official_https_archive", "reference": "https://www.cs.cmu.edu/~enron/enron_mail_20150507.tar.gz", "status": "blocked"},
+      "license_evidence_reference": "https://www.cs.cmu.edu/~enron/",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://www.cs.cmu.edu/~enron/",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://www.cs.cmu.edu/~enron/",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official page permits research access but states privacy sensitivity and does not state an explicit reusable content license.",
+      "unresolved_questions": ["Legal basis for ML training and derived redistribution", "Whether project retention and redaction controls are sufficient", "Whether message-level copyright permits the intended use"]
     },
     {
       "source_id": "apache_spamassassin_easy_ham",
@@ -51,7 +63,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; group SimHash near duplicates",
       "campaign_policy": "archive family and normalized template; one split only",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": ["legit_account_notification", "legit_billing_receipt", "legit_support_ticket", "legit_saas_newsletter", "legit_promotional_marketing", "legit_transactional_notification"],
+      "raw_storage_allowed": false,
+      "required_redactions": ["sender and recipient addresses", "personal names", "message identifiers", "routing headers"],
+      "acquisition_method": {"type": "official_https_archive", "reference": "https://spamassassin.apache.org/old/publiccorpus/20030228_easy_ham.tar.bz2", "status": "blocked"},
+      "license_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official README states that copyright remains with original senders and that many full headers remain.",
+      "unresolved_questions": ["Permission for ML training beyond spam-filter testing", "Permission to store and redistribute derived text", "Required header and identity redaction"]
     },
     {
       "source_id": "apache_spamassassin_hard_ham",
@@ -74,7 +98,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; group SimHash near duplicates",
       "campaign_policy": "archive family and normalized template; one split only",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": ["legit_security_alert", "legit_password_reset", "legit_billing_receipt", "legit_invoice", "legit_support_ticket", "legit_promotional_marketing"],
+      "raw_storage_allowed": false,
+      "required_redactions": ["sender and recipient addresses", "personal names", "message identifiers", "routing headers"],
+      "acquisition_method": {"type": "official_https_archive", "reference": "https://spamassassin.apache.org/old/publiccorpus/20030228_hard_ham.tar.bz2", "status": "blocked"},
+      "license_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official README states that copyright remains with original senders and that many full headers remain.",
+      "unresolved_questions": ["Permission for ML training beyond spam-filter testing", "Permission to store and redistribute derived text", "Required header and identity redaction"]
     },
     {
       "source_id": "apache_spamassassin_spam",
@@ -97,7 +133,19 @@
       "required_fields": ["text", "language", "source_record_id", "campaign_group", "template_group", "message_type"],
       "deduplication_policy": "reject exact and normalized duplicates; group SimHash near duplicates",
       "campaign_policy": "not eligible for development promotion",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": ["sender and recipient addresses", "personal names", "message identifiers", "routing headers"],
+      "acquisition_method": {"type": "official_https_archive", "reference": "https://spamassassin.apache.org/old/publiccorpus/20030228_spam.tar.bz2", "status": "blocked"},
+      "license_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://spamassassin.apache.org/old/publiccorpus/readme.html",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Generic spam remains ineligible for a phishing label; sender copyright and header privacy remain unresolved.",
+      "unresolved_questions": ["No eligible email-body label role in the current project"]
     },
     {
       "source_id": "zenodo_phishing_nlp_15235123",
@@ -120,7 +168,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; reject cross-boundary SimHash distance <= 3",
       "campaign_policy": "independently reviewed campaign identifiers; one split only",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": ["phish_microsoft_365", "phish_google", "phish_banking", "phish_fake_invoice", "phish_payroll", "phish_shipping", "phish_account_suspension", "phish_credential_theft", "phish_bec"],
+      "raw_storage_allowed": true,
+      "required_redactions": ["reject any row containing residual personal information despite publisher anonymization claim"],
+      "acquisition_method": {"type": "official_https_file", "reference": "https://zenodo.org/records/15235123/files/phishing_nlp_dataset.xlsx?download=1", "status": "approved"},
+      "license_evidence_reference": "https://zenodo.org/records/15235123",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://zenodo.org/records/15235123",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://zenodo.org/records/15235123",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official record states CC BY 4.0, English messages, ML use, and anonymized content. Project policy still accepts only explicit Phishing rows and requires manual taxonomy review.",
+      "unresolved_questions": ["Category distribution within explicit Phishing rows is not publisher-supplied", "Source already dominates the development pool and should normally receive zero Batch 001 allocation"]
     },
     {
       "source_id": "zenodo_phishing_validation_13474746",
@@ -143,7 +203,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "external isolation; report duplication without changing publisher archive",
       "campaign_policy": "external-only grouping",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": ["legit_transactional_notification", "phish_credential_theft"],
+      "raw_storage_allowed": true,
+      "required_redactions": ["reject any row containing personal information", "do not alter the publisher archive"],
+      "acquisition_method": {"type": "official_https_file", "reference": "https://zenodo.org/records/13474746/files/Phishing_validation_emails.csv?download=1", "status": "external_only"},
+      "license_evidence_reference": "https://zenodo.org/records/13474746",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://zenodo.org/records/13474746",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://zenodo.org/records/13474746",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official record states CC BY 4.0 and describes this dataset specifically for model validation; project policy keeps it external-only.",
+      "unresolved_questions": ["Publisher describes a real/artificial mixture without row-level provenance", "Privacy/anonymization details are not stated on the official record"]
     },
     {
       "source_id": "spaphish_mendeley",
@@ -166,7 +238,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "not eligible for English development ingestion",
       "campaign_policy": "Spanish supplemental corpus only",
-      "supported_formats": ["csv"]
+      "supported_formats": ["csv"],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": ["verify publisher surrogates removed all personal and organizational identifiers", "exclude justification fields containing residual identifiers"],
+      "acquisition_method": {"type": "official_repository_file", "reference": "https://data.mendeley.com/datasets/hz2d6gz7pc/5", "status": "pending_direct_method_verification"},
+      "license_evidence_reference": "https://data.mendeley.com/datasets/hz2d6gz7pc/5",
+      "license_evidence_checked_at": "2026-07-18",
+      "privacy_evidence_reference": "https://data.mendeley.com/datasets/hz2d6gz7pc/5",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "https://data.mendeley.com/datasets/hz2d6gz7pc/5",
+      "reviewer": "phase-b2a-official-metadata-review",
+      "review_notes": "Official record states CC BY 4.0 and describes manual anonymization, but the corpus is Spanish and cannot improve the primary English Batch 001.",
+      "unresolved_questions": ["Stable unauthenticated official file URL", "Residual PII review", "Out of scope for the English model"]
     },
     {
       "source_id": "phishtank_openphish_url_feeds",
@@ -189,7 +273,19 @@
       "required_fields": [],
       "deduplication_policy": "not applicable",
       "campaign_policy": "not eligible for email corpus ingestion",
-      "supported_formats": []
+      "supported_formats": [],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": [],
+      "acquisition_method": {"type": "not_applicable", "reference": null, "status": "blocked"},
+      "license_evidence_reference": null,
+      "license_evidence_checked_at": null,
+      "privacy_evidence_reference": null,
+      "privacy_evidence_checked_at": null,
+      "acquisition_evidence_reference": null,
+      "reviewer": "phase-b2a-policy-review",
+      "review_notes": "URL reputation feeds cannot supply email-body labels.",
+      "unresolved_questions": ["None within email-body dataset acquisition; source type is ineligible"]
     },
     {
       "source_id": "kaggle-contextual-email-deception-cc0",
@@ -212,7 +308,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "external isolation",
       "campaign_policy": "external-only grouping",
-      "supported_formats": ["csv"]
+      "supported_formats": ["csv"],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": ["retain no personal identifiers if provenance is later verified"],
+      "acquisition_method": {"type": "existing_local_external_artifact", "reference": "services/ml/data/external/contextual_email_deception_cc0.csv", "status": "external_only_pending_reconciliation"},
+      "license_evidence_reference": null,
+      "license_evidence_checked_at": null,
+      "privacy_evidence_reference": null,
+      "privacy_evidence_checked_at": null,
+      "acquisition_evidence_reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate",
+      "reviewer": "phase-b2a-local-record-review",
+      "review_notes": "The local README records a CC0 claim, but the controlled registry intentionally does not treat that as verified official evidence.",
+      "unresolved_questions": ["Official license evidence", "Publisher provenance", "Privacy and synthetic-generation provenance"]
     },
     {
       "source_id": "phishphage-safe-synthetic-v2",
@@ -235,7 +343,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; reject cross-boundary SimHash distance <= 3",
       "campaign_policy": "scenario family and template must remain in one split",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": [],
+      "acquisition_method": {"type": "existing_project_artifact", "reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate", "status": "not_eligible_for_batch_001"},
+      "license_evidence_reference": null,
+      "license_evidence_checked_at": null,
+      "privacy_evidence_reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate",
+      "reviewer": "phase-b2a-local-record-review",
+      "review_notes": "Synthetic content is prohibited in Batch 001 and the applicable project license is unresolved.",
+      "unresolved_questions": ["Applicable project license", "Not a real-message source"]
     },
     {
       "source_id": "phishphage-targeted-training-anchors-v2",
@@ -258,7 +378,19 @@
       "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
       "deduplication_policy": "reject exact and normalized duplicates; reject cross-boundary SimHash distance <= 3",
       "campaign_policy": "target scenario family and template must remain in one split",
-      "supported_formats": ["jsonl", "csv"]
+      "supported_formats": ["jsonl", "csv"],
+      "permitted_categories": [],
+      "raw_storage_allowed": false,
+      "required_redactions": [],
+      "acquisition_method": {"type": "existing_project_artifact", "reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate", "status": "not_eligible_for_batch_001"},
+      "license_evidence_reference": null,
+      "license_evidence_checked_at": null,
+      "privacy_evidence_reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate",
+      "privacy_evidence_checked_at": "2026-07-18",
+      "acquisition_evidence_reference": "services/ml/README.md#step-2-historical-dataset-strategy-and-language-gate",
+      "reviewer": "phase-b2a-local-record-review",
+      "review_notes": "Synthetic content is prohibited in Batch 001 and the applicable project license is unresolved.",
+      "unresolved_questions": ["Applicable project license", "Not a real-message source"]
     }
   ]
 }

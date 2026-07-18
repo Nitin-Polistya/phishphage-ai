@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "decision_values": ["verified", "not_permitted", "unresolved", "not_applicable"],
+  "policy": "Every applicable item requires an evidence reference, checked date, reviewer, and notes. Public availability alone is not approval.",
+  "checks": [
+    {"id":"content_copyright","question":"Who owns copyright in individual message content, headers, and annotations?","required_for_development":true},
+    {"id":"dataset_metadata_license","question":"What license is asserted by the official dataset record, and does it cover the actual content?","required_for_development":true},
+    {"id":"redistribution","question":"May raw content, normalized content, derived artifacts, and statistics be redistributed?","required_for_development":true},
+    {"id":"research_use_restrictions","question":"Are use rights limited to research, spam filtering, non-commercial work, or another purpose?","required_for_development":true},
+    {"id":"privacy_personal_information","question":"Does the source contain personal, confidential, account, routing, or organizational information?","required_for_development":true},
+    {"id":"consent_or_public_interest","question":"What consent, authorization, or documented public-interest basis applies to real messages?","required_for_development":true},
+    {"id":"raw_message_storage","question":"May raw messages be stored locally, for how long, and with what access controls?","required_for_development":true},
+    {"id":"derived_feature_storage","question":"May normalized text, hashes, SimHash, campaign groups, and aggregate features be retained?","required_for_development":true},
+    {"id":"attribution","question":"What creator, DOI, license, or citation attribution is required?","required_for_development":true},
+    {"id":"permitted_ml_use","question":"Does the evidence permit the intended phishing-classification training and evaluation use?","required_for_development":true},
+    {"id":"publication_of_statistics","question":"May aggregate counts, metrics, and non-identifying error statistics be published?","required_for_development":true},
+    {"id":"public_repository_inclusion","question":"Which metadata, fixtures, scripts, derived features, or raw content may enter a public repository?","required_for_development":true}
+  ]
+}

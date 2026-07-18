@@ -27,6 +27,8 @@ The generated `reports/corpus_inventory.{json,md}` and `reports/dataset_gap_anal
 
 Future acquisition is controlled by `config/dataset_source_registry.json` and the ignored `data/staging/<batch_id>/` workflow. Use `scripts/ingest_batch.py` to initialize and validate a local batch, `scripts/review_batch.py` for explicit human decisions, and `scripts/promote_batch.py --dry-run` before any separately confirmed promotion. Blocked, pending, external-only, privacy-unapproved, license-unapproved, duplicated, ungrouped, unsupported, or incompletely reviewed rows cannot promote. Full lifecycle, report, confirmation, and rollback procedures are in [DATASET_EXPANSION.md](DATASET_EXPANSION.md).
 
+Phase B.2A adds `config/source_review_checklist.json`, the planning-only `config/acquisition_batches/batch_001.json`, `scripts/audit_source_registry.py`, and `scripts/validate_batch_readiness.py`. Batch 001 plans 120 real English messages (70 legitimate, 50 phishing), zero synthetic and zero additional dominant-Zenodo rows. It remains blocked until at least two independent sources have verified license/privacy/acquisition evidence and human approval.
+
 ## Step 3: template-shift generalization
 
 Step 3 operates on the already provisioned v2 academic corpus; it does not override the acquisition review gate for future source additions. The existing 178-row grouped diagnostic is reproduced before cleaning. Development data excludes its exact text, removes 428 canonical-template duplicates and 5 close semantic duplicates, removes 2 non-English rows, and reduces synthetic contribution from 68.5% to 22.15%.

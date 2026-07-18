@@ -31,6 +31,10 @@ REGISTRY_FIELDS = {
     "allowed_labels", "allowed_splits", "redistribution_allowed", "external_only",
     "ingestion_enabled", "approval_notes", "approved_by", "approved_date",
     "required_fields", "deduplication_policy", "campaign_policy", "supported_formats",
+    "permitted_categories", "raw_storage_allowed", "required_redactions", "acquisition_method",
+    "license_evidence_reference", "license_evidence_checked_at", "privacy_evidence_reference",
+    "privacy_evidence_checked_at", "acquisition_evidence_reference", "reviewer", "review_notes",
+    "unresolved_questions",
 }
 FORBIDDEN_PRIVACY_FIELDS = {
     "to", "cc", "bcc", "recipient", "recipient_email", "recipient_name",

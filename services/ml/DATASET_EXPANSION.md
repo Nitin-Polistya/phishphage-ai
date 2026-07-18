@@ -79,6 +79,21 @@ The inventory is read-only and contains aggregate metadata and hashes, never mes
 
 Future sources must use `config/dataset_source_registry.json`. Registry entries carry explicit approval, license, privacy, language, label, split, format, deduplication, and campaign policies. The only statuses are `approved`, `blocked`, `pending`, and `external_only`. Unknown licensing remains `pending`; an ingestion-enabled entry must have approved source, license, and privacy status and must not be external-only.
 
+### Phase B.2A source readiness
+
+`config/source_review_checklist.json` defines the mandatory evidence review for content copyright, metadata licensing, redistribution, research restrictions, privacy, consent or public-interest basis, raw and derived storage, attribution, ML use, statistics publication, and public-repository inclusion. Each applicable decision needs an evidence reference, checked date, reviewer, and notes. Public download access is never sufficient evidence.
+
+`config/acquisition_batches/batch_001.json` is a planning document only. It targets 120 real English messages: 70 legitimate and 50 phishing, zero synthetic, zero additional rows from the dominant Zenodo source, no source slot above 35%, and no template above 5%. It intentionally remains `blocked_pending_source_approval`: the legitimate candidate corpora remain blocked and two independent English phishing sources have not yet been identified and approved.
+
+Run the planning audits without acquiring data:
+
+```powershell
+python scripts/audit_source_registry.py
+python scripts/validate_batch_readiness.py
+```
+
+These commands generate ignored `reports/source_registry_audit.{json,md}`, `reports/batch_001_readiness.{json,md}`, and manual packets under `reports/source_reviews/`. Readiness must say `ready_for_acquisition` before any staging batch is initialized.
+
 No acquisition file enters `processed/` directly. The enforced lifecycle is:
 
 ```text
@@ -136,6 +151,23 @@ python scripts/promote_batch.py `
 ```
 
 This documentation is illustrative; no batch was initialized, ingested, reviewed, or promoted by the Phase B implementation task.
+
+### Post-approval Batch 001 runbook
+
+Do not execute these steps until two or more independent sources have complete, human-approved evidence:
+
+1. Complete every applicable item in `config/source_review_checklist.json`; record official evidence and the accountable reviewer in the registry.
+2. Update only the reviewed source entry. Never infer approval from public availability.
+3. Run `python scripts/audit_source_registry.py` and `python scripts/validate_batch_readiness.py`; stop unless readiness is `ready_for_acquisition`.
+4. Initialize staging with `python scripts/ingest_batch.py init --batch-id batch_001 --source-id SOURCE_ID --input-filename AUTHORIZED.jsonl --acquisition-date YYYY-MM-DD`.
+5. Place the authorized input only at `data/staging/batch_001/raw/AUTHORIZED.jsonl`.
+6. Run `python scripts/ingest_batch.py run --batch-id batch_001`.
+7. Inspect `batch_validation`, `rejected_rows`, and `duplicate_report`; resolve any rejection by correcting the source batch and rerunning, never by deleting evidence from a report.
+8. Review every accepted sample with `scripts/review_batch.py`, recording label, taxonomy category, campaign, template, privacy check, license check, reviewer, time, and notes.
+9. Run `python scripts/promote_batch.py --batch-id batch_001 --dry-run`; do not use `--confirm` while blockers exist.
+10. Run `python scripts/audit_corpus_inventory.py` and `python scripts/analyze_dataset_gaps.py`; independently inspect leakage and balance changes.
+11. Only after independent approval, run `python scripts/promote_batch.py --batch-id batch_001 --confirm` and retain its receipt and rollback backup.
+12. Retraining remains a later phase and is not part of acquisition or promotion.
 
 ### Reports and rollback
 

@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "source_id": "replace-with-reviewed-source-id",
+  "display_name": "Replace with reviewed display name",
   "source_name": "replace-with-reviewed-source-name",
   "source_type": "email_corpus",
   "homepage_or_reference": null,
@@ -19,5 +21,19 @@
   "required_provenance": ["source_record_id", "campaign_group", "template_group", "source_license", "content_hash"],
   "deduplication_policy": {"exact": "reject", "normalized": "reject", "near_duplicate": "group", "campaign": "single_split"},
   "privacy_policy": {"retain_private_recipients": false, "retain_attachment_content": false, "fetch_embedded_links": false},
-  "enabled": false
+  "enabled": false,
+  "license_status": "pending",
+  "privacy_status": "pending",
+  "approval_status": "pending",
+  "permitted_categories": [],
+  "raw_storage_allowed": false,
+  "required_redactions": [],
+  "license_evidence_reference": null,
+  "license_evidence_checked_at": null,
+  "privacy_evidence_reference": null,
+  "privacy_evidence_checked_at": null,
+  "acquisition_evidence_reference": null,
+  "reviewer": null,
+  "review_notes": "Unknown evidence remains unresolved; public availability is not approval.",
+  "unresolved_questions": ["License evidence", "Privacy evidence", "Acquisition authorization"]
 }

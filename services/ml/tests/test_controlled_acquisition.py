@@ -31,6 +31,13 @@ def _source(**overrides: object) -> dict:
         "required_fields": ["text", "label", "language", "source_record_id", "campaign_group", "template_group", "message_type", "is_synthetic"],
         "deduplication_policy": "reject duplicates", "campaign_policy": "one split only",
         "supported_formats": ["jsonl", "csv"],
+        "permitted_categories": ["legit_workplace_collaboration", "phish_credential_theft"],
+        "raw_storage_allowed": True, "required_redactions": [],
+        "acquisition_method": {"type": "test_fixture", "reference": "fixture", "status": "approved"},
+        "license_evidence_reference": "fixture-license", "license_evidence_checked_at": "2026-07-18",
+        "privacy_evidence_reference": "fixture-privacy", "privacy_evidence_checked_at": "2026-07-18",
+        "acquisition_evidence_reference": "fixture-acquisition", "reviewer": "test-reviewer",
+        "review_notes": "fixture", "unresolved_questions": [],
     }
     source.update(overrides)
     return source
