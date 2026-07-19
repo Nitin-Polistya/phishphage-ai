@@ -17,6 +17,16 @@ from .schemas import DatasetSummary, SplitSummary
 
 
 LABEL_MAPPING = {"legitimate": 0, "phishing": 1, "0": 0, "1": 1, 0: 0, 1: 1}
+LABEL_QUALITIES = frozenset({
+    "gold_manual", "silver_multi_source", "weak_source_provenance",
+    "synthetic", "unknown",
+})
+WEAK_TRAIN_ROLE = "train_only"
+FORBIDDEN_WEAK_PARTITIONS = frozenset({
+    "validation", "valid", "test", "diagnostic", "calibration",
+    "threshold_selection", "threshold-selection", "external",
+    "external_evaluation", "benchmark",
+})
 REQUIRED_COLUMNS = {"text", "label"}
 MIN_ENGLISH_PERCENTAGE = 80.0
 DetectorFactory.seed = 42
@@ -106,6 +116,33 @@ def load_and_validate_dataset(dataset_path: str | Path) -> pd.DataFrame:
         frame["source"] = "unspecified"
     if "provenance_type" not in frame:
         frame["provenance_type"] = "unspecified"
+    if "label_quality" not in frame:
+        frame["label_quality"] = "unknown"
+    frame["label_quality"] = frame["label_quality"].fillna("unknown").astype(str)
+    invalid_qualities = sorted(set(frame["label_quality"]) - LABEL_QUALITIES)
+    if invalid_qualities:
+        raise ValueError(f"Unsupported label_quality values: {invalid_qualities}")
+    if "source_id" not in frame:
+        frame["source_id"] = frame["source"].astype(str)
+    if "source_weight" not in frame:
+        frame["source_weight"] = frame["label_quality"].map(
+            lambda quality: 0.35 if quality == "weak_source_provenance" else 1.0
+        )
+    frame["source_weight"] = pd.to_numeric(frame["source_weight"], errors="raise")
+    if frame["source_weight"].isna().any() or (~frame["source_weight"].between(0, 1)).any():
+        raise ValueError("source_weight must be between 0 and 1")
+    gold = frame["label_quality"].eq("gold_manual")
+    if gold.any() and not frame.loc[gold, "source_weight"].eq(1.0).all():
+        raise ValueError("gold_manual rows must retain source_weight=1.0")
+    for column, default in (
+        ("campaign_group", "campaign-unspecified"),
+        ("automated_evidence", ""), ("privacy_status", "unknown"),
+        ("review_status", "unknown"), ("split_role", "development_pool"),
+    ):
+        if column not in frame:
+            frame[column] = default
+        frame[column] = frame[column].fillna(default)
+    validate_dataset_boundaries(frame)
 
     summary = DatasetSummary(
         input_rows=input_rows,
@@ -122,6 +159,26 @@ def load_and_validate_dataset(dataset_path: str | Path) -> pd.DataFrame:
     return frame
 
 
+def validate_dataset_boundaries(frame: pd.DataFrame, *, partition: str | None = None) -> None:
+    """Fail closed if weak labels could influence evaluation or selection."""
+    if "label_quality" not in frame:
+        return
+    weak = frame["label_quality"].astype(str).eq("weak_source_provenance")
+    if not weak.any():
+        return
+    if partition and partition.lower() != "train":
+        raise ValueError(f"weak_source_provenance rows are forbidden in {partition}")
+    roles = frame.loc[weak, "split_role"].astype(str).str.lower()
+    if not roles.eq(WEAK_TRAIN_ROLE).all() or roles.isin(FORBIDDEN_WEAK_PARTITIONS).any():
+        raise ValueError("weak_source_provenance rows must use split_role=train_only")
+    if not frame.loc[weak, "label"].astype(int).eq(1).all():
+        raise ValueError("weak_source_provenance is permitted only for phishing label 1")
+    if not frame.loc[weak, "review_status"].astype(str).eq("not_manually_reviewed").all():
+        raise ValueError("weak_source_provenance rows must be marked not_manually_reviewed")
+    if not frame.loc[weak, "privacy_status"].astype(str).eq("privacy_sanitized").all():
+        raise ValueError("weak_source_provenance rows require privacy_sanitized status")
+
+
 def prepare_dataset(dataset_path: str | Path) -> PreparedDataset:
     frame = load_and_validate_dataset(dataset_path)
     return PreparedDataset(dataframe=frame, summary=frame.attrs["dataset_summary"])
@@ -134,6 +191,8 @@ def split_dataset(frame: pd.DataFrame, random_state: int = 42) -> tuple[pd.DataF
     roles = frame.get("split_role", pd.Series("development_pool", index=frame.index)).fillna("development_pool")
     fixed_train = frame.loc[roles.eq("train_only")].copy()
     pool = frame.loc[~roles.eq("train_only")].reset_index(drop=True)
+    validate_dataset_boundaries(fixed_train, partition="train")
+    validate_dataset_boundaries(pool, partition="validation")
     splitter = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=random_state)
     folds = list(splitter.split(pool, pool["label"], groups=pool["template_group"]))
     test_indices = set(folds[0][1].tolist())

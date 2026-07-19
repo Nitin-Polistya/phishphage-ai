@@ -56,6 +56,16 @@ def build_pipeline(config: MLConfig) -> Pipeline:
     return build_candidates(config)["A_word_tfidf_logistic_regression"]
 
 
+def fit_with_source_weights(
+    pipeline: Pipeline, texts: list[str], labels: list[int], sample_weights: list[float],
+) -> Pipeline:
+    """Fit a candidate with provenance-aware weights routed to its classifier."""
+    if len(texts) != len(sample_weights):
+        raise ValueError("sample_weights must align with training rows")
+    pipeline.fit(texts, labels, clf__sample_weight=sample_weights)
+    return pipeline
+
+
 def _probabilities(pipeline: Pipeline, texts: list[str]) -> list[float]:
     return pipeline.predict_proba(texts)[:, 1].astype(float).tolist()
 
@@ -125,12 +135,13 @@ def train_model(dataset_path: str | Path, model_output: str | Path, metrics_outp
     prepared = prepare_dataset(dataset_path)
     train_frame, valid_frame, test_frame, split_summary = split_dataset(prepared.dataframe, random_state=cfg.random_state)
     train_texts, train_labels = train_frame["text"].tolist(), train_frame["label"].tolist()
+    train_weights = train_frame["source_weight"].astype(float).tolist()
     valid_texts, valid_labels = valid_frame["text"].tolist(), valid_frame["label"].tolist()
 
     candidate_rows, fitted = [], {}
     calibration_comparison = {}
     for name, pipeline in build_candidates(cfg).items():
-        pipeline.fit(train_texts, train_labels)
+        fit_with_source_weights(pipeline, train_texts, train_labels, train_weights)
         fitted[name] = pipeline
         probabilities = _probabilities(pipeline, valid_texts)
         threshold_rows = evaluate_thresholds(valid_labels, probabilities, THRESHOLDS)
