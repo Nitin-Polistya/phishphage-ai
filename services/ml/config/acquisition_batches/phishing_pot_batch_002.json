@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "batch_id": "phishing_pot_batch_002",
+  "source_id": "github_rf_peixoto_phishing_pot",
+  "purpose": "Dry-run-only deterministic weak-label expansion for non-commercial research",
+  "selection_seed": "phishing-pot-batch-002-v1",
+  "maximum_selected_candidates": 500,
+  "source_commit": "80685cbfe69a1f905707be92e144ba5b71f9ee37",
+  "language": "en",
+  "label": "phishing",
+  "label_quality": "weak_source_provenance",
+  "review_status": "not_manually_reviewed",
+  "split_role": "train_only",
+  "source_weight": 0.35,
+  "selection_limits": {
+    "maximum_per_campaign_group": 3,
+    "maximum_per_template_group": 2,
+    "maximum_recognized_brand_share": 0.15,
+    "maximum_sender_infrastructure_share": 0.05,
+    "maximum_source_share_after_inclusion": 0.20
+  },
+  "source_artifact_exclusion": {
+    "enabled": true,
+    "categories": [
+      "explicit_honeypot_term",
+      "collection_name_marker",
+      "honeypot_recipient_marker"
+    ]
+  },
+  "safety": {
+    "static_parse_only": true,
+    "render_html": false,
+    "follow_urls": false,
+    "resolve_dns": false,
+    "load_remote_resources": false,
+    "execute_or_extract_attachments": false,
+    "write_attachment_bytes": false,
+    "preserve_attachment_filenames": false
+  },
+  "registry_changed": false,
+  "source_approved": false,
+  "promotion_eligible": false,
+  "training_enabled": false,
+  "notes": [
+    "This configuration authorizes only a local dry run against the existing ignored checkout.",
+    "Batch 001 candidate IDs remain a protected exclusion boundary.",
+    "No active development dataset, model, threshold, source approval, or promotion state is modified."
+  ]
+}
