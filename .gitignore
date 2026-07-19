@@ -22,6 +22,7 @@ services/ml/data/external/*
 services/ml/data/staging/*
 services/ml/models/*
 services/ml/reports/*
+services/ml/artifacts/*
 !services/ml/data/raw/.gitkeep
 !services/ml/data/interim/.gitkeep
 !services/ml/data/processed/.gitkeep

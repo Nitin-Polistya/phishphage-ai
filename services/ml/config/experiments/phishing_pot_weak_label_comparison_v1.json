@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "experiment_suite": "phishing_pot_weak_label_comparison_v1",
+  "seed": 42,
+  "bootstrap_seed": 314159,
+  "bootstrap_iterations": 300,
+  "fixed_threshold": 0.5,
+  "experiments": {
+    "baseline": {"weak_rows": 0, "weak_weight": null},
+    "weak_035": {"weak_rows": 107, "weak_weight": 0.35},
+    "weak_050": {"weak_rows": 107, "weak_weight": 0.5}
+  },
+  "source": {
+    "id": "github_rf_peixoto_phishing_pot",
+    "commit": "80685cbfe69a1f905707be92e144ba5b71f9ee37",
+    "license_classification": "restricted_noncommercial_cc_by_nc_4_0",
+    "approval_status": "not_approved_for_unrestricted_use"
+  },
+  "paths": {
+    "baseline": "services/ml/data/processed/english_core.csv",
+    "weak_manifest": "services/ml/data/interim/phishing_pot_batch_002/proposed_training_sample.jsonl",
+    "artifact_dir": "services/ml/artifacts/experiments/phishing_pot_weak_label_comparison_v1",
+    "report_dir": "services/ml/reports/phishing_pot_weak_label_comparison_v1",
+    "active_model": "services/ml/models/phishshield_model.joblib"
+  },
+  "evaluation": {
+    "fixed_validation": "services/ml/data/external/development_benchmark.csv",
+    "grouped_diagnostic": "services/ml/data/external/validation.csv",
+    "template_shift_diagnostic": "services/ml/data/processed/grouped_template_diagnostic_v2.csv",
+    "external_evaluation": "services/ml/data/external/final_external_benchmark.csv",
+    "hard_negative": "services/ml/tests/fixtures/safe_email_cases.py"
+  },
+  "expected_sha256": {
+    "baseline": "8d802bf95f1e101f0d1390317a938341eff6d9e9b31c93b6806a25e62166419b",
+    "weak_manifest": "a06a43db8b1ca7e4cf3cc4233d2e92ce5c9bda909e229b3d49f6e286a5ca05cd",
+    "fixed_validation": "f55ded1ffe6d3f8245a7443edcd92c48217c3d6b0614af8137f03aa335265477",
+    "grouped_diagnostic": "aa17b4877fa08db8181aca62a9a7db9971e7ab62b84da69992e3448c65e3f496",
+    "template_shift_diagnostic": "a7ceebb726ebe9f2ea32d85d83b88d72afb43af83053975d0c334bfb41fdf36b",
+    "external_evaluation": "831e5ab3f7341bceeecfabeda80c1eab026bd45de75bc40e69423145db018fbc",
+    "hard_negative": "2343290a3bce1afa173c78a6b73a09c840db721d96368090eb24b4fa50f21f68",
+    "active_model": "2a3d4f416d1378945da5d499bfbcbbecbb362c7561274ce7c33e22b1e8ee055c"
+  },
+  "feature_configuration": {
+    "type": "word_tfidf", "lowercase": true, "ngram_range": [1, 2],
+    "min_df": 1, "max_df": 0.95, "max_features": 30000,
+    "sublinear_tf": true, "strip_accents": "unicode"
+  },
+  "model_configuration": {
+    "type": "logistic_regression", "class_weight": "balanced",
+    "solver": "liblinear", "max_iter": 1000, "random_state": 42
+  },
+  "grouping_policy": {
+    "weak_rows_train_only": true,
+    "exclude_exact_training_overlap_from_protected_evaluation": true,
+    "campaign_and_template_groups_may_not_cross_training_evaluation": true
+  },
+  "acceptance_criteria": {
+    "external_recall_max_decrease": 0.02,
+    "external_precision_max_decrease": 0.03,
+    "external_fpr_max_increase": 0.02,
+    "external_brier_max_increase": 0.02,
+    "template_shift_f1_max_decrease": 0.02,
+    "source_probe_auc_warning": 0.8
+  }
+}
