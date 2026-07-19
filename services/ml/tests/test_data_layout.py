@@ -14,8 +14,9 @@ def test_canonical_data_directories_exist_with_gitkeep() -> None:
         assert (directory / ".gitkeep").is_file()
 
 
-def test_external_directory_is_flat() -> None:
-    assert not any(path.is_dir() for path in (DATA_ROOT / "external").iterdir())
+def test_external_directory_has_no_legacy_lifecycle_nesting() -> None:
+    nested = {path.name.lower() for path in (DATA_ROOT / "external").iterdir() if path.is_dir()}
+    assert not nested.intersection({"raw", "interim", "processed"})
 
 
 def test_scripts_and_docs_do_not_reference_legacy_external_subdirectories() -> None:

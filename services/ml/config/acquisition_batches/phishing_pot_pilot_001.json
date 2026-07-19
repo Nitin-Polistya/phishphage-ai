@@ -12,7 +12,34 @@
   "raw_storage_allowed": false,
   "ingestion_enabled": false,
   "redistribution_allowed": false,
-  "acquisition_status": "not_started_requires_separate_authorization",
+  "acquisition_status": "acquired_external_staging_only_pending_review",
+  "acquisition": {
+    "official_repository": "https://github.com/rf-peixoto/phishing_pot",
+    "method": "git_clone_depth_1_no_tags",
+    "commit_sha": "80685cbfe69a1f905707be92e144ba5b71f9ee37",
+    "tree_sha": "283fcd91f2b1e2c5630ef0a976ae3481b7bb00a1",
+    "repository_tree_eml_count": 8614,
+    "local_checkout_eml_count": 8612,
+    "local_checkout_unavailable_count": 2,
+    "local_checkout_unavailable_reason": "local endpoint security removed or blocked suspicious files; protection was not bypassed",
+    "acquired_at_utc": "2026-07-19T05:40:14.5879854Z",
+    "license_reference": "https://github.com/rf-peixoto/phishing_pot/blob/80685cbfe69a1f905707be92e144ba5b71f9ee37/LICENSE",
+    "local_location_policy": "Git-ignored services/ml/data/external/phishing_pot only"
+  },
+  "selection": {
+    "seed": "phishing-pot-pilot-001-v1",
+    "algorithm": "evidence_score_then_seeded_sha256_v1",
+    "criteria": [
+      "English language estimate",
+      "safe static EML parse",
+      "provisional phishing-intent evidence",
+      "no unresolved privacy flags",
+      "no exact, normalized, semantic, campaign, template, or external-boundary overlap",
+      "maximum two candidates per campaign",
+      "maximum one candidate per template",
+      "maximum 25 percent per brand"
+    ]
+  },
   "sample_review_required": true,
   "promotion_requires_explicit_source_approval": true,
   "safe_handling": {

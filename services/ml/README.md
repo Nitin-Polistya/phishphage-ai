@@ -29,7 +29,17 @@ Future acquisition is controlled by `config/dataset_source_registry.json` and th
 
 Phase B.2A adds `config/source_review_checklist.json`, the planning-only `config/acquisition_batches/batch_001.json`, `scripts/audit_source_registry.py`, and `scripts/validate_batch_readiness.py`. Batch 001 plans 120 real English messages (70 legitimate, 50 phishing), zero synthetic and zero additional dominant-Zenodo rows. It remains blocked until at least two independent sources have verified license/privacy/acquisition evidence and human approval.
 
-`github_rf_peixoto_phishing_pot` is recorded as a pending, phishing-only candidate for 22 Batch 001 rows. Its CC BY-NC 4.0 license state is `verified_restricted_noncommercial`, not approved; privacy is `pending_sample_review`. `staging_allowed: true` supports only a future separately authorized, ignored staging review, while `development_allowed`, raw storage, ingestion, and redistribution remain false. The planning-only pilot specification and empty report schemas are under `config/acquisition_batches/phishing_pot_pilot_001.json` and `config/report_templates/phishing_pot_pilot/`; the [source-review packet](config/report_templates/phishing_pot_pilot/source_review_packet.md) is the mandatory manual checklist. No staged row may promote until privacy, language, phishing-label, encoded-content, attachment, attribution, duplicate/overlap, campaign/template, source-approval, and explicit development-capability checks all pass. CC BY-NC material remains restricted to non-commercial research; retain attribution and third-party-rights evidence and never redistribute raw emails.
+`github_rf_peixoto_phishing_pot` remains a pending, phishing-only candidate for 22 Batch 001 rows. Its CC BY-NC 4.0 license state is `verified_restricted_noncommercial`, not approved; privacy is `pending_sample_review`. The authorized pilot acquired commit `80685cbfe69a1f905707be92e144ba5b71f9ee37` into ignored external storage and selected 22 provisional messages into ignored staging. This does not change `development_allowed`, ingestion, raw-storage, or redistribution permissions. All 22 await manual review and the blocked promotion preview confirms that no row can promote. The pilot metadata and safe schemas are under `config/acquisition_batches/phishing_pot_pilot_001.json` and `config/report_templates/phishing_pot_pilot/`; the [source-review packet](config/report_templates/phishing_pot_pilot/source_review_packet.md) remains mandatory. CC BY-NC material is limited to non-commercial research, attribution must be preserved, and raw email must never be committed or redistributed.
+
+Reproduce local validation after the ignored official checkout exists:
+
+```powershell
+python services/ml/scripts/validate_phishing_pot_preflight.py
+python services/ml/scripts/run_phishing_pot_pilot.py --workers 16
+python services/ml/scripts/preview_phishing_pot_promotion.py
+```
+
+The scanner never renders HTML, contacts remote resources, executes attachment content, or writes bodies, addresses, URLs, filenames, or attachment bytes to reports. Automated taxonomy is provisional; it never substitutes for human phishing-versus-spam/scam/malware adjudication.
 
 ## Step 3: template-shift generalization
 

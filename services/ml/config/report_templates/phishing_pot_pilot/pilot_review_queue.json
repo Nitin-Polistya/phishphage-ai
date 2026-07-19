@@ -5,10 +5,12 @@
     "phishing",
     "spam_not_phishing",
     "scam_not_phishing",
+    "malware_not_phishing",
     "ambiguous",
     "reject_privacy",
     "reject_duplicate",
-    "reject_non_english"
+    "reject_non_english",
+    "reject_corrupt"
   ],
   "required_review_fields": [
     "candidate_id",

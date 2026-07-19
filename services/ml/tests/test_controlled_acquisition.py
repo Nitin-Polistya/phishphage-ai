@@ -120,6 +120,20 @@ def _pilot_review(**overrides: object) -> dict:
     return review
 
 
+def test_pilot_adjudication_enum_is_complete_and_closed() -> None:
+    assert PILOT_REVIEW_CLASSIFICATIONS == {
+        "phishing",
+        "spam_not_phishing",
+        "scam_not_phishing",
+        "malware_not_phishing",
+        "ambiguous",
+        "reject_privacy",
+        "reject_duplicate",
+        "reject_non_english",
+        "reject_corrupt",
+    }
+
+
 @pytest.mark.parametrize(
     "classification",
     sorted(PILOT_REVIEW_CLASSIFICATIONS - {"phishing"}),
@@ -154,6 +168,72 @@ def test_pending_source_remains_ineligible_even_after_positive_sample_review() -
     assert "development_use_disabled" in result["reasons"]
     assert "source_approval_incomplete" in result["reasons"]
     assert "privacy_review_incomplete" in result["reasons"]
+
+
+def test_development_disabled_source_cannot_promote_even_when_other_gates_pass() -> None:
+    result = pilot_promotion_eligibility(
+        _source(development_allowed=False), _pilot_review()
+    )
+    assert result == {"eligible": False, "reasons": ["development_use_disabled"]}
+
+
+@pytest.mark.parametrize(
+    ("field", "reason"),
+    [
+        ("manual_approved", "manual_approval_missing"),
+        ("phishing_confirmed", "phishing_behavior_not_confirmed"),
+        ("language", "english_language_not_confirmed"),
+        ("privacy_checks_passed", "sample_privacy_check_failed"),
+        ("duplicate_checks_passed", "duplicate_check_failed"),
+        ("overlap_checks_passed", "development_overlap_check_failed"),
+        ("campaign_group", "campaign_group_missing"),
+        ("template_group", "template_group_missing"),
+    ],
+)
+def test_incomplete_sample_review_cannot_promote(field: str, reason: str) -> None:
+    incomplete_value: object = (
+        "es" if field == "language" else ("" if field.endswith("_group") else False)
+    )
+    result = pilot_promotion_eligibility(
+        _source(), _pilot_review(**{field: incomplete_value})
+    )
+    assert result["eligible"] is False
+    assert reason in result["reasons"]
+
+
+def test_pilot_promotion_blockers_are_deterministic() -> None:
+    source = _source(
+        development_allowed=False,
+        approval_status="pending",
+        privacy_status="pending_sample_review",
+    )
+    review = _pilot_review(
+        classification="reject_corrupt",
+        manual_approved=False,
+        phishing_confirmed=False,
+        language="und",
+        privacy_checks_passed=False,
+        duplicate_checks_passed=False,
+        overlap_checks_passed=False,
+        campaign_group="",
+        template_group="",
+    )
+    expected = [
+        "development_use_disabled",
+        "source_approval_incomplete",
+        "privacy_review_incomplete",
+        "manual_approval_missing",
+        "classification_not_phishing:reject_corrupt",
+        "phishing_behavior_not_confirmed",
+        "english_language_not_confirmed",
+        "sample_privacy_check_failed",
+        "duplicate_check_failed",
+        "development_overlap_check_failed",
+        "campaign_group_missing",
+        "template_group_missing",
+    ]
+    assert pilot_promotion_eligibility(source, review)["reasons"] == expected
+    assert pilot_promotion_eligibility(source, review)["reasons"] == expected
 
 
 def test_unknown_license_must_remain_pending(tmp_path: Path) -> None:

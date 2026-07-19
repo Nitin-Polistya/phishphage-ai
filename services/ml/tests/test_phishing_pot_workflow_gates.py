@@ -60,7 +60,8 @@ def test_source_review_packet_is_metadata_only_and_covers_required_risks() -> No
     packet = (ROOT / "config/report_templates/phishing_pot_pilot/source_review_packet.md").read_text(encoding="utf-8").lower()
     for phrase in (
         "cc by-nc", "non-commercial", "third-party", "url query", "encoded content",
-        "attachments", "spam", "language", "campaign", "template", "no source may be cloned",
+        "attachments", "spam", "language", "campaign", "template",
+        "explicitly authorized clone", "no additional acquisition",
     ):
         assert phrase in packet
     assert "contains no cloned repository content" in packet

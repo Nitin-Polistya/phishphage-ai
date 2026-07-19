@@ -31,7 +31,12 @@ from .preprocessing import normalize_email_text
 
 
 URL_PATTERN = re.compile(r"(?i)\b(?:https?|hxxps?)://[^\s<>\"']+|\bwww\.[^\s<>\"']+")
+EMAIL_PATTERN = re.compile(r"(?i)(?<![\w.+-])([a-z0-9][a-z0-9._%+-]*@[a-z0-9.-]+\.[a-z]{2,})(?![\w.-])")
 MAX_MESSAGE_BYTES = 10 * 1024 * 1024
+MAX_MIME_PARTS = 200
+MAX_MIME_DEPTH = 12
+MAX_TEXT_PART_BYTES = 2 * 1024 * 1024
+MAX_DECODED_TEXT_BYTES = 5 * 1024 * 1024
 AUTHENTICATION_HEADERS = (
     "Authentication-Results",
     "ARC-Authentication-Results",
@@ -63,16 +68,22 @@ class _SafeHTMLTextExtractor(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.text_parts: list[str] = []
         self.urls: list[str] = []
+        self.remote_resource_count = 0
+        self.sensitive_attribute_count = 0
         self._suppressed_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag.lower() in {"script", "style", "svg", "template"}:
             self._suppressed_depth += 1
         for key, value in attrs:
+            if value and (EMAIL_PATTERN.search(html.unescape(value)) or _url_has_sensitive_components(value)):
+                self.sensitive_attribute_count += 1
             if key.lower() in {"href", "src", "action"} and value:
                 candidate = html.unescape(value).strip()
                 if URL_PATTERN.match(candidate):
                     self.urls.append(candidate)
+                    if key.lower() == "src":
+                        self.remote_resource_count += 1
 
     def handle_endtag(self, tag: str) -> None:
         if tag.lower() in {"script", "style", "svg", "template"} and self._suppressed_depth:
@@ -184,16 +195,128 @@ def safe_archive_members(path: str | Path) -> list[dict[str, Any]]:
     return members
 
 
-def _decoded_part(part: Message) -> str:
-    try:
-        content = part.get_content()
-        if isinstance(content, str):
-            return content
-    except (LookupError, UnicodeDecodeError, AttributeError):
-        pass
+def _decoded_part(part: Message, *, limit: int = MAX_TEXT_PART_BYTES) -> tuple[str, bool]:
+    """Decode inert text with a strict byte ceiling; never invoke content handlers."""
     payload = part.get_payload(decode=True) or b""
+    truncated = len(payload) > limit
+    payload = payload[:limit]
     charset = part.get_content_charset() or "utf-8"
-    return payload.decode(charset, errors="replace")
+    try:
+        return payload.decode(charset, errors="replace"), truncated
+    except LookupError:
+        return payload.decode("utf-8", errors="replace"), truncated
+
+
+def _leaf_parts(message: Message) -> Iterator[tuple[Message, int]]:
+    """Walk MIME without recursion and reject part-count/depth bombs."""
+    stack: list[tuple[Message, int]] = [(message, 0)]
+    seen = 0
+    while stack:
+        part, depth = stack.pop()
+        seen += 1
+        if seen > MAX_MIME_PARTS:
+            raise ValueError(f"Message exceeds {MAX_MIME_PARTS} MIME parts")
+        if depth > MAX_MIME_DEPTH:
+            raise ValueError(f"Message exceeds MIME depth {MAX_MIME_DEPTH}")
+        payload = part.get_payload()
+        if part.is_multipart() and isinstance(payload, list):
+            stack.extend((child, depth + 1) for child in reversed(payload))
+        else:
+            yield part, depth
+
+
+def mask_email_address(value: str) -> str:
+    """Return a stable display mask without exposing the local part."""
+    address = parseaddr(value)[1].lower()
+    if "@" not in address:
+        return ""
+    local, domain = address.rsplit("@", 1)
+    return f"{local[:1] or '*'}***@{domain}"
+
+
+def _url_has_sensitive_components(value: str) -> bool:
+    candidate = html.unescape(value).strip()
+    parseable = re.sub(r"(?i)^hxxps?://", "https://", candidate)
+    if parseable.lower().startswith("www."):
+        parseable = "https://" + parseable
+    try:
+        parsed = urllib.parse.urlsplit(parseable)
+    except ValueError:
+        return False
+    return bool(parsed.query or parsed.fragment)
+
+
+def _safe_url_evidence(value: str) -> dict[str, Any]:
+    candidate = value.strip().rstrip(".,);]")
+    parseable = re.sub(r"(?i)^hxxps?://", "https://", candidate)
+    if parseable.lower().startswith("www."):
+        parseable = "https://" + parseable
+    try:
+        parsed = urllib.parse.urlsplit(parseable)
+        host = (parsed.hostname or "").lower()
+    except ValueError:
+        return {
+            "host": "",
+            "scheme": "",
+            "path_present": False,
+            "query_parameter_names": [],
+            "has_fragment": False,
+            "malformed": True,
+        }
+    parameter_names = sorted({name for name, _ in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)})
+    return {
+        "host": host,
+        "scheme": parsed.scheme.lower(),
+        "path_present": bool(parsed.path and parsed.path != "/"),
+        "query_parameter_names": parameter_names,
+        "has_fragment": bool(parsed.fragment),
+    }
+
+
+def _privacy_summary(
+    message: Message,
+    decoded_text: str,
+    urls: Iterable[str],
+    *,
+    sensitive_html_attribute_count: int,
+    attachment_names: Iterable[str],
+) -> dict[str, Any]:
+    header_names = ("From", "To", "Cc", "Reply-To", "Return-Path", "Received")
+    masked_headers: dict[str, list[str]] = {}
+    address_locations: list[str] = []
+    for name in header_names:
+        matches: list[str] = []
+        for value in message.get_all(name, []):
+            matches.extend(EMAIL_PATTERN.findall(str(value)))
+        if matches:
+            address_locations.append(name.lower())
+            masked_headers[name.lower()] = sorted({mask_email_address(item) for item in matches})
+    body_addresses = EMAIL_PATTERN.findall(decoded_text)
+    evidence = [_safe_url_evidence(url) for url in sorted(set(urls))]
+    flags: list[str] = []
+    if address_locations:
+        flags.append("address_in_header")
+    if body_addresses:
+        flags.append("address_in_decoded_content")
+    if any(item["query_parameter_names"] for item in evidence):
+        flags.append("sensitive_url_parameters_require_review")
+    attachment_privacy_count = sum(
+        1 for name in attachment_names
+        if EMAIL_PATTERN.search(name) or re.search(r"(?i)(?:token|secret|password|credential|account)[-_ ]", name)
+    )
+    if sensitive_html_attribute_count:
+        flags.append("sensitive_html_attribute_requires_review")
+    if attachment_privacy_count:
+        flags.append("sensitive_attachment_name_requires_review")
+    return {
+        "flags": flags,
+        "address_header_locations": sorted(address_locations),
+        "decoded_content_address_count": len(set(map(str.lower, body_addresses))),
+        "masked_header_addresses": masked_headers,
+        "url_evidence": evidence,
+        "sensitive_html_attribute_count": sensitive_html_attribute_count,
+        "sensitive_attachment_name_count": attachment_privacy_count,
+    }
 
 
 def _domain(header_value: str | None) -> str:
@@ -204,40 +327,65 @@ def _domain(header_value: str | None) -> str:
 def parse_email_bytes(raw: bytes, *, source_id: str, campaign_id: str) -> dict[str, Any]:
     if len(raw) > MAX_MESSAGE_BYTES:
         raise ValueError(f"Message exceeds {MAX_MESSAGE_BYTES} bytes")
-    message = BytesParser(policy=policy.default).parsebytes(raw)
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(raw)
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise ValueError("Message could not be parsed safely") from exc
     plain_parts: list[str] = []
     html_parts: list[str] = []
     urls: list[str] = []
     attachments: list[dict[str, Any]] = []
+    mime_types: set[str] = set()
+    parse_warnings = [type(defect).__name__ for defect in message.defects]
+    remote_resources_blocked = 0
+    sensitive_html_attribute_count = 0
+    decoded_text_bytes = 0
 
-    parts: Iterable[Message] = message.walk() if message.is_multipart() else (message,)
-    for part in parts:
-        if part.is_multipart():
-            continue
+    for part, _depth in _leaf_parts(message):
+        mime_types.add(part.get_content_type().lower())
+        parse_warnings.extend(type(defect).__name__ for defect in part.defects)
         filename = part.get_filename()
         disposition = part.get_content_disposition()
         payload = part.get_payload(decode=True) or b""
         if filename or disposition == "attachment":
+            safe_name = Path(filename).name if filename else null_filename()
             attachments.append(
                 {
-                    "filename": Path(filename).name if filename else null_filename(),
+                    "filename": safe_name,
+                    "privacy_safe_filename": {
+                        "extension": Path(safe_name).suffix.lower(),
+                        "name_sha256_prefix": hashlib.sha256(safe_name.encode("utf-8", errors="replace")).hexdigest()[:12],
+                    },
                     "content_type": part.get_content_type(),
                     "bytes": len(payload),
+                    "sha256": hashlib.sha256(payload).hexdigest(),
                 }
             )
             continue
         content_type = part.get_content_type().lower()
         if content_type == "text/plain":
-            text = _decoded_part(part)
+            text, truncated = _decoded_part(part)
+            decoded_text_bytes += len(text.encode("utf-8", errors="replace"))
+            if truncated:
+                parse_warnings.append("TextPartTruncated")
             plain_parts.append(text)
             urls.extend(URL_PATTERN.findall(text))
         elif content_type == "text/html":
             extractor = _SafeHTMLTextExtractor()
-            extractor.feed(_decoded_part(part))
+            decoded, truncated = _decoded_part(part)
+            decoded_text_bytes += len(decoded.encode("utf-8", errors="replace"))
+            if truncated:
+                parse_warnings.append("TextPartTruncated")
+            extractor.feed(decoded)
+            extractor.close()
             text = " ".join(extractor.text_parts)
             html_parts.append(text)
+            remote_resources_blocked += extractor.remote_resource_count
+            sensitive_html_attribute_count += extractor.sensitive_attribute_count
             urls.extend(extractor.urls)
             urls.extend(URL_PATTERN.findall(text))
+        if decoded_text_bytes > MAX_DECODED_TEXT_BYTES:
+            raise ValueError(f"Message exceeds {MAX_DECODED_TEXT_BYTES} decoded text bytes")
 
     subject = normalize_email_text(str(message.get("Subject", "")))
     plain_body = normalize_email_text("\n".join(plain_parts))
@@ -249,6 +397,13 @@ def parse_email_bytes(raw: bytes, *, source_id: str, campaign_id: str) -> dict[s
         for name in AUTHENTICATION_HEADERS
         if message.get_all(name, [])
     }
+    privacy = _privacy_summary(
+        message,
+        "\n".join((*plain_parts, *html_parts)),
+        urls,
+        sensitive_html_attribute_count=sensitive_html_attribute_count,
+        attachment_names=(item["filename"] for item in attachments),
+    )
     return {
         "text": text,
         "subject": subject,
@@ -258,7 +413,12 @@ def parse_email_bytes(raw: bytes, *, source_id: str, campaign_id: str) -> dict[s
         "reply_to_domain": _domain(message.get("Reply-To")),
         "urls": sorted(set(urls)),
         "authentication_headers": auth_headers,
+        "mime_types": sorted(mime_types),
         "attachments": attachments,
+        "remote_resources_blocked": remote_resources_blocked,
+        "privacy": privacy,
+        "malformed": bool(parse_warnings),
+        "parse_warnings": sorted(set(parse_warnings)),
         "source": source_id,
         "campaign_id": campaign_id,
     }
@@ -372,4 +532,3 @@ def assert_not_external_path(path: str | Path) -> None:
     parts = {part.lower() for part in Path(path).resolve().parts}
     if "external" in parts:
         raise ValueError("External-validation data is physically isolated and cannot be used as core input")
-

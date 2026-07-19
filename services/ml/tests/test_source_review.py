@@ -173,7 +173,7 @@ def test_readiness_report_is_deterministic() -> None:
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
 
 
-def test_phishing_pot_pilot_is_empty_planning_only() -> None:
+def test_phishing_pot_pilot_remains_restricted_after_staging_acquisition() -> None:
     pilot = json.loads((ML_ROOT / "config/acquisition_batches/phishing_pot_pilot_001.json").read_text(encoding="utf-8"))
     templates = ML_ROOT / "config/report_templates/phishing_pot_pilot"
     queue = json.loads((templates / "pilot_review_queue.json").read_text(encoding="utf-8"))
@@ -182,11 +182,13 @@ def test_phishing_pot_pilot_is_empty_planning_only() -> None:
     assert pilot["staging_only"] is True
     assert pilot["development_allowed"] is False
     assert pilot["raw_storage_allowed"] is False
-    assert pilot["acquisition_status"] == "not_started_requires_separate_authorization"
+    assert pilot["acquisition_status"] == "acquired_external_staging_only_pending_review"
+    assert pilot["acquisition"]["commit_sha"]
     assert queue["samples"] == []
     assert set(queue["allowed_classifications"]) == {
-        "phishing", "spam_not_phishing", "scam_not_phishing", "ambiguous",
-        "reject_privacy", "reject_duplicate", "reject_non_english",
+        "phishing", "spam_not_phishing", "scam_not_phishing", "malware_not_phishing",
+        "ambiguous", "reject_privacy", "reject_duplicate", "reject_non_english",
+        "reject_corrupt",
     }
     assert attribution["raw_redistribution_allowed"] is False
     assert attribution["provenance_rows"] == []

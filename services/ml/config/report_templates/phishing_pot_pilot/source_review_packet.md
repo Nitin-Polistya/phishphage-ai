@@ -75,5 +75,7 @@ until those decisions and an independent source audit are complete.
 - accepted/rejected counts and reviewer identities;
 - explicit decision to keep raw content non-redistributable.
 
-No source may be cloned, downloaded, ingested, promoted, or used for training
-while any required item is pending or rejected.
+The current explicitly authorized clone may exist only in ignored external
+acquisition storage. No additional acquisition, development ingestion,
+promotion, redistribution, or training use is allowed while any required item
+is pending or rejected.

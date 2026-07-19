@@ -28,8 +28,9 @@ LICENSE_STATUS_ENUM = STATUS_ENUM | {"verified_restricted_noncommercial"}
 PRIVACY_STATUS_ENUM = STATUS_ENUM | {"pending_sample_review"}
 REVIEW_STATUS_ENUM = {"approve", "reject", "needs_revision", "external_only"}
 PILOT_REVIEW_CLASSIFICATIONS = {
-    "phishing", "spam_not_phishing", "scam_not_phishing", "ambiguous",
-    "reject_privacy", "reject_duplicate", "reject_non_english",
+    "phishing", "spam_not_phishing", "scam_not_phishing", "malware_not_phishing",
+    "ambiguous", "reject_privacy", "reject_duplicate", "reject_non_english",
+    "reject_corrupt",
 }
 REGISTRY_FIELDS = {
     "source_id", "display_name", "homepage", "dataset_reference", "license",

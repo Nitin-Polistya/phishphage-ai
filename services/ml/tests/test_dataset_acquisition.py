@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import base64
+import hashlib
 import json
 import sys
 import tarfile
@@ -9,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from phishshield_ml.acquisition import (
+    MAX_MIME_DEPTH,
+    MAX_MIME_PARTS,
     assert_not_external_path,
     load_source_registry,
     parse_email_bytes,
@@ -77,7 +81,122 @@ not executable by the parser
     assert record["urls"] == ["https://example.test/review"]
     assert record["authentication_headers"]["authentication-results"] == ["mx.example; spf=pass"]
     assert record["attachments"][0]["filename"] == "sample.bin"
+    assert record["attachments"][0]["sha256"] == hashlib.sha256(b"not executable by the parser").hexdigest()
+    assert record["attachments"][0]["privacy_safe_filename"]["extension"] == ".bin"
     assert "not executable" not in record["text"]
+
+
+def test_email_parser_never_fetches_html_remote_resources(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_network(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("message-derived network access attempted")
+
+    monkeypatch.setattr("urllib.request.urlopen", fail_network)
+    raw = b"""MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<img src="https://tracker.example/pixel?id=secret" data-recipient="private.person@example.test"><a href="https://login.example/path?token=private">Review</a>
+"""
+    record = parse_email_bytes(raw, source_id="fixture", campaign_id="fixture:remote")
+    assert record["remote_resources_blocked"] == 1
+    assert record["sanitized_html_text"] == "Review"
+    assert "sensitive_url_parameters_require_review" in record["privacy"]["flags"]
+    privacy_json = json.dumps(record["privacy"])
+    assert "secret" not in privacy_json
+    assert "private" not in privacy_json
+    assert record["privacy"]["sensitive_html_attribute_count"] >= 1
+    assert "sensitive_html_attribute_requires_review" in record["privacy"]["flags"]
+    assert {item["host"] for item in record["privacy"]["url_evidence"]} == {
+        "login.example", "tracker.example",
+    }
+    assert {name for item in record["privacy"]["url_evidence"] for name in item["query_parameter_names"]} == {
+        "id", "token",
+    }
+
+
+def test_encoded_addresses_are_detected_and_masked_without_exposure() -> None:
+    encoded_body = base64.b64encode(b"Contact named.person@example.com for access").decode("ascii")
+    raw = f"""From: =?utf-8?q?Named_Person?= <named.person@example.com>
+To: honeypot@example.net
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: base64
+
+{encoded_body}
+""".encode("ascii")
+    record = parse_email_bytes(raw, source_id="fixture", campaign_id="fixture:privacy")
+    privacy = record["privacy"]
+    assert privacy["decoded_content_address_count"] == 1
+    assert privacy["masked_header_addresses"]["from"] == ["n***@example.com"]
+    assert privacy["masked_header_addresses"]["to"] == ["h***@example.net"]
+    assert "named.person@" not in json.dumps(privacy)
+    assert "honeypot@" not in json.dumps(privacy)
+
+
+def test_sensitive_attachment_name_is_flagged_without_copying_attachment_content() -> None:
+    raw = b"""MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=x
+
+--x
+Content-Type: text/plain
+
+Review message
+--x
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="account-token-123.exe"
+
+inert bytes only
+--x--
+"""
+    record = parse_email_bytes(raw, source_id="fixture", campaign_id="fixture:attachment")
+    assert record["privacy"]["sensitive_attachment_name_count"] == 1
+    assert "sensitive_attachment_name_requires_review" in record["privacy"]["flags"]
+    assert "inert bytes only" not in record["text"]
+
+
+def test_malformed_mime_is_flagged_without_exposing_content() -> None:
+    raw = b"""MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary=unfinished
+
+--unfinished
+Content-Type: text/plain
+
+safe visible text
+"""
+    record = parse_email_bytes(raw, source_id="fixture", campaign_id="fixture:malformed")
+    assert record["malformed"] is True
+    assert record["parse_warnings"]
+    assert "safe visible text" in record["text"]
+
+
+def test_malformed_url_evidence_is_inert_and_does_not_break_parsing() -> None:
+    record = parse_email_bytes(
+        b"Content-Type: text/plain\n\nReview http://[invalid-host/path",
+        source_id="fixture",
+        campaign_id="fixture:bad-url",
+    )
+    assert record["privacy"]["url_evidence"][0]["malformed"] is True
+
+
+def test_mime_part_limit_rejects_part_bombs() -> None:
+    parts = [
+        b"--many\nContent-Type: text/plain\n\nx\n" for _ in range(MAX_MIME_PARTS + 1)
+    ]
+    raw = b"MIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=many\n\n" + b"".join(parts) + b"--many--\n"
+    with pytest.raises(ValueError, match="MIME parts"):
+        parse_email_bytes(raw, source_id="fixture", campaign_id="fixture:parts")
+
+
+def test_mime_depth_limit_rejects_deep_nesting() -> None:
+    headers = b"MIME-Version: 1.0\n"
+    body = b""
+    for depth in range(MAX_MIME_DEPTH + 2):
+        boundary = f"depth-{depth}".encode("ascii")
+        body += b"Content-Type: multipart/mixed; boundary=" + boundary + b"\n\n--" + boundary + b"\n"
+    body += b"Content-Type: text/plain\n\nx\n"
+    for depth in reversed(range(MAX_MIME_DEPTH + 2)):
+        body += b"--depth-" + str(depth).encode("ascii") + b"--\n"
+    with pytest.raises(ValueError, match="MIME depth"):
+        parse_email_bytes(headers + body, source_id="fixture", campaign_id="fixture:depth")
 
 
 def test_archive_path_traversal_is_rejected(tmp_path: Path) -> None:

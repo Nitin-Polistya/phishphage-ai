@@ -281,7 +281,7 @@
       "permitted_categories": ["phish_microsoft_365", "phish_google", "phish_banking", "phish_fake_invoice", "phish_payroll", "phish_shipping", "phish_credential_theft", "phish_bec"],
       "raw_storage_allowed": false,
       "required_redactions": ["honeypot recipient addresses in headers", "honeypot addresses in message bodies", "honeypot addresses and identifiers in URL parameters", "personal names and third-party recipient identifiers", "tracking identifiers and account tokens"],
-      "acquisition_method": {"type": "manual_authorized_eml_selection", "reference": "https://github.com/rf-peixoto/phishing_pot/tree/main/email", "status": "pending_no_clone_or_download"},
+      "acquisition_method": {"type": "official_git_clone_depth_1", "reference": "https://github.com/rf-peixoto/phishing_pot", "status": "acquired_external_staging_only", "commit_sha": "80685cbfe69a1f905707be92e144ba5b71f9ee37", "acquired_at_utc": "2026-07-19T05:40:14.5879854Z"},
       "license_evidence_reference": "https://github.com/rf-peixoto/phishing_pot/blob/main/LICENSE",
       "license_evidence_checked_at": "2026-07-18",
       "privacy_evidence_reference": "https://github.com/rf-peixoto/phishing_pot#contribute",
