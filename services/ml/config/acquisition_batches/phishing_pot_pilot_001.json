@@ -41,6 +41,7 @@
     ]
   },
   "sample_review_required": true,
+  "automated_triage_allowed_for_training": false,
   "promotion_requires_explicit_source_approval": true,
   "safe_handling": {
     "render_html": false,
