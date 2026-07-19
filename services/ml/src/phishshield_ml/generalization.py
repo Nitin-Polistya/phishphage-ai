@@ -20,7 +20,10 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.svm import LinearSVC
 
 from .config import MLConfig
-from .dataset import canonicalize_template, load_and_validate_dataset, split_dataset
+from .dataset import (
+    canonicalize_template, load_and_validate_dataset, split_dataset,
+    validate_dataset_boundaries,
+)
 from .evaluation import evaluate_predictions, write_metrics_json
 from .schemas import SplitSummary, TrainingSummary
 from .security_features import SecurityIndicatorTransformer
@@ -236,6 +239,12 @@ def train_generalized_model(
     cfg = config or MLConfig(model_output=Path(model_output), metrics_output=Path(metrics_output))
     development = load_and_validate_dataset(dataset_path)
     diagnostic = load_and_validate_dataset(grouped_diagnostic_path)
+    validate_dataset_boundaries(diagnostic, partition="diagnostic")
+    if development["label_quality"].astype(str).eq("weak_source_provenance").any():
+        raise ValueError(
+            "Generalization cross-validation cannot consume weak_source_provenance rows; "
+            "use the train-only pipeline so weak rows never enter validation folds"
+        )
     if set(development["text"]) & set(diagnostic["text"]):
         raise RuntimeError("Exact text leakage between development and grouped diagnostic")
 

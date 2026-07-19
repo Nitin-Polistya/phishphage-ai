@@ -34,6 +34,8 @@ SOURCE_COMMIT = "80685cbfe69a1f905707be92e144ba5b71f9ee37"
 
 PHONE_PATTERN = re.compile(r"(?<!\w)(?:\+?\d[\d ().-]{7,}\d)(?!\w)")
 EMAIL_LIKE_PATTERN = re.compile(r"(?i)(?<![\w.+-])[a-z0-9][a-z0-9._%+-]*@[a-z0-9.-]+(?![\w.-])")
+BROADER_EMAIL_PATTERN = re.compile(r"(?i)(?<!\S)[^\s@<>]+@[^\s@<>]+(?!\S)")
+ANY_ATOM_EMAIL_PATTERN = re.compile(r"(?i)[^\s@<>\"]{1,128}@[^\s@<>\"]{1,255}")
 PERSON_PATTERN = re.compile(r"(?im)\b(?:dear|hello|hi|attention)\s+([A-Z][a-z]{1,30}(?:\s+[A-Z][a-z]{1,30}){0,2})\b")
 ACCOUNT_PATTERN = re.compile(r"(?i)\b((?:subscription|account|customer|member|invoice|case|ticket|reference)\s+(?:id|number|no\.?|#)\s*[:=-]?\s*)([A-Z0-9][A-Z0-9._-]{4,})\b")
 SECRET_PATTERN = re.compile(r"(?i)\b((?:password|passcode|otp|token|secret|api[_ -]?key|tracking[_ -]?id)\s*[:=]\s*)([^\s,;<>]{4,})")
@@ -87,8 +89,12 @@ def sanitize_visible_text(value: str) -> tuple[str, dict[str, Any], list[str]]:
         counts["url"] += 1
         return _url_token(match, domains)
 
-    sanitized = URL_PATTERN.sub(url_repl, str(value))
+    sanitized = re.sub(r"(?im)^.*\b(?:received|message-id)\s*:.*$", "", str(value))
+    sanitized = URL_PATTERN.sub(url_repl, sanitized)
+    sanitized = re.sub(r"(?i)\b(?:https?|hxxps?)://\S+", "<URL_DOMAIN>", sanitized)
     sanitized = replace(EMAIL_LIKE_PATTERN, sanitized, "<EMAIL_ADDRESS>", "email_address")
+    sanitized = replace(BROADER_EMAIL_PATTERN, sanitized, "<EMAIL_ADDRESS>", "email_address")
+    sanitized = replace(ANY_ATOM_EMAIL_PATTERN, sanitized, "<EMAIL_ADDRESS>", "email_address")
     sanitized = replace(PHONE_PATTERN, sanitized, "<PHONE_NUMBER>", "phone_number")
     sanitized = PERSON_PATTERN.sub(
         lambda match: f"{match.group(0)[:match.group(0).find(match.group(1))]}<PERSON_NAME>",

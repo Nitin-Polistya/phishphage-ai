@@ -5,7 +5,14 @@
   "purpose": "Dry-run-only deterministic weak-label expansion for non-commercial research",
   "selection_seed": "phishing-pot-batch-002-v1",
   "maximum_selected_candidates": 500,
+  "maximum_static_assessment_pool": 2000,
   "source_commit": "80685cbfe69a1f905707be92e144ba5b71f9ee37",
+  "acquisition": {
+    "repository_tree_eml_count": 8614,
+    "local_checkout_eml_count": 8612,
+    "local_checkout_unavailable_count": 2,
+    "unavailable_handling": "excluded_without_restoration_or_security_bypass"
+  },
   "language": "en",
   "label": "phishing",
   "label_quality": "weak_source_provenance",

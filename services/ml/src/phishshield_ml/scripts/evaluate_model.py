@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from phishshield_ml.dataset import load_and_validate_dataset
+from phishshield_ml.dataset import load_and_validate_dataset, validate_dataset_boundaries
 from phishshield_ml.evaluation import evaluate_predictions, write_metrics_json
 from phishshield_ml.inference import load_model_bundle
 
@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     frame = load_and_validate_dataset(args.dataset)
+    validate_dataset_boundaries(frame, partition="external_evaluation")
     bundle = load_model_bundle(args.model)
     pipeline = bundle.pipeline
     probabilities = pipeline.predict_proba(frame["text"].tolist())[:, 1].tolist()
