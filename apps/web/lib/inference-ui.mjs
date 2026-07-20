@@ -17,3 +17,7 @@ export function displayPrediction(result) {
   if (result.prediction === 'phishing') return 'Phishing';
   return result.probability >= 0.35 ? 'Suspicious' : 'Low risk';
 }
+
+export function uniqueSignalValues(values) {
+  return [...new Set(values)];
+}

@@ -1,5 +1,6 @@
 import type { DashboardStats, ScanIndicator, ScanRecord, ThreatVector } from '@/types';
 import type { AnalysisInputMode, ThreatSeverity, UnifiedAnalysisResponse } from '@/types/analysis';
+import type { PredictionResponse } from '@/types/inference';
 
 const SCAN_STORAGE_KEY = 'phishphage.scan-records.v1';
 const SCAN_STORAGE_EVENT = 'phishphage:scan-records-changed';
@@ -176,6 +177,47 @@ export function createScanRecord(result: UnifiedAnalysisResponse, inputMode?: An
       staleReason: analysisFreshness === 'current' ? null : (
         result.stale_reason ?? 'This scan was produced by an unavailable or superseded analysis engine. Re-scan the original email.'
       ),
+    },
+  };
+}
+
+function headerValue(rawEmail: string, name: string) {
+  const match = rawEmail.match(new RegExp(`^${name}:\\s*(.+)$`, 'im'));
+  return match?.[1]?.trim() || '';
+}
+
+export function createProductionScanRecord(result: PredictionResponse, rawEmail: string, inputMode: AnalysisInputMode): ScanRecord {
+  const subject = headerValue(rawEmail, 'Subject') || '(No subject)';
+  const sender = headerValue(rawEmail, 'From') || 'Not supplied';
+  const classification = result.prediction === 'phishing' ? 'phishing' : result.probability >= 0.35 ? 'suspicious' : 'safe';
+  const signalValues = [
+    ...result.signals.detected_indicators,
+    ...result.signals.phishing_signals,
+    ...result.signals.authentication_signals,
+    ...result.signals.url_indicators,
+    ...result.signals.urgency_indicators,
+  ];
+  const indicators = [...new Set(signalValues)].map((value, index) => ({
+    code: `production-${value.toLowerCase().replace(/[^a-z0-9]+/g, '-') || index}`,
+    title: value.replaceAll('_', ' '),
+    category: 'model signal',
+    severity: result.risk_score >= 70 ? 'high' : result.risk_score >= 30 ? 'medium' : 'low' as ThreatSeverity,
+    score: 0,
+    description: 'Signal returned by the production inference service.',
+    evidence: null,
+  }));
+  return {
+    id: createId(), timestamp: new Date().toISOString(), subject, sender, classification,
+    riskScore: Math.round(result.risk_score), confidence: result.confidence, indicators,
+    attachmentCount: 0, extractedUrlCount: result.signals.url_indicators.length,
+    details: {
+      replyTo: null, recipients: [], cc: [], messageDate: null, messageId: null,
+      recommendations: [...result.recommendations], urls: [], attachments: [], inputMode,
+      ruleEngine: { status: 'active', version: 'production-inference' },
+      mlEngine: { status: 'available', version: result.model_version },
+      mlPrediction: result.prediction, mlPhishingProbability: result.probability,
+      mlThreshold: result.threshold_used, finalDecisionConfidence: result.confidence,
+      analysisFreshness: 'stale', staleReason: 'Production-only scan; re-scan after a governed engine change.',
     },
   };
 }

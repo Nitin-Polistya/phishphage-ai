@@ -1,14 +1,20 @@
-export const EXAMPLE_EMAIL = `From: Example Support <support@example.com>
-To: recipient@example.com
-Subject: Example account notice
+export const EXAMPLE_EMAIL = `From: operations@example.org
+To: team@example.org
+Subject: Weekly engineering meeting notes
+Date: Tue, 14 Jul 2026 10:00:00 +0000
+Message-ID: <weekly-meeting-001@example.org>
 
-Dear User,
+Hello team,
 
-This is a safe synthetic message for testing the PhishShield AI workflow.
+The notes from this week's engineering meeting are attached to the internal
+project record.
 
-If you need to review your account, open the official website independently.
+The next scheduled meeting is Tuesday at 10:00 AM in Conference Room B.
 
-Reference page: https://example.com/account
+Agenda:
+- Sprint updates
+- Documentation review
+- Upcoming maintenance window
 
-Thank you,
-Example Support Team`;
+Regards,
+Engineering Operations`;
