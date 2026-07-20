@@ -180,3 +180,32 @@ The API now reports `body_text_only`, `structured_fields`, `html_content`, or `c
 The selected model remains text-only because feature set A won. Candidate C can derive structured indicators from supplied raw text/headers, but it does not establish sender reputation, validate SPF/DKIM/DMARC, inspect attachment content, render HTML, follow redirects, or use external threat intelligence. Real inbox prevalence, multilingual mail, thread history, image-only lures, compromised legitimate accounts, and novel campaigns can behave very differently.
 
 See `REGRESSION_REPORT.md` for the Facebook impersonation before/after record.
+
+## Phase B.3E — source-artifact reduction (diagnostic only)
+
+The source-membership probe is a diagnostic for collection-specific signal;
+it is not the phishing classifier and must never be used to justify changing
+the production threshold.  `phishshield_ml.artifact_reduction` inventories
+probe features, hashes ranked lexical features in reports, and applies only
+approved transport/collection normalisations.  The input corpus is read-only;
+the classifier is not retrained and no dataset rows are rewritten.
+
+Approved transforms are limited to collection headers/mailbox markers,
+transport identifiers (Message-ID, Received and MIME boundaries), generator
+comments and tracking parameter values.  Authentication failures, sender
+mismatch, URLs, credential/payment/urgency language, attachments and other
+phishing semantics are preserved.  A run is capped at five deterministic
+iterations and stops early when AUC falls below 0.75 or no safe transform
+remains.
+
+Example (using the reviewed configuration):
+
+```powershell
+apps\api\.venv\Scripts\python.exe -c "from phishshield_ml.artifact_reduction import run_artifact_reduction; run_artifact_reduction('services/ml/config/experiments/phishing_pot_weak_label_comparison_v1.json')"
+```
+
+Reports are written beneath `services/ml/reports/artifact_reduction_v1/` and
+are intentionally Git-ignored.  They contain aggregate metrics, hashed probe
+feature identifiers and transform names only; raw EML, addresses and URL
+parameters must not be copied into reports.  Review
+`artifact_reduction_summary.md` before considering any subsequent experiment.
