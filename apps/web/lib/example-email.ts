@@ -1,14 +1,14 @@
-export const EXAMPLE_EMAIL = `From: Security Alert <security@microsoft-verify-account.com>
-To: user@example.com
-Subject: Unusual Sign-in Activity Detected
+export const EXAMPLE_EMAIL = `From: Example Support <support@example.com>
+To: recipient@example.com
+Subject: Example account notice
 
 Dear User,
 
-We detected an unusual sign-in attempt to your Microsoft account from a new location (Ip: 192.168.1.1 - Moscow, RU).
+This is a safe synthetic message for testing the PhishShield AI workflow.
 
-If this was not you, please verify your identity immediately to prevent account suspension.
+If you need to review your account, open the official website independently.
 
-Click here to verify your account: http://secure-microsoft-login.net/verify-identity
+Reference page: https://example.com/account
 
 Thank you,
-Microsoft Security Team`;
+Example Support Team`;
