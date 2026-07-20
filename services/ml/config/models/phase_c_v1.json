@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "experiment_version": "phase_c_model_development_v1",
+  "random_seed": 42,
+  "fixed_threshold": 0.5,
+  "cv_folds": 3,
+  "boundary_config": "services/ml/config/experiments/phishing_pot_weak_label_comparison_v1.json",
+  "report_dir": "services/ml/reports/phase_c_model_development_v1",
+  "artifact_dir": "services/ml/artifacts/phase_c_model_development_v1/deployment_candidate",
+  "models": [
+    {
+      "model_id": "phase-c-logistic-regression-v1", "estimator": "logistic_regression",
+      "hyperparameters": [{"C": 0.5}, {"C": 1.0}, {"C": 2.0}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    },
+    {
+      "model_id": "phase-c-linear-svm-v1", "estimator": "linear_svm",
+      "hyperparameters": [{"C": 0.25}, {"C": 0.5}, {"C": 1.0}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    },
+    {
+      "model_id": "phase-c-sgd-classifier-v1", "estimator": "sgd_classifier",
+      "hyperparameters": [{"alpha": 0.00001}, {"alpha": 0.0001}, {"alpha": 0.001}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    },
+    {
+      "model_id": "phase-c-complement-nb-v1", "estimator": "complement_naive_bayes",
+      "hyperparameters": [{"alpha": 0.25}, {"alpha": 0.5}, {"alpha": 1.0}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    },
+    {
+      "model_id": "phase-c-random-forest-v1", "estimator": "random_forest",
+      "hyperparameters": [{"n_estimators": 200, "max_depth": 30, "min_samples_leaf": 1}, {"n_estimators": 200, "max_depth": null, "min_samples_leaf": 1}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    },
+    {
+      "model_id": "phase-c-hist-gradient-boosting-v1", "estimator": "hist_gradient_boosting",
+      "hyperparameters": [{"learning_rate": 0.05, "max_iter": 120, "max_leaf_nodes": 15, "l2_regularization": 1.0}, {"learning_rate": 0.1, "max_iter": 120, "max_leaf_nodes": 31, "l2_regularization": 1.0}],
+      "feature_configuration": {"type": "word_tfidf_chi2", "lowercase": true, "ngram_range": [1, 2], "min_df": 1, "max_df": 0.95, "max_features": 30000, "selection_k": 512, "sublinear_tf": true, "strip_accents": "unicode"},
+      "calibration_methods": ["uncalibrated", "platt", "isotonic"], "random_seed": 42,
+      "training_manifest_hash": "042f7d25769f66ae99bac59885070181aee69c440b0fbd8f505aeb9333a32ddd",
+      "evaluation_manifest_hashes": {"fixed_validation": "7b6e61b33e0637b5905b0613ecb7b15ccb5b5d229ff4f36eecd7fc0e63a89369", "grouped_diagnostic": "0112581c1d8d5475c9370b3b63f5cdd666bef281b6fa4bd3c9050a2a1d233ff2", "template_shift_diagnostic": "2c19bd6fb045d1d10b84017814a9a04676a49ec2c758087dab43e2454d365cb9", "external_evaluation": "bf28e9f5d462f46c9d69a18deec9021b53ebf253f7f0349b794b038956d72da0", "hard_negative": "476d09fb5a4fdf348d49604442cf32b32193c35a928732b4c0296fa13286d0ec"},
+      "experiment_version": "phase_c_model_development_v1"
+    }
+  ]
+}
