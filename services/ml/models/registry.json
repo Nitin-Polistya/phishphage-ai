@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "registry_version": "phase_d_registry_v1",
+  "models": [
+    {
+      "model_id": "phase-c-logistic-regression-v1",
+      "version": "1.0.0",
+      "training_timestamp": "2026-07-20T07:15:11.543039+00:00",
+      "artifact_path": "services/ml/artifacts/phase_c_model_development_v1/deployment_candidate/fitted_pipeline.joblib",
+      "vectorizer_path": "services/ml/artifacts/phase_c_model_development_v1/deployment_candidate/vectorizer.joblib",
+      "feature_manifest_path": "services/ml/artifacts/phase_c_model_development_v1/deployment_candidate/feature_manifest.json",
+      "feature_manifest_hash": "8744e7c08e62f478b1fbf37e8a702b4dd5e109999f220381353150107f66d99c",
+      "vectorizer_hash": "8d1e6c7672caac3c111eda14d46604604cd8182bd11bf63ba79a1793740f6c01",
+      "pipeline_hash": "d25bbc803b245b8422e46f4199cd9a8d935be5731f5cc3134da3a0f1b912d362",
+      "sha256": "d25bbc803b245b8422e46f4199cd9a8d935be5731f5cc3134da3a0f1b912d362",
+      "calibration": "isotonic",
+      "threshold": 0.5,
+      "deployment_candidate": true,
+      "activated": false,
+      "compatible_api_version": "1"
+    }
+  ]
+}

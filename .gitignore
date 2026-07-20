@@ -29,6 +29,7 @@ services/ml/artifacts/*
 !services/ml/data/external/.gitkeep
 !services/ml/data/staging/.gitkeep
 !services/ml/models/.gitkeep
+!services/ml/models/registry.json
 !services/ml/reports/.gitkeep
 !services/ml/data/README.md
 !services/ml/README.md
