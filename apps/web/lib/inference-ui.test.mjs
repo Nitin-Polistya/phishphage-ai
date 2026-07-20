@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { displayPrediction, displayRisk, uniqueSignalValues, validateRawEmail } from './inference-ui.mjs';
+import { buildQuickPasteRawEmail, displayPrediction, displayRisk, uniqueSignalValues, validateRawEmail } from './inference-ui.mjs';
 
 test('rejects empty and oversized raw email input', () => {
   assert.equal(validateRawEmail('   '), 'Paste an email before starting analysis.');
@@ -21,4 +21,10 @@ test('maps backend prediction without claiming certainty', () => {
 
 test('deduplicates repeated signal labels before rendering', () => {
   assert.deepEqual(uniqueSignalValues(['actionable_url', 'actionable_url', 'auth']), ['actionable_url', 'auth']);
+});
+
+test('builds deterministic Quick Paste source without fake authentication headers', () => {
+  const source = buildQuickPasteRawEmail({ senderName: 'Ops', senderEmail: 'ops@example.org', recipientName: '', recipientEmail: '', replyTo: '', subject: 'Notes', body: 'Hello' }, [{ filename: 'notes.pdf', mimeType: 'application/pdf', sizeBytes: '1024' }]);
+  assert.equal(source, 'From: Ops <ops@example.org>\nSubject: Notes\nMIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\n\nHello\nAttachment metadata: notes.pdf (application/pdf), 1024 bytes');
+  assert.equal(source.includes('Authentication-Results'), false);
 });

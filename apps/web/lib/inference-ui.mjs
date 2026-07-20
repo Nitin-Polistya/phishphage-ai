@@ -21,3 +21,14 @@ export function displayPrediction(result) {
 export function uniqueSignalValues(values) {
   return [...new Set(values)];
 }
+
+export function buildQuickPasteRawEmail(fields, attachments = []) {
+  const headers = [];
+  if (fields.senderName || fields.senderEmail) headers.push(`From: ${fields.senderName ? `${fields.senderName} ` : ''}${fields.senderEmail ? `<${fields.senderEmail}>` : ''}`.trim());
+  if (fields.recipientName || fields.recipientEmail) headers.push(`To: ${fields.recipientName ? `${fields.recipientName} ` : ''}${fields.recipientEmail ? `<${fields.recipientEmail}>` : ''}`.trim());
+  if (fields.replyTo) headers.push(`Reply-To: ${fields.replyTo}`);
+  if (fields.subject) headers.push(`Subject: ${fields.subject}`);
+  headers.push('MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8');
+  const metadata = attachments.filter((item) => item.filename.trim()).map((item) => `Attachment metadata: ${item.filename.trim()}${item.mimeType.trim() ? ` (${item.mimeType.trim()})` : ''}${item.sizeBytes.trim() ? `, ${item.sizeBytes.trim()} bytes` : ''}`);
+  return `${headers.join('\n')}\n\n${[fields.body.trim(), ...metadata].filter(Boolean).join('\n')}`;
+}

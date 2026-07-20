@@ -5,9 +5,10 @@ import { useEffect } from 'react';
 import { usePreferences } from '@/hooks/use-preferences';
 
 export function ThemeController() {
-  const { preferences } = usePreferences();
+  const { preferences, isLoaded } = usePreferences();
 
   useEffect(() => {
+    if (!isLoaded) return;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const applyTheme = () => {
       const resolved = preferences.theme === 'system' ? (media.matches ? 'dark' : 'light') : preferences.theme;
@@ -17,7 +18,7 @@ export function ThemeController() {
     applyTheme();
     media.addEventListener('change', applyTheme);
     return () => media.removeEventListener('change', applyTheme);
-  }, [preferences.theme]);
+  }, [isLoaded, preferences.theme]);
 
   return null;
 }

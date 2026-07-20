@@ -1,58 +1,388 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, ClipboardPaste, Clock3, Loader2, RotateCcw, Shield, Upload, X } from 'lucide-react';
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Check,
+  CheckCircle2,
+  ClipboardPaste,
+  FileText,
+  Loader2,
+  Mail,
+  Paperclip,
+  RotateCcw,
+  Upload,
+  X,
+} from 'lucide-react';
+
 import { ApiError, analyzeProductionEmail } from '@/lib/api';
+import {
+  clearSelectedAttachments,
+  formatFileSize,
+  mergeAttachmentSelection,
+  removeSelectedAttachment,
+  toAttachmentMetadataPayload,
+  type SelectedQuickAttachment,
+} from '@/lib/attachment-metadata';
 import { EXAMPLE_EMAIL } from '@/lib/example-email';
-import { createProductionScanRecord, saveScan } from '@/lib/scan-store';
 import { readPreferences } from '@/lib/preferences';
+import {
+  beginRequest,
+  buildQuickPasteRawEmail,
+  clearRequestTiming,
+  completeRequestTiming,
+  emptyQuickPaste,
+  isCurrentRequest,
+  validateQuickPaste,
+  type QuickPasteField,
+  type QuickPasteFields,
+  type RequestTimingState,
+} from '@/lib/production-analysis-ui';
+import { createProductionScanRecord, saveScan } from '@/lib/scan-store';
 import type { AnalysisInputMode } from '@/types/analysis';
 import type { PredictionResponse } from '@/types/inference';
 import { BackendStatus } from './backend-status';
-import { RiskScoreCard } from './risk-score-card';
+import { ProductionAnalysisResults } from './production-analysis-results';
 
 const MAX_EMAIL_BYTES = 2_000_000;
 const stages = ['Validating email', 'Parsing headers and content', 'Extracting security indicators', 'Running ML inference', 'Preparing explanation'];
-const uniqueSignalValues = (values: string[]) => [...new Set(values)];
+const modes = [
+  { id: 'quick_paste' as const, label: 'Quick Paste', actionLabel: 'Analyze Quick Paste', icon: Mail },
+  { id: 'raw_email' as const, label: 'Raw Source', actionLabel: 'Analyze Raw Source', icon: FileText },
+  { id: 'eml_upload' as const, label: 'Upload .eml', actionLabel: 'Analyze Uploaded .eml', icon: Upload },
+];
 
-function errorTitle(kind: ApiError['kind']) {
-  if (kind === 'backend_unavailable' || kind === 'timeout') return 'Analysis service unavailable';
-  if (kind === 'cancelled') return 'Analysis cancelled';
-  if (kind === 'validation') return 'Check the email input';
-  if (kind === 'service_unavailable') return 'Inference model unavailable';
-  return 'Analysis failed';
-}
+type ErrorField = QuickPasteField | 'rawSource' | 'emlFile' | 'quickAttachments';
+type AnalysisError = { message: string; field?: ErrorField };
 
-function SignalGroup({ title, values, tone = 'slate' }: { title: string; values: string[]; tone?: 'slate' | 'amber' | 'rose' | 'blue' }) {
-  const uniqueValues = uniqueSignalValues(values);
-  const toneClass = { slate: 'text-slate-400', amber: 'text-amber-300', rose: 'text-rose-300', blue: 'text-blue-300' }[tone];
-  return <section className="rounded-lg border border-slate-800 bg-slate-950/45 p-4" aria-label={title}><div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-slate-200">{title}</h3><span className={`text-xs ${toneClass}`}>{uniqueValues.length ? `${uniqueValues.length} detected` : 'Not available'}</span></div>{uniqueValues.length ? <ul className="mt-3 flex flex-wrap gap-2">{uniqueValues.map((value, index) => <li key={`${title}-${value}-${index}`} className="rounded border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-300">{value.replaceAll('_', ' ')}</li>)}</ul> : <p className="mt-3 text-xs leading-5 text-slate-500">No corresponding indicators were returned by the backend.</p>}</section>;
+function extensionLabel(filename: string | null, contentType: string | null) {
+  const extension = filename?.match(/\.[^.]+$/)?.[0]?.toLowerCase();
+  return contentType && contentType !== 'application/octet-stream' ? contentType : extension || 'Unknown type';
 }
 
 export function ProductionAnalysis() {
-  const [mode, setMode] = useState<AnalysisInputMode>(() => readPreferences().defaultAnalysisMode);
-  const [rawEmail, setRawEmail] = useState('');
-  const [quick, setQuick] = useState({ sender: '', recipient: '', subject: '', body: '' });
+  const [mode, setMode] = useState<AnalysisInputMode>('quick_paste');
+  const [quick, setQuick] = useState<QuickPasteFields>(emptyQuickPaste);
+  const [attachments, setAttachments] = useState<SelectedQuickAttachment[]>([]);
+  const [rawSource, setRawSource] = useState('');
+  const [selectedFile, setSelectedFile] = useState<{ name: string; size: number } | null>(null);
   const [result, setResult] = useState<PredictionResponse | null>(null);
-  const [error, setError] = useState<ApiError | null>(null);
+  const [resultAttachmentCount, setResultAttachmentCount] = useState(0);
+  const [error, setError] = useState<AnalysisError | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [stageIndex, setStageIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [clientRoundTripMs, setClientRoundTripMs] = useState<number | null>(null);
+  const [timing, setTiming] = useState<RequestTimingState>({ sequence: 0, modelProcessingMs: null, clientRoundTripMs: null });
   const abortRef = useRef<AbortController | null>(null);
-  const startedAtRef = useRef(0);
+  const requestSequenceRef = useRef(0);
+  const emlInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  useEffect(() => {
+    setMode(readPreferences().defaultAnalysisMode);
+  }, []);
+
   useEffect(() => () => abortRef.current?.abort(), []);
-  useEffect(() => { if (!isLoading) return; const stageTimer = window.setInterval(() => setStageIndex((current) => (current + 1) % stages.length), 1400); const elapsedTimer = window.setInterval(() => setElapsed((current) => current + 0.1), 100); return () => { window.clearInterval(stageTimer); window.clearInterval(elapsedTimer); }; }, [isLoading]);
 
-  const inputForMode = () => mode === 'quick_paste' ? [quick.sender ? `From: ${quick.sender}` : '', quick.recipient ? `To: ${quick.recipient}` : '', quick.subject ? `Subject: ${quick.subject}` : '', '', quick.body].filter((line, index, all) => line || index === all.length - 1).join('\n') : rawEmail;
-  const setFile = async (file: File) => { if (!file.name.toLowerCase().endsWith('.eml')) { setError(new ApiError('validation', 'Upload an .eml file.')); return; } if (file.size > MAX_EMAIL_BYTES) { setError(new ApiError('validation', 'This email exceeds the 2 MB processing limit.')); return; } setRawEmail(await file.text()); setMode('eml_upload'); setError(null); };
-  const handleSubmit = async (event: FormEvent) => { event.preventDefault(); if (isLoading) return; const payload = inputForMode(); if (!payload.trim()) { setError(new ApiError('validation', mode === 'quick_paste' ? 'Enter a message body before starting analysis.' : 'Paste or upload an email before starting analysis.')); return; } if (new TextEncoder().encode(payload).length > MAX_EMAIL_BYTES) { setError(new ApiError('validation', 'This email exceeds the 2 MB processing limit.')); return; } setError(null); setResult(null); setClientRoundTripMs(null); setIsLoading(true); setStageIndex(0); setElapsed(0); startedAtRef.current = performance.now(); const controller = new AbortController(); abortRef.current = controller; try { const analysis = await analyzeProductionEmail(payload, controller.signal); setResult(analysis); setClientRoundTripMs(performance.now() - startedAtRef.current); if (readPreferences().saveSuccessfulScans) saveScan(createProductionScanRecord(analysis, payload, mode)); } catch (caught) { setError(caught instanceof ApiError ? caught : new ApiError('unexpected', 'Analysis failed safely. Please try again.')); } finally { abortRef.current = null; setIsLoading(false); } };
-  const clear = () => { abortRef.current?.abort(); abortRef.current = null; setRawEmail(''); setQuick({ sender: '', recipient: '', subject: '', body: '' }); setResult(null); setError(null); setClientRoundTripMs(null); setIsLoading(false); };
+  useEffect(() => {
+    if (!isLoading) return;
+    const stageTimer = window.setInterval(() => setStageIndex((current) => (current + 1) % stages.length), 1400);
+    const elapsedTimer = window.setInterval(() => setElapsed((current) => current + 0.1), 100);
+    return () => {
+      window.clearInterval(stageTimer);
+      window.clearInterval(elapsedTimer);
+    };
+  }, [isLoading]);
 
-  return <div className="analyze-surface space-y-6"><div className="flex flex-col gap-4 border-b border-slate-800 pb-6 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-400">Production inference workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Analyze an email</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">Choose an input mode, then submit one validated email string to the production analyzer. Raw content stays in memory unless local scan history is enabled.</p></div><BackendStatus /></div>
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]"><form onSubmit={handleSubmit} className="rounded-xl border border-slate-800 bg-slate-900/75 p-5 shadow-xl shadow-black/10 sm:p-6"><div className="flex flex-wrap gap-2" role="tablist" aria-label="Email input mode">{(['quick_paste', 'raw_email', 'eml_upload'] as AnalysisInputMode[]).map((value) => <button key={value} type="button" role="tab" aria-selected={mode === value} onClick={() => { setMode(value); setError(null); }} disabled={isLoading} className={`min-h-10 rounded-md border px-3 text-sm transition active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${mode === value ? 'border-blue-500 bg-blue-500/10 text-blue-200' : 'border-slate-700 text-slate-400 hover:bg-slate-800'}`}>{value === 'quick_paste' ? 'Quick Paste' : value === 'raw_email' ? 'Raw Source' : '.eml Upload'}</button>)}</div>
-      {mode === 'quick_paste' ? <div className="mt-5 space-y-3">{[['sender','Sender'],['recipient','Recipient'],['subject','Subject']].map(([key,label]) => <input key={key} value={quick[key as keyof typeof quick]} onChange={(event) => setQuick({ ...quick, [key]: event.target.value })} disabled={isLoading} placeholder={label} className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-70" />)}<textarea value={quick.body} onChange={(event) => setQuick({ ...quick, body: event.target.value })} disabled={isLoading} placeholder="Message body" className="min-h-[260px] w-full resize-y rounded-md border border-slate-700 bg-slate-950 p-3 text-sm leading-6 text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-70" /></div> : <><label htmlFor="production-raw-email" className="mt-5 block text-sm font-semibold text-slate-200">{mode === 'eml_upload' ? 'Uploaded .eml source' : 'Raw email source'}</label><textarea id="production-raw-email" value={rawEmail} onChange={(event) => { setRawEmail(event.target.value); setError(null); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) void setFile(file); }} disabled={isLoading} className="mt-3 min-h-[360px] w-full resize-y rounded-lg border border-slate-700 bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-70" placeholder="From: sender@example.org\nSubject: Message subject\n\nPaste the message body here..." /><div className="mt-3 flex flex-wrap items-center gap-3"><label className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-300 transition active:scale-[0.98] hover:bg-slate-800 focus-within:ring-2 focus-within:ring-blue-500"><Upload className="h-4 w-4" aria-hidden="true" />Choose .eml<input type="file" accept=".eml,message/rfc822" className="sr-only" disabled={isLoading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void setFile(file); event.currentTarget.value = ''; }} /></label><span className="text-xs text-slate-500">or drag a .eml file onto the editor</span></div></>}
-      <div onDragOver={(event) => { if (mode !== 'quick_paste') event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file && mode !== 'quick_paste') void setFile(file); }} className="mt-2 text-xs text-slate-500">{mode === 'quick_paste' ? 'Fields are combined into one raw string before submission.' : `${(mode === 'eml_upload' ? rawEmail : rawEmail).length.toLocaleString()} chars · maximum 2 MB`}</div>
-      <div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => { setRawEmail(EXAMPLE_EMAIL); setMode('raw_email'); setError(null); }} disabled={isLoading} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-300 transition active:scale-[0.98] hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"><ClipboardPaste className="h-4 w-4" aria-hidden="true" />Use safe example</button><button type="button" onClick={clear} disabled={isLoading && !rawEmail} className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-700 px-3 text-sm text-slate-400 transition active:scale-[0.98] hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"><RotateCcw className="h-4 w-4" aria-hidden="true" />Clear</button></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="submit" disabled={isLoading} className="inline-flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-semibold text-white transition active:scale-[0.98] hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:cursor-not-allowed disabled:opacity-50">{isLoading ? <><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />Analyzing</> : <><Shield className="h-4 w-4" aria-hidden="true" />Analyze email</>}</button>{isLoading && <button type="button" onClick={() => abortRef.current?.abort()} className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-rose-500/40 px-4 text-sm font-semibold text-rose-300 transition active:scale-[0.98] hover:bg-rose-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"><X className="h-4 w-4" aria-hidden="true" />Cancel</button>}</div></form>
-      <section aria-live="polite" aria-busy={isLoading}>{isLoading && <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-6"><div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none text-blue-400" aria-hidden="true" /><h2 className="font-semibold text-slate-100">Processing email</h2><span className="ml-auto text-xs tabular-nums text-slate-500">{elapsed.toFixed(1)}s</span></div><p className="mt-4 text-sm text-slate-400">{stages[stageIndex]}…</p></div>}{error && <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-5"><div className="flex gap-3"><AlertCircle className="h-5 w-5 text-rose-400" aria-hidden="true" /><div><h2 className="font-semibold text-rose-200">{errorTitle(error.kind)}</h2><p className="mt-1 text-sm text-slate-300">{error.message}</p></div></div></div>}{!isLoading && !error && !result && <div className="flex min-h-[420px] items-center justify-center rounded-xl border border-dashed border-slate-800 bg-slate-900/30 p-8 text-center"><CheckCircle2 className="h-10 w-10 text-slate-700" aria-hidden="true" /><p className="mt-4 text-slate-400">Your result will appear here.</p></div>}{result && !isLoading && <div className="space-y-4"><RiskScoreCard result={result} /><div className="grid gap-4 sm:grid-cols-3"><div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Phishing probability</p><p className="mt-2 text-2xl font-semibold text-slate-100">{(result.probability * 100).toFixed(1)}%</p></div><div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Confidence</p><p className="mt-2 text-2xl font-semibold text-slate-100">{(result.confidence * 100).toFixed(1)}%</p></div><div className="rounded-lg border border-slate-800 bg-slate-900/70 p-4"><p className="text-xs uppercase tracking-wide text-slate-500">Model processing</p><p className="mt-2 flex items-center gap-2 text-2xl font-semibold text-slate-100"><Clock3 className="h-5 w-5 text-blue-400" aria-hidden="true" />{result.processing_time_ms.toFixed(1)}<span className="text-sm text-slate-500">ms</span></p>{clientRoundTripMs !== null && <p className="mt-1 text-xs text-slate-500">Client round-trip: {clientRoundTripMs.toFixed(0)} ms</p>}</div></div><div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5"><h2 className="font-semibold text-slate-100">Relevant signal families</h2><div className="mt-3 flex flex-wrap gap-2">{result.feature_families.map((family) => <span key={family} className="rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1.5 text-xs text-blue-200">{family.replaceAll('_', ' ')}</span>)}</div></div><div className="grid gap-4 md:grid-cols-2"><SignalGroup title="Phishing signals" values={result.signals.phishing_signals} tone="rose" /><SignalGroup title="Urgency indicators" values={result.signals.urgency_indicators} tone="amber" /><SignalGroup title="Authentication" values={result.signals.authentication_signals} tone="blue" /><SignalGroup title="URL indicators" values={result.signals.url_indicators} tone="amber" /></div><div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5"><h2 className="font-semibold text-slate-100">Recommendations</h2><ul className="mt-3 space-y-3">{result.recommendations.map((recommendation, index) => <li key={`${recommendation}-${index}`} className="flex gap-3 text-sm text-slate-300"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" aria-hidden="true" />{recommendation}</li>)}</ul></div></div>}</section></div></div>;
+  const invalidateActiveRequest = () => {
+    requestSequenceRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsLoading(false);
+    setTiming({ sequence: requestSequenceRef.current, modelProcessingMs: null, clientRoundTripMs: null });
+  };
+
+  const selectMode = (nextMode: AnalysisInputMode) => {
+    if (nextMode === mode) return;
+    invalidateActiveRequest();
+    setMode(nextMode);
+    setError(null);
+    setResult(null);
+    setResultAttachmentCount(0);
+  };
+
+  const onModeKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % modes.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + modes.length) % modes.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = modes.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    selectMode(modes[nextIndex].id);
+    window.requestAnimationFrame(() => tabRefs.current[nextIndex]?.focus());
+  };
+
+  const updateQuick = (field: QuickPasteField, value: string) => {
+    setQuick((current) => ({ ...current, [field]: value }));
+    if (error?.field === field) setError(null);
+  };
+
+  const onAttachmentsSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const selection = mergeAttachmentSelection(attachments, event.target.files ?? []);
+    setAttachments(selection.attachments);
+    setError(selection.errors.length ? { field: 'quickAttachments', message: selection.errors.join(' ') } : null);
+    event.target.value = '';
+  };
+
+  const focusErrorField = (field: ErrorField) => {
+    const id = field === 'rawSource' ? 'raw-email-source' : field === 'emlFile' ? 'eml-file-input' : field === 'quickAttachments' ? 'quick-attachments' : `quick-${field}`;
+    window.requestAnimationFrame(() => document.getElementById(id)?.focus());
+  };
+
+  const loadEml = async (file: File) => {
+    setError(null);
+    setResult(null);
+    setResultAttachmentCount(0);
+    setTiming((current) => ({ ...current, modelProcessingMs: null, clientRoundTripMs: null }));
+    if (!file.name.toLowerCase().endsWith('.eml')) {
+      setError({ field: 'emlFile', message: 'Choose a file with the .eml extension.' });
+      focusErrorField('emlFile');
+      return;
+    }
+    if (file.size > MAX_EMAIL_BYTES) {
+      setError({ field: 'emlFile', message: 'This email exceeds the 2 MB processing limit.' });
+      focusErrorField('emlFile');
+      return;
+    }
+    const text = await file.text();
+    if (!text.trim()) {
+      setError({ field: 'emlFile', message: 'The selected .eml file is empty.' });
+      focusErrorField('emlFile');
+      return;
+    }
+    setRawSource(text);
+    setSelectedFile({ name: file.name, size: file.size });
+  };
+
+  const onEmlSelected = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) void loadEml(file);
+    event.target.value = '';
+  };
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    abortRef.current?.abort();
+    const nextTiming = beginRequest(requestSequenceRef.current);
+    requestSequenceRef.current = nextTiming.sequence;
+    const requestSequence = nextTiming.sequence;
+    setTiming(nextTiming);
+    setResult(null);
+    setResultAttachmentCount(0);
+    setError(null);
+
+    if (mode === 'quick_paste') {
+      const problem = validateQuickPaste(quick);
+      if (problem) {
+        setError(problem);
+        focusErrorField(problem.field);
+        return;
+      }
+    } else if (!rawSource.trim()) {
+      const field = mode === 'eml_upload' ? 'emlFile' : 'rawSource';
+      setError({ field, message: mode === 'eml_upload' ? 'Choose a non-empty .eml file.' : 'Paste the complete raw email source.' });
+      focusErrorField(field);
+      return;
+    }
+
+    const attachmentMetadata = mode === 'quick_paste' ? toAttachmentMetadataPayload(attachments) : [];
+    const rawEmail = mode === 'quick_paste' ? buildQuickPasteRawEmail(quick, attachmentMetadata) : rawSource;
+    if (new TextEncoder().encode(rawEmail).length > MAX_EMAIL_BYTES) {
+      const field = mode === 'quick_paste' ? 'body' : mode === 'raw_email' ? 'rawSource' : 'emlFile';
+      setError({ field, message: 'This email exceeds the 2 MB processing limit.' });
+      focusErrorField(field);
+      return;
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsLoading(true);
+    setElapsed(0);
+    setStageIndex(0);
+    const startedAt = performance.now();
+
+    try {
+      const response = await analyzeProductionEmail(rawEmail, controller.signal);
+      if (!isCurrentRequest(requestSequenceRef.current, requestSequence) || controller.signal.aborted) return;
+      const clientRoundTripMs = performance.now() - startedAt;
+      setResult(response);
+      setResultAttachmentCount(attachmentMetadata.length);
+      setTiming((current) => completeRequestTiming(current, requestSequence, response.processing_time_ms, clientRoundTripMs));
+      if (readPreferences().saveSuccessfulScans) {
+        saveScan(createProductionScanRecord(response, rawEmail, mode, attachmentMetadata));
+      }
+    } catch (caught) {
+      if (!isCurrentRequest(requestSequenceRef.current, requestSequence)) return;
+      setResult(null);
+      setResultAttachmentCount(0);
+      setTiming((current) => clearRequestTiming(current, requestSequence));
+      if (!(caught instanceof ApiError && caught.kind === 'cancelled')) {
+        setError({ message: caught instanceof ApiError ? caught.message : 'Analysis failed safely. Please try again.' });
+      }
+    } finally {
+      if (isCurrentRequest(requestSequenceRef.current, requestSequence)) {
+        abortRef.current = null;
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const cancel = () => {
+    invalidateActiveRequest();
+    setResult(null);
+    setResultAttachmentCount(0);
+    setError(null);
+  };
+
+  const clear = () => {
+    invalidateActiveRequest();
+    setQuick(emptyQuickPaste);
+    setAttachments(clearSelectedAttachments());
+    setRawSource('');
+    setSelectedFile(null);
+    setResult(null);
+    setResultAttachmentCount(0);
+    setError(null);
+    if (emlInputRef.current) emlInputRef.current.value = '';
+    if (attachmentInputRef.current) attachmentInputRef.current.value = '';
+  };
+
+  const activeMode = modes.find((item) => item.id === mode) ?? modes[0];
+  const ActiveModeIcon = activeMode.icon;
+
+  return (
+    <main className="mx-auto max-w-6xl space-y-8">
+      <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div><p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Production inference workspace</p><h1 className="mt-2 text-3xl font-semibold text-foreground">Analyze an email</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">Select an input mode. Only the active mode is submitted to the production analyzer.</p></div>
+        <BackendStatus />
+      </div>
+
+      <form noValidate onSubmit={submit} className="space-y-6 rounded-xl border border-border bg-surface/75 p-5 shadow-xl sm:p-7">
+        <div>
+          <div className="grid gap-2 sm:grid-cols-3" role="tablist" aria-label="Input mode">
+            {modes.map((item, index) => {
+              const active = item.id === mode;
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  ref={(node) => { tabRefs.current[index] = node; }}
+                  id={`mode-tab-${item.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={`mode-panel-${item.id}`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => selectMode(item.id)}
+                  onKeyDown={(event) => onModeKeyDown(event, index)}
+                  className={`flex min-h-12 items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm font-semibold transition-[background-color,border-color,color,box-shadow,transform] active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'border-primary bg-primary text-primary-foreground shadow-[inset_0_0_0_1px_rgb(var(--color-primary))]' : 'border-border bg-background/70 text-muted-foreground hover:border-input hover:bg-surface-muted hover:text-foreground'}`}
+                >
+                  <span className="flex items-center gap-2"><Icon className="h-4 w-4" aria-hidden="true" />{item.label}</span>
+                  {active && <Check className="h-4 w-4 shrink-0" aria-label="Selected" />}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 flex items-center gap-2 text-sm font-medium text-foreground" aria-live="polite"><CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />Current input mode: {activeMode.label}</p>
+        </div>
+
+        {mode === 'quick_paste' && (
+          <section id="mode-panel-quick_paste" role="tabpanel" aria-labelledby="mode-tab-quick_paste" className="space-y-4">
+            <p className="text-sm leading-6 text-muted-foreground">Use Quick Paste for copied inbox content. Full message headers are not available, so some authentication and routing checks may be unavailable.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              {([
+                ['senderName', 'Sender name', 'text'],
+                ['senderEmail', 'Sender email', 'email'],
+                ['recipientName', 'Recipient name (optional)', 'text'],
+                ['recipientEmail', 'Recipient email (optional)', 'email'],
+                ['replyTo', 'Reply-To (optional)', 'email'],
+                ['subject', 'Subject', 'text'],
+              ] as Array<[QuickPasteField, string, 'text' | 'email']>).map(([field, label, type]) => (
+                <label key={field} htmlFor={`quick-${field}`} className="space-y-1.5 text-sm text-muted-foreground">
+                  <span>{label}</span>
+                  <input
+                    id={`quick-${field}`}
+                    type={type}
+                    value={quick[field]}
+                    onChange={(event) => updateQuick(field, event.target.value)}
+                    aria-invalid={error?.field === field || undefined}
+                    aria-describedby={error?.field === field ? 'analysis-error' : undefined}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2.5 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 aria-[invalid=true]:border-danger"
+                  />
+                </label>
+              ))}
+            </div>
+            <label htmlFor="quick-body" className="block space-y-1.5 text-sm text-muted-foreground">
+              <span>Email body</span>
+              <textarea id="quick-body" value={quick.body} onChange={(event) => updateQuick('body', event.target.value)} aria-invalid={error?.field === 'body' || undefined} aria-describedby={error?.field === 'body' ? 'analysis-error' : undefined} className="min-h-48 w-full resize-y rounded-md border border-input bg-background p-3 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 aria-[invalid=true]:border-danger" />
+            </label>
+
+            <section className="rounded-lg border border-border p-4" aria-labelledby="quick-attachments-heading">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div><h2 id="quick-attachments-heading" className="text-sm font-semibold text-foreground">Attachments <span className="font-normal text-muted-foreground">(optional)</span></h2><p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Only attachment metadata is included. Attachment contents are not uploaded, opened, or scanned.</p></div>
+                <input ref={attachmentInputRef} id="quick-attachments" type="file" multiple onChange={onAttachmentsSelected} className="sr-only" aria-describedby={error?.field === 'quickAttachments' ? 'analysis-error' : undefined} />
+                <button type="button" onClick={() => attachmentInputRef.current?.click()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Paperclip className="h-4 w-4" aria-hidden="true" />Add attachments</button>
+              </div>
+              {attachments.length > 0 && <ul className="mt-4 grid gap-2 md:grid-cols-2">{attachments.map(({ key, metadata }) => <li key={key} className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-background/60 p-3"><Paperclip className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-foreground">{metadata.filename}</p><p className="mt-0.5 truncate text-xs text-muted-foreground">{extensionLabel(metadata.filename, metadata.content_type)} · {formatFileSize(metadata.size_bytes)}</p></div><button type="button" aria-label={`Remove ${metadata.filename}`} onClick={() => setAttachments(removeSelectedAttachment(attachments, key))} className="rounded-md p-2 text-muted-foreground hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4" aria-hidden="true" /></button></li>)}</ul>}
+            </section>
+          </section>
+        )}
+
+        {mode === 'raw_email' && (
+          <section id="mode-panel-raw_email" role="tabpanel" aria-labelledby="mode-tab-raw_email">
+            <p className="mb-3 text-sm leading-6 text-muted-foreground">Paste the complete RFC822 message source. Copied inbox content belongs in Quick Paste.</p>
+            <textarea id="raw-email-source" aria-label="Raw email source" value={rawSource} onChange={(event) => { setRawSource(event.target.value); if (error?.field === 'rawSource') setError(null); }} aria-invalid={error?.field === 'rawSource' || undefined} aria-describedby={error?.field === 'rawSource' ? 'analysis-error' : undefined} className="min-h-[420px] w-full resize-y overflow-auto rounded-lg border border-input bg-background p-4 font-mono text-xs leading-6 text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring/30 aria-[invalid=true]:border-danger" />
+            <p className="mt-2 text-xs text-muted-foreground">{rawSource.length.toLocaleString()} characters · 2 MB maximum</p>
+          </section>
+        )}
+
+        {mode === 'eml_upload' && (
+          <section id="mode-panel-eml_upload" role="tabpanel" aria-labelledby="mode-tab-eml_upload">
+            <div onDragOver={(event) => { event.preventDefault(); event.currentTarget.classList.add('border-primary'); }} onDragLeave={(event) => event.currentTarget.classList.remove('border-primary')} onDrop={(event) => { event.preventDefault(); event.currentTarget.classList.remove('border-primary'); const file = event.dataTransfer.files[0]; if (file) void loadEml(file); }} className="flex min-h-64 flex-col items-center justify-center rounded-xl border-2 border-dashed border-input p-8 text-center transition">
+              <Upload className="h-10 w-10 text-primary" aria-hidden="true" />
+              <h2 className="mt-4 text-lg font-semibold text-foreground">Drop an .eml file here</h2>
+              <p className="mt-2 text-sm text-muted-foreground">Maximum size 2 MB. The email source is read in memory only.</p>
+              <button type="button" onClick={() => emlInputRef.current?.click()} className="mt-5 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Choose file</button>
+              <input ref={emlInputRef} id="eml-file-input" type="file" accept=".eml,message/rfc822" className="sr-only" aria-label="Choose an EML file" aria-describedby={error?.field === 'emlFile' ? 'analysis-error' : undefined} onChange={onEmlSelected} />
+            </div>
+            {selectedFile && <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-background/60 p-4"><div className="min-w-0"><p className="break-words text-sm text-foreground">{selectedFile.name}</p><p className="text-xs text-muted-foreground">{formatFileSize(selectedFile.size)}</p></div><button type="button" aria-label="Remove selected file" onClick={() => { setSelectedFile(null); setRawSource(''); if (emlInputRef.current) emlInputRef.current.value = ''; }} className="rounded p-2 text-muted-foreground hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4" /></button></div>}
+          </section>
+        )}
+
+        {error && <p id="analysis-error" role="alert" className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">{error.message}</p>}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
+          <div className="flex flex-wrap gap-2">
+            {mode === 'raw_email' && <button type="button" onClick={() => { setRawSource(EXAMPLE_EMAIL); setError(null); }} disabled={isLoading} className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ClipboardPaste className="h-4 w-4" />Use safe example</button>}
+            <button type="button" onClick={clear} className="inline-flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><RotateCcw className="h-4 w-4" />Clear</button>
+            {isLoading && <button type="button" onClick={cancel} className="inline-flex items-center gap-2 rounded-md border border-danger/40 px-3 py-2 text-sm font-medium text-danger hover:bg-danger/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-4 w-4" />Cancel analysis</button>}
+          </div>
+          <button type="submit" disabled={isLoading} className="inline-flex min-h-11 items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition active:scale-[0.98] hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">{isLoading ? <><Loader2 className="h-4 w-4 animate-spin" />Analyzing {activeMode.label}</> : <><ActiveModeIcon className="h-4 w-4" />{activeMode.actionLabel}</>}</button>
+        </div>
+      </form>
+
+      {!result && !isLoading && <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed border-border bg-surface/30 px-6 text-center text-sm text-muted-foreground"><CheckCircle2 className="mr-2 h-5 w-5" />Your analysis result will appear below the input workspace.</div>}
+      {isLoading && <div className="rounded-xl border border-primary/30 bg-primary/10 p-6" role="status" aria-live="polite"><div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary" /><span className="font-semibold text-foreground">{stages[stageIndex]}</span><span className="ml-auto text-xs tabular-nums text-muted-foreground">{elapsed.toFixed(1)}s</span></div></div>}
+      {result && <ProductionAnalysisResults result={result} clientRoundTripMs={timing.clientRoundTripMs} attachmentCount={resultAttachmentCount} />}
+    </main>
+  );
 }

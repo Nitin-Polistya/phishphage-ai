@@ -25,48 +25,48 @@ function formatDate(timestamp: string) {
 }
 
 const riskStyles = {
-  safe: 'text-emerald-300',
-  suspicious: 'text-amber-300',
-  phishing: 'text-rose-300',
+  safe: 'text-success',
+  suspicious: 'text-warning',
+  phishing: 'text-danger',
 };
 
 export function RecentScans({ scans, onOpen, isLoaded }: RecentScansProps) {
   return (
-    <Card className="h-full border-slate-800 bg-slate-900/80">
+    <Card className="h-full border-border bg-surface/80">
       <CardHeader className="pb-3">
-        <h2 className="text-base font-semibold text-slate-100">Recent scans</h2>
-        <CardDescription className="text-slate-400">The latest email classifications saved in this browser.</CardDescription>
+        <h2 className="text-base font-semibold text-foreground">Recent scans</h2>
+        <CardDescription className="text-muted-foreground">The latest email classifications saved in this browser.</CardDescription>
       </CardHeader>
       <CardContent className="px-0 pb-0">
         {!isLoaded ? (
           <div className="space-y-3 px-5 py-5" aria-busy="true" aria-label="Loading recent scans">
-            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-16 w-full bg-slate-800" />)}
+            {Array.from({ length: 4 }, (_, index) => <Skeleton key={index} className="h-16 w-full bg-surface-muted" />)}
           </div>
         ) : scans.length === 0 ? (
           <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-            <Inbox className="h-8 w-8 text-slate-600" aria-hidden="true" />
-            <p className="mt-3 text-sm font-medium text-slate-200">No scans yet</p>
-            <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Run an email analysis to create the first locally stored scan.</p>
-            <Button asChild size="sm" className="mt-5 bg-blue-600 text-white hover:bg-blue-500">
+            <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            <p className="mt-3 text-sm font-medium text-foreground">No scans yet</p>
+            <p className="mt-1 max-w-xs text-xs leading-5 text-foreground0">Run an email analysis to create the first locally stored scan.</p>
+            <Button asChild size="sm" className="mt-5 bg-primary text-primary-foreground hover:bg-primary">
               <Link href="/analyze">Analyze email</Link>
             </Button>
           </div>
         ) : (
           <>
-            <div className="divide-y divide-slate-800 md:hidden">
+            <div className="divide-y divide-border md:hidden">
               {scans.map((scan) => (
-                <button key={scan.id} type="button" onClick={() => onOpen(scan.id)} className="group block w-full px-5 py-4 text-left transition-colors hover:bg-slate-800/50 focus-visible:bg-slate-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500" aria-label={`Open scan details for ${scan.subject}`}>
+                <button key={scan.id} type="button" onClick={() => onOpen(scan.id)} className="group block w-full px-5 py-4 text-left transition-colors hover:bg-surface-muted/50 focus-visible:bg-surface-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" aria-label={`Open scan details for ${scan.subject}`}>
                   <span className="flex items-start justify-between gap-4">
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-slate-200">{scan.subject}</span>
-                      <span className="mt-1 block truncate text-xs text-slate-500">{scan.sender}</span>
+                      <span className="block truncate text-sm font-semibold text-foreground">{scan.subject}</span>
+                      <span className="mt-1 block truncate text-xs text-foreground0">{scan.sender}</span>
                     </span>
-                    <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-600 transition-colors group-hover:text-blue-400" aria-hidden="true" />
+                    <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" />
                   </span>
                   <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
                     <ClassificationBadge classification={scan.classification} />
                     <span className={cn('text-xs font-semibold tabular-nums', riskStyles[scan.classification])}>Risk {scan.riskScore}/100</span>
-                    <span className="text-xs text-slate-500">{formatDate(scan.timestamp)}</span>
+                    <span className="text-xs text-foreground0">{formatDate(scan.timestamp)}</span>
                   </span>
                 </button>
               ))}
@@ -74,25 +74,25 @@ export function RecentScans({ scans, onOpen, isLoaded }: RecentScansProps) {
 
             <div className="hidden overflow-x-auto md:block">
               <Table>
-                <TableHeader className="bg-slate-950/40">
-                  <TableRow className="border-slate-800 hover:bg-transparent">
-                    <TableHead className="min-w-56 text-slate-400">Subject</TableHead>
-                    <TableHead className="min-w-48 text-slate-400">Sender</TableHead>
-                    <TableHead className="text-slate-400">Verdict</TableHead>
-                    <TableHead className="whitespace-nowrap text-slate-400">Risk</TableHead>
-                    <TableHead className="whitespace-nowrap text-slate-400">Scanned</TableHead>
+                <TableHeader className="bg-background/40">
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="min-w-56 text-muted-foreground">Subject</TableHead>
+                    <TableHead className="min-w-48 text-muted-foreground">Sender</TableHead>
+                    <TableHead className="text-muted-foreground">Verdict</TableHead>
+                    <TableHead className="whitespace-nowrap text-muted-foreground">Risk</TableHead>
+                    <TableHead className="whitespace-nowrap text-muted-foreground">Scanned</TableHead>
                     <TableHead className="w-10"><span className="sr-only">Open details</span></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {scans.map((scan) => (
-                    <TableRow key={scan.id} role="button" tabIndex={0} onClick={() => onOpen(scan.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(scan.id); } }} aria-label={`Open scan details for ${scan.subject}`} className="group cursor-pointer border-slate-800 transition-colors hover:bg-slate-800/50 focus-visible:bg-slate-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500">
-                      <TableCell><p className="max-w-64 truncate font-medium text-slate-200" title={scan.subject}>{scan.subject}</p></TableCell>
-                      <TableCell><p className="max-w-52 truncate text-slate-400" title={scan.sender}>{scan.sender}</p></TableCell>
+                    <TableRow key={scan.id} role="button" tabIndex={0} onClick={() => onOpen(scan.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(scan.id); } }} aria-label={`Open scan details for ${scan.subject}`} className="group cursor-pointer border-border transition-colors hover:bg-surface-muted/50 focus-visible:bg-surface-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                      <TableCell><p className="max-w-64 truncate font-medium text-foreground" title={scan.subject}>{scan.subject}</p></TableCell>
+                      <TableCell><p className="max-w-52 truncate text-muted-foreground" title={scan.sender}>{scan.sender}</p></TableCell>
                       <TableCell><ClassificationBadge classification={scan.classification} /></TableCell>
                       <TableCell className={cn('font-semibold tabular-nums', riskStyles[scan.classification])}>{scan.riskScore}/100</TableCell>
-                      <TableCell className="whitespace-nowrap text-slate-400">{formatDate(scan.timestamp)}</TableCell>
-                      <TableCell><ArrowUpRight className="h-4 w-4 text-slate-600 transition-colors group-hover:text-blue-400" aria-hidden="true" /></TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(scan.timestamp)}</TableCell>
+                      <TableCell><ArrowUpRight className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" aria-hidden="true" /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

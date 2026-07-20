@@ -24,55 +24,55 @@ export function SecurityInsights({ scans, stats, vectors, isLoaded }: SecurityIn
   const safeRate = stats.totalScans ? Math.round((stats.safeEmails / stats.totalScans) * 100) : 0;
 
   return (
-    <Card className="border-slate-800 bg-slate-900/80">
+    <Card className="border-border bg-surface/80">
       <CardHeader className="pb-4">
-        <h2 className="text-base font-semibold text-slate-100">Security insights</h2>
+        <h2 className="text-base font-semibold text-foreground">Security insights</h2>
       </CardHeader>
       <CardContent>
         {!isLoaded ? (
           <div className="grid gap-5 md:grid-cols-3" aria-busy="true" aria-label="Loading security insights">
-            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full bg-slate-800" />)}
+            {Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-24 w-full bg-surface-muted" />)}
           </div>
         ) : <div className="grid gap-5 md:grid-cols-3">
           <div className="flex gap-3">
-            <ScanSearch className="mt-0.5 h-5 w-5 text-sky-400" aria-hidden="true" />
+            <ScanSearch className="mt-0.5 h-5 w-5 text-primary" aria-hidden="true" />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Most common signal</p>
-              <p className="mt-1 text-sm font-medium text-slate-200">{vectors[0]?.label ?? 'No signals detected'}</p>
-              {vectors[0] && <Badge variant="outline" className="mt-2 border-slate-700 text-slate-400">{vectors[0].count} observations</Badge>}
+              <p className="text-xs font-medium uppercase tracking-wide text-foreground0">Most common signal</p>
+              <p className="mt-1 text-sm font-medium text-foreground">{vectors[0]?.label ?? 'No signals detected'}</p>
+              {vectors[0] && <Badge variant="outline" className="mt-2 border-input text-muted-foreground">{vectors[0].count} observations</Badge>}
             </div>
           </div>
 
-          <div className="flex gap-3 md:border-l md:border-slate-800 md:pl-5">
-            <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-400" aria-hidden="true" />
+          <div className="flex gap-3 md:border-l md:border-border md:pl-5">
+            <AlertTriangle className="mt-0.5 h-5 w-5 text-warning" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Highest-risk scan</p>
-              <p className="mt-1 truncate text-sm font-medium text-slate-200">{highestRisk?.subject ?? 'No recent scans'}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-foreground0">Highest-risk scan</p>
+              <p className="mt-1 truncate text-sm font-medium text-foreground">{highestRisk?.subject ?? 'No recent scans'}</p>
               {highestRisk && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge variant="outline" className="mt-2 cursor-help border-rose-500/30 bg-rose-500/10 text-rose-300">
+                      <Badge variant="outline" className="mt-2 cursor-help border-danger/30 bg-danger/10 text-danger">
                         Risk {highestRisk.riskScore}/100
                       </Badge>
                     </TooltipTrigger>
-                    <TooltipContent className="border-slate-700 bg-slate-950 text-slate-200">Highest risk score across saved scans</TooltipContent>
+                    <TooltipContent className="border-input bg-background text-foreground">Highest risk score across saved scans</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               )}
             </div>
           </div>
 
-          <div className="flex gap-3 md:border-l md:border-slate-800 md:pl-5">
-            <ShieldCheck className="mt-0.5 h-5 w-5 text-emerald-400" aria-hidden="true" />
+          <div className="flex gap-3 md:border-l md:border-border md:pl-5">
+            <ShieldCheck className="mt-0.5 h-5 w-5 text-success" aria-hidden="true" />
             <div className="w-full">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Safe classification rate</p>
-                <span className="text-sm font-semibold tabular-nums text-emerald-300">{stats.totalScans ? `${safeRate}%` : '—'}</span>
+                <p className="text-xs font-medium uppercase tracking-wide text-foreground0">Safe classification rate</p>
+                <span className="text-sm font-semibold tabular-nums text-success">{stats.totalScans ? `${safeRate}%` : '—'}</span>
               </div>
-              <Separator className="my-2 bg-slate-800" />
-              <Progress value={safeRate} aria-label={stats.totalScans ? `${safeRate}% of scans classified safe` : 'No scans available for safe classification rate'} className="h-2 bg-slate-800 [&>div]:bg-emerald-500" />
-              <p className="mt-2 text-xs text-slate-500">{stats.totalScans ? 'Across all saved scans' : 'No scans analyzed yet'}</p>
+              <Separator className="my-2 bg-surface-muted" />
+              <Progress value={safeRate} aria-label={stats.totalScans ? `${safeRate}% of scans classified safe` : 'No scans available for safe classification rate'} className="h-2 bg-surface-muted [&>div]:bg-success" />
+              <p className="mt-2 text-xs text-foreground0">{stats.totalScans ? 'Across all saved scans' : 'No scans analyzed yet'}</p>
             </div>
           </div>
         </div>}

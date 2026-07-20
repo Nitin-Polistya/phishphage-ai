@@ -5,6 +5,23 @@ import { ThemeController } from '@/components/theme-controller';
 
 import './globals.css';
 
+const themeInitializationScript = `
+  (() => {
+    const storageKey = 'phishphage.preferences.v1';
+    const validThemes = new Set(['system', 'dark', 'light']);
+    let preference = 'system';
+    try {
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+      if (validThemes.has(stored.theme)) preference = stored.theme;
+    } catch {}
+    const resolved = preference === 'system'
+      ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : preference;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.style.colorScheme = resolved;
+  })();
+`;
+
 export const metadata: Metadata = {
   title: {
     default: 'PhishShield AI',
@@ -26,6 +43,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} /></head>
       <body><ThemeController />{children}</body>
     </html>
   );

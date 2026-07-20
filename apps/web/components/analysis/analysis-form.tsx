@@ -75,9 +75,9 @@ function optional(value: string) {
 
 function FieldLabel({ htmlFor, children, optionalField = false }: { htmlFor: string; children: string; optionalField?: boolean }) {
   return (
-    <Label htmlFor={htmlFor} className="flex items-center gap-2 text-sm text-slate-300">
+    <Label htmlFor={htmlFor} className="flex items-center gap-2 text-sm text-muted-foreground">
       {children}
-      {optionalField && <span className="text-[11px] font-normal text-slate-500">Optional</span>}
+      {optionalField && <span className="text-[11px] font-normal text-foreground0">Optional</span>}
     </Label>
   );
 }
@@ -233,14 +233,14 @@ export function AnalysisForm() {
 
   return (
     <div className="analyze-surface space-y-6">
-      <Card className="border-slate-800 bg-slate-900/80">
-        <CardHeader className="border-b border-slate-800 pb-5">
+      <Card className="border-border bg-surface/80">
+        <CardHeader className="border-b border-border pb-5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-slate-100">Choose an input method</h2>
-              <p className="mt-1 text-sm text-slate-400">Select the format that best matches the email evidence you have.</p>
+              <h2 className="text-base font-semibold text-foreground">Choose an input method</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Select the format that best matches the email evidence you have.</p>
             </div>
-            <Badge variant="outline" className="w-fit border-slate-700 text-slate-400">Raw submissions are not stored</Badge>
+            <Badge variant="outline" className="w-fit border-input text-muted-foreground">Raw submissions are not stored</Badge>
           </div>
         </CardHeader>
 
@@ -263,14 +263,14 @@ export function AnalysisForm() {
                   onClick={() => selectMode(item.id)}
                   onKeyDown={(event) => moveTabFocus(event, index)}
                   className={cn(
-                    'rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60',
+                    'rounded-lg border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60',
                     active
-                      ? 'border-blue-500 bg-blue-500/10 text-slate-100 shadow-sm'
-                      : 'border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:bg-slate-950',
+                      ? 'border-primary bg-primary/10 text-foreground shadow-sm'
+                      : 'border-border bg-background/50 text-muted-foreground hover:border-input hover:bg-background',
                   )}
                 >
-                  <span className="flex items-center gap-2 text-sm font-semibold"><Icon className={cn('h-4 w-4', active ? 'text-blue-400' : 'text-slate-500')} aria-hidden="true" />{item.label}</span>
-                  <span className="mt-1.5 block text-xs leading-5 text-slate-500">{item.description}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold"><Icon className={cn('h-4 w-4', active ? 'text-primary' : 'text-foreground0')} aria-hidden="true" />{item.label}</span>
+                  <span className="mt-1.5 block text-xs leading-5 text-foreground0">{item.description}</span>
                 </button>
               );
             })}
@@ -279,39 +279,39 @@ export function AnalysisForm() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-6">
             {mode === 'quick_paste' && (
               <section id="analysis-panel-quick_paste" role="tabpanel" aria-labelledby="analysis-tab-quick_paste" className="space-y-6">
-                <div className="rounded-lg bg-slate-950/60 p-4 text-sm leading-6 text-slate-400">
+                <div className="rounded-lg bg-background/60 p-4 text-sm leading-6 text-muted-foreground">
                   Paste the visible message and add any metadata you know. Missing full-email headers are excluded from header-based checks.
                 </div>
 
                 <fieldset className="space-y-4">
-                  <legend className="text-sm font-semibold text-slate-200">Message details</legend>
+                  <legend className="text-sm font-semibold text-foreground">Message details</legend>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-1.5"><FieldLabel htmlFor="sender_name" optionalField>Sender name</FieldLabel><Input id="sender_name" value={quick.sender_name} onChange={(event) => setQuick({ ...quick, sender_name: event.target.value })} placeholder="Jane Smith" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
-                    <div className="space-y-1.5"><FieldLabel htmlFor="sender_email" optionalField>Sender email</FieldLabel><Input id="sender_email" type="email" value={quick.sender_email} onChange={(event) => setQuick({ ...quick, sender_email: event.target.value })} placeholder="jane@example.com" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
-                    <div className="space-y-1.5"><FieldLabel htmlFor="recipient_name" optionalField>Recipient name</FieldLabel><Input id="recipient_name" value={quick.recipient_name} onChange={(event) => setQuick({ ...quick, recipient_name: event.target.value })} placeholder="Nitin" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
-                    <div className="space-y-1.5"><FieldLabel htmlFor="recipient_email" optionalField>Recipient email</FieldLabel><Input id="recipient_email" type="email" value={quick.recipient_email} onChange={(event) => setQuick({ ...quick, recipient_email: event.target.value })} placeholder="you@example.com" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
-                    <div className="space-y-1.5"><FieldLabel htmlFor="reply_to" optionalField>Reply-To</FieldLabel><Input id="reply_to" type="email" value={quick.reply_to} onChange={(event) => setQuick({ ...quick, reply_to: event.target.value })} placeholder="reply@example.com" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
-                    <div className="space-y-1.5"><FieldLabel htmlFor="subject" optionalField>Subject</FieldLabel><Input id="subject" value={quick.subject} onChange={(event) => setQuick({ ...quick, subject: event.target.value })} placeholder="Email subject" className="border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="sender_name" optionalField>Sender name</FieldLabel><Input id="sender_name" value={quick.sender_name} onChange={(event) => setQuick({ ...quick, sender_name: event.target.value })} placeholder="Jane Smith" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="sender_email" optionalField>Sender email</FieldLabel><Input id="sender_email" type="email" value={quick.sender_email} onChange={(event) => setQuick({ ...quick, sender_email: event.target.value })} placeholder="jane@example.com" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="recipient_name" optionalField>Recipient name</FieldLabel><Input id="recipient_name" value={quick.recipient_name} onChange={(event) => setQuick({ ...quick, recipient_name: event.target.value })} placeholder="Nitin" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="recipient_email" optionalField>Recipient email</FieldLabel><Input id="recipient_email" type="email" value={quick.recipient_email} onChange={(event) => setQuick({ ...quick, recipient_email: event.target.value })} placeholder="you@example.com" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="reply_to" optionalField>Reply-To</FieldLabel><Input id="reply_to" type="email" value={quick.reply_to} onChange={(event) => setQuick({ ...quick, reply_to: event.target.value })} placeholder="reply@example.com" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
+                    <div className="space-y-1.5"><FieldLabel htmlFor="subject" optionalField>Subject</FieldLabel><Input id="subject" value={quick.subject} onChange={(event) => setQuick({ ...quick, subject: event.target.value })} placeholder="Email subject" className="border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
                   </div>
-                  <div className="space-y-1.5"><FieldLabel htmlFor="quick-body">Email body</FieldLabel><Textarea id="quick-body" required value={quick.body} onChange={(event) => setQuick({ ...quick, body: event.target.value })} placeholder="Paste the visible email body..." className="min-h-52 resize-y border-slate-700 bg-slate-950 text-slate-200 placeholder:text-slate-600" /></div>
+                  <div className="space-y-1.5"><FieldLabel htmlFor="quick-body">Email body</FieldLabel><Textarea id="quick-body" required value={quick.body} onChange={(event) => setQuick({ ...quick, body: event.target.value })} placeholder="Paste the visible email body..." className="min-h-52 resize-y border-input bg-background text-foreground placeholder:text-muted-foreground" /></div>
                 </fieldset>
 
-                <Separator className="bg-slate-800" />
+                <Separator className="bg-surface-muted" />
                 <section aria-labelledby="quick-attachments-heading" className="space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div><h3 id="quick-attachments-heading" className="text-sm font-semibold text-slate-200">Attachment metadata <span className="font-normal text-slate-500">(optional)</span></h3><p className="mt-1 text-xs leading-5 text-slate-500">Only filenames, types, and sizes are analyzed. File contents are never uploaded.</p></div>
+                    <div><h3 id="quick-attachments-heading" className="text-sm font-semibold text-foreground">Attachment metadata <span className="font-normal text-foreground0">(optional)</span></h3><p className="mt-1 text-xs leading-5 text-foreground0">Only filenames, types, and sizes are analyzed. File contents are never uploaded.</p></div>
                     <Input ref={quickAttachmentInput} type="file" multiple onChange={onQuickAttachmentsSelected} className="sr-only" id="quick-attachments" />
-                    <Button type="button" variant="outline" size="sm" onClick={() => quickAttachmentInput.current?.click()} className="shrink-0 border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"><Paperclip aria-hidden="true" />Add attachments</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => quickAttachmentInput.current?.click()} className="shrink-0 border-input bg-surface text-muted-foreground hover:bg-surface-muted hover:text-foreground"><Paperclip aria-hidden="true" />Add attachments</Button>
                   </div>
                   {attachments.length > 0 && <ul className="grid gap-2 md:grid-cols-2">
                     {attachments.map(({ key, metadata }) => (
-                      <li key={key} className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-slate-950/60 px-3 py-3">
+                      <li key={key} className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-background/60 px-3 py-3">
                         <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-2"><p className="truncate text-sm font-medium text-slate-200" title={metadata.filename ?? undefined}>{metadata.filename}</p><Badge variant="outline" className={cn('shrink-0', metadata.suspicious_extension ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-slate-700 text-slate-400')}>{metadata.extension || 'no extension'}</Badge></div>
-                          <p className="mt-1 truncate text-xs text-slate-500">{metadata.content_type} - {formatFileSize(metadata.size_bytes)}</p>
-                          {metadata.suspicious_extension && <p className="mt-1 flex items-center gap-1.5 text-xs text-rose-300"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />Potentially risky extension</p>}
+                          <div className="flex min-w-0 items-center gap-2"><p className="truncate text-sm font-medium text-foreground" title={metadata.filename ?? undefined}>{metadata.filename}</p><Badge variant="outline" className={cn('shrink-0', metadata.suspicious_extension ? 'border-danger/30 bg-danger/10 text-danger' : 'border-input text-muted-foreground')}>{metadata.extension || 'no extension'}</Badge></div>
+                          <p className="mt-1 truncate text-xs text-foreground0">{metadata.content_type} - {formatFileSize(metadata.size_bytes)}</p>
+                          {metadata.suspicious_extension && <p className="mt-1 flex items-center gap-1.5 text-xs text-danger"><AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />Potentially risky extension</p>}
                         </div>
-                        <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${metadata.filename}`} onClick={() => setAttachments(removeSelectedAttachment(attachments, key))} className="shrink-0 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"><X aria-hidden="true" /></Button>
+                        <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${metadata.filename}`} onClick={() => setAttachments(removeSelectedAttachment(attachments, key))} className="shrink-0 text-foreground0 hover:bg-danger/10 hover:text-danger"><X aria-hidden="true" /></Button>
                       </li>
                     ))}
                   </ul>}
@@ -321,51 +321,51 @@ export function AnalysisForm() {
 
             {mode === 'raw_email' && (
               <section id="analysis-panel-raw_email" role="tabpanel" aria-labelledby="analysis-tab-raw_email" className="space-y-3">
-                <div className="rounded-lg bg-slate-950/60 p-4 text-sm leading-6 text-slate-400">Paste the complete source from <span className="font-medium text-slate-300">Show original</span> or <span className="font-medium text-slate-300">View message source</span>. At least two recognizable headers are required.</div>
+                <div className="rounded-lg bg-background/60 p-4 text-sm leading-6 text-muted-foreground">Paste the complete source from <span className="font-medium text-muted-foreground">Show original</span> or <span className="font-medium text-muted-foreground">View message source</span>. At least two recognizable headers are required.</div>
                 <FieldLabel htmlFor="raw-email">Raw email source</FieldLabel>
-                <Textarea id="raw-email" required value={rawEmail} onChange={(event) => setRawEmail(event.target.value)} placeholder={'From: sender@example.com\nSubject: Message subject\n\nEmail body'} className="min-h-[360px] resize-y border-slate-700 bg-slate-950 p-4 font-mono text-xs leading-5 text-slate-200 placeholder:text-slate-600 sm:min-h-[420px]" />
+                <Textarea id="raw-email" required value={rawEmail} onChange={(event) => setRawEmail(event.target.value)} placeholder={'From: sender@example.com\nSubject: Message subject\n\nEmail body'} className="min-h-[360px] resize-y border-input bg-background p-4 font-mono text-xs leading-5 text-foreground placeholder:text-muted-foreground sm:min-h-[420px]" />
               </section>
             )}
 
             {mode === 'eml_upload' && (
               <section id="analysis-panel-eml_upload" role="tabpanel" aria-labelledby="analysis-tab-eml_upload" className="space-y-4">
-                <div onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={onDrop} className={cn('flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center transition-colors sm:min-h-64 sm:p-8', isDragging ? 'border-blue-400 bg-blue-500/10' : 'border-slate-700 bg-slate-950/50')}>
-                  <UploadCloud className="h-9 w-9 text-slate-500" aria-hidden="true" />
-                  <p className="mt-4 text-sm font-medium text-slate-200">Drop an .eml file here</p>
-                  <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">Maximum 2 MB. Parsed in memory; attachment contents are never executed.</p>
+                <div onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={onDrop} className={cn('flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center transition-colors sm:min-h-64 sm:p-8', isDragging ? 'border-primary bg-primary/10' : 'border-input bg-background/50')}>
+                  <UploadCloud className="h-9 w-9 text-foreground0" aria-hidden="true" />
+                  <p className="mt-4 text-sm font-medium text-foreground">Drop an .eml file here</p>
+                  <p className="mt-1 max-w-md text-xs leading-5 text-foreground0">Maximum 2 MB. Parsed in memory; attachment contents are never executed.</p>
                   <Input ref={fileInput} type="file" accept=".eml,message/rfc822" onChange={onFileChange} className="sr-only" id="eml-file" />
-                  <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} className="mt-4 border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"><Paperclip aria-hidden="true" />Choose file</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} className="mt-4 border-input bg-surface text-muted-foreground hover:bg-surface-muted hover:text-foreground"><Paperclip aria-hidden="true" />Choose file</Button>
                 </div>
-                {emlFile && <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-950/60 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-slate-200" title={emlFile.name}>{emlFile.name}</p><p className="mt-1 text-xs text-slate-500">{formatFileSize(emlFile.size)} - ready to analyze</p></div><Button type="button" variant="ghost" size="icon" onClick={() => { setEmlFile(null); setEmlText(''); if (fileInput.current) fileInput.current.value = ''; }} aria-label="Remove selected file" className="shrink-0 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"><X aria-hidden="true" /></Button></div>}
+                {emlFile && <div className="flex items-center justify-between gap-3 rounded-lg bg-background/60 px-4 py-3"><div className="min-w-0"><p className="truncate text-sm font-medium text-foreground" title={emlFile.name}>{emlFile.name}</p><p className="mt-1 text-xs text-foreground0">{formatFileSize(emlFile.size)} - ready to analyze</p></div><Button type="button" variant="ghost" size="icon" onClick={() => { setEmlFile(null); setEmlText(''); if (fileInput.current) fileInput.current.value = ''; }} aria-label="Remove selected file" className="shrink-0 text-foreground0 hover:bg-danger/10 hover:text-danger"><X aria-hidden="true" /></Button></div>}
               </section>
             )}
 
             {error && (
-              <Alert id="analysis-error" className="border-rose-500/30 bg-rose-500/10 text-rose-200">
+              <Alert id="analysis-error" className="border-danger/30 bg-danger/10 text-danger">
                 <AlertCircle aria-hidden="true" />
                 <AlertTitle>{errorTitle}</AlertTitle>
                 <AlertDescription className="pr-2">
                   <p>{error.message}</p>
                   {(error.kind === 'backend_unavailable' || error.kind === 'service_unavailable' || error.kind === 'unexpected') && (
-                    <Button type="submit" variant="outline" size="sm" disabled={isLoading || !canAnalyze} className="mt-3 border-rose-400/30 bg-transparent text-rose-100 hover:bg-rose-500/10 hover:text-white">Try again</Button>
+                    <Button type="submit" variant="outline" size="sm" disabled={isLoading || !canAnalyze} className="mt-3 border-danger/30 bg-transparent text-danger hover:bg-danger/10 hover:text-foreground">Try again</Button>
                   )}
                 </AlertDescription>
               </Alert>
             )}
 
             {isLoading && (
-              <div role="status" aria-live="polite" className="rounded-lg bg-blue-500/10 p-4">
-                <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-blue-400" aria-hidden="true" /><div><p className="text-sm font-medium text-slate-200">Analyzing email</p><p className="mt-0.5 text-xs text-slate-400">Parsing content and evaluating security signals...</p></div></div>
-                <Progress value={100} className="mt-3 h-1 bg-slate-800 [&>div]:animate-pulse [&>div]:bg-blue-500" aria-label="Analysis in progress" />
+              <div role="status" aria-live="polite" className="rounded-lg bg-primary/10 p-4">
+                <div className="flex items-center gap-3"><Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden="true" /><div><p className="text-sm font-medium text-foreground">Analyzing email</p><p className="mt-0.5 text-xs text-muted-foreground">Parsing content and evaluating security signals...</p></div></div>
+                <Progress value={100} className="mt-3 h-1 bg-surface-muted [&>div]:animate-pulse [&>div]:bg-primary" aria-label="Analysis in progress" />
               </div>
             )}
 
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-800 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                {mode === 'raw_email' && <Button type="button" variant="ghost" size="sm" onClick={() => { setRawEmail(EXAMPLE_EMAIL); setError(null); setResult(null); }} disabled={isLoading} className="text-slate-400 hover:bg-slate-800 hover:text-white">Load example</Button>}
-                <Button type="button" variant="ghost" size="sm" onClick={handleClear} disabled={isLoading} className="text-slate-500 hover:bg-slate-800 hover:text-slate-200"><Trash2 aria-hidden="true" />Clear</Button>
+                {mode === 'raw_email' && <Button type="button" variant="ghost" size="sm" onClick={() => { setRawEmail(EXAMPLE_EMAIL); setError(null); setResult(null); }} disabled={isLoading} className="text-muted-foreground hover:bg-surface-muted hover:text-foreground">Load example</Button>}
+                <Button type="button" variant="ghost" size="sm" onClick={handleClear} disabled={isLoading} className="text-foreground0 hover:bg-surface-muted hover:text-foreground"><Trash2 aria-hidden="true" />Clear</Button>
               </div>
-              <Button type="submit" disabled={isLoading || !canAnalyze} aria-describedby={error ? 'analysis-error' : undefined} className="w-full bg-blue-600 text-white hover:bg-blue-500 sm:w-auto">{isLoading ? <><Loader2 className="animate-spin" aria-hidden="true" />Analyzing...</> : <><Send aria-hidden="true" />Analyze email</>}</Button>
+              <Button type="submit" disabled={isLoading || !canAnalyze} aria-describedby={error ? 'analysis-error' : undefined} className="w-full bg-primary text-primary-foreground hover:bg-primary sm:w-auto">{isLoading ? <><Loader2 className="animate-spin" aria-hidden="true" />Analyzing...</> : <><Send aria-hidden="true" />Analyze email</>}</Button>
             </div>
           </form>
         </CardContent>

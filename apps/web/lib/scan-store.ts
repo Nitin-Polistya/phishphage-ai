@@ -1,5 +1,5 @@
 import type { DashboardStats, ScanIndicator, ScanRecord, ThreatVector } from '@/types';
-import type { AnalysisInputMode, ThreatSeverity, UnifiedAnalysisResponse } from '@/types/analysis';
+import type { AnalysisInputMode, EmailAttachmentMetadata, ThreatSeverity, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { PredictionResponse } from '@/types/inference';
 
 const SCAN_STORAGE_KEY = 'phishphage.scan-records.v1';
@@ -186,7 +186,12 @@ function headerValue(rawEmail: string, name: string) {
   return match?.[1]?.trim() || '';
 }
 
-export function createProductionScanRecord(result: PredictionResponse, rawEmail: string, inputMode: AnalysisInputMode): ScanRecord {
+export function createProductionScanRecord(
+  result: PredictionResponse,
+  rawEmail: string,
+  inputMode: AnalysisInputMode,
+  attachments: EmailAttachmentMetadata[] = [],
+): ScanRecord {
   const subject = headerValue(rawEmail, 'Subject') || '(No subject)';
   const sender = headerValue(rawEmail, 'From') || 'Not supplied';
   const classification = result.prediction === 'phishing' ? 'phishing' : result.probability >= 0.35 ? 'suspicious' : 'safe';
@@ -209,10 +214,10 @@ export function createProductionScanRecord(result: PredictionResponse, rawEmail:
   return {
     id: createId(), timestamp: new Date().toISOString(), subject, sender, classification,
     riskScore: Math.round(result.risk_score), confidence: result.confidence, indicators,
-    attachmentCount: 0, extractedUrlCount: result.signals.url_indicators.length,
+    attachmentCount: attachments.length, extractedUrlCount: result.signals.url_indicators.length,
     details: {
       replyTo: null, recipients: [], cc: [], messageDate: null, messageId: null,
-      recommendations: [...result.recommendations], urls: [], attachments: [], inputMode,
+      recommendations: [...result.recommendations], urls: [], attachments: attachments.map((item) => ({ ...item })), inputMode,
       ruleEngine: { status: 'active', version: 'production-inference' },
       mlEngine: { status: 'available', version: result.model_version },
       mlPrediction: result.prediction, mlPhishingProbability: result.probability,

@@ -99,14 +99,14 @@ export function ReportActionsMenu({ scan, onView, onJson, onCsv, onPrint }: Repo
             if (!open) openMenu();
           }
         }}
-        className="theme-link h-8 w-8 hover:bg-slate-800"
+        className="theme-link h-8 w-8 hover:bg-surface-muted"
       >
         <MoreVertical aria-hidden="true" />
       </Button>
       {open && createPortal(
-        <div ref={menuRef} id={menuId} role="menu" aria-label={`Actions for ${scan.subject}`} onKeyDown={handleMenuKeyDown} style={{ top: position.top, left: position.left }} className="fixed z-[80] w-44 rounded-md border border-slate-700 bg-slate-950 p-1 shadow-xl shadow-black/30">
+        <div ref={menuRef} id={menuId} role="menu" aria-label={`Actions for ${scan.subject}`} onKeyDown={handleMenuKeyDown} style={{ top: position.top, left: position.left }} className="fixed z-[80] w-44 rounded-md border border-input bg-background p-1 shadow-xl shadow-black/30">
           {actions.map((action) => (
-            <button key={action.label} type="button" role="menuitem" onClick={() => { setOpen(false); action.run(); }} className="theme-link flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-slate-800 focus-visible:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+            <button key={action.label} type="button" role="menuitem" onClick={() => { setOpen(false); action.run(); }} className="theme-link flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm hover:bg-surface-muted focus-visible:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <action.icon className="h-4 w-4" aria-hidden="true" />{action.label}
             </button>
           ))}

@@ -43,7 +43,7 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-slate-950">
+    <div className="flex min-h-screen bg-background">
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} isDesktop={isDesktop} onToggleCollapsed={toggleCollapsed} onCloseMobile={closeMobile} />
       <div inert={mobileOpen ? true : undefined} className={cn('flex min-w-0 flex-1 flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-20' : 'lg:pl-64')}>
         <TopNav mobileOpen={mobileOpen} menuButtonRef={menuButtonRef} onOpenSidebar={() => setMobileOpen(true)} />

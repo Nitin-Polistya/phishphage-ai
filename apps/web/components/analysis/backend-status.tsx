@@ -26,10 +26,10 @@ export function BackendStatus() {
   }, []);
 
   const config = {
-    loading: { label: 'Loading', icon: Loader2, tone: 'text-slate-400' },
-    connected: { label: 'Connected', icon: CircleCheck, tone: 'text-emerald-400' },
-    degraded: { label: 'Degraded', icon: CircleAlert, tone: 'text-amber-400' },
-    offline: { label: 'Offline', icon: CircleAlert, tone: 'text-rose-400' },
+    loading: { label: 'Loading', icon: Loader2, tone: 'text-muted-foreground' },
+    connected: { label: 'Connected', icon: CircleCheck, tone: 'text-success' },
+    degraded: { label: 'Degraded', icon: CircleAlert, tone: 'text-warning' },
+    offline: { label: 'Offline', icon: CircleAlert, tone: 'text-danger' },
   }[state];
   const Icon = config.icon;
 
@@ -39,9 +39,9 @@ export function BackendStatus() {
         <Icon className={`h-3.5 w-3.5 motion-reduce:animate-none ${state === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true" />
         <span>{config.label}</span>
       </span>
-      {health?.model_version && <span className="hidden border-l border-slate-700 pl-3 text-slate-500 sm:inline">Model v{health.model_version}</span>}
-      {health?.deployment_candidate && <span className="hidden rounded border border-amber-500/30 px-1.5 py-0.5 text-amber-300 md:inline">Candidate model</span>}
-      <Activity className="hidden h-3.5 w-3.5 text-slate-600 md:inline" aria-hidden="true" />
+      {health?.model_version && <span className="hidden border-l border-input pl-3 text-foreground0 sm:inline">Model v{health.model_version}</span>}
+      {health?.deployment_candidate && <span className="hidden rounded border border-warning/30 px-1.5 py-0.5 text-warning md:inline">Candidate model</span>}
+      <Activity className="hidden h-3.5 w-3.5 text-muted-foreground md:inline" aria-hidden="true" />
     </div>
   );
 }

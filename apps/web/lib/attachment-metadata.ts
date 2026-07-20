@@ -10,7 +10,6 @@ export const SUSPICIOUS_ATTACHMENT_EXTENSIONS = new Set([
 
 export interface SelectedQuickAttachment {
   key: string;
-  lastModified: number;
   metadata: EmailAttachmentMetadata;
 }
 
@@ -19,7 +18,7 @@ export interface AttachmentSelectionResult {
   errors: string[];
 }
 
-type FileMetadata = Pick<File, 'name' | 'type' | 'size' | 'lastModified'>;
+type FileMetadata = Pick<File, 'name' | 'type' | 'size'>;
 
 export function extensionFromFilename(filename: string): string | null {
   const match = filename.trim().toLowerCase().match(/\.[^.]+$/);
@@ -27,7 +26,7 @@ export function extensionFromFilename(filename: string): string | null {
 }
 
 export function attachmentKey(file: FileMetadata): string {
-  return `${file.name}\u0000${file.size}\u0000${file.lastModified}`;
+  return `${file.name}\u0000${file.type}\u0000${file.size}`;
 }
 
 export function deriveAttachmentMetadata(file: FileMetadata): SelectedQuickAttachment {
@@ -35,7 +34,6 @@ export function deriveAttachmentMetadata(file: FileMetadata): SelectedQuickAttac
   const extension = extensionFromFilename(filename);
   return {
     key: attachmentKey(file),
-    lastModified: file.lastModified,
     metadata: {
       filename,
       content_type: file.type || 'application/octet-stream',

@@ -29,7 +29,7 @@ test('derives ZIP metadata and marks the extension suspicious', () => {
   assert.equal(selected.metadata.suspicious_extension, true);
 });
 
-test('prevents duplicate filename, size, and lastModified combinations', () => {
+test('prevents duplicate filename, MIME type, and size combinations without reading file content', () => {
   const original = file('same.pdf', 'application/pdf', 5, 42);
   const first = mergeAttachmentSelection([], [original]);
   const duplicate = mergeAttachmentSelection(first.attachments, [original]);

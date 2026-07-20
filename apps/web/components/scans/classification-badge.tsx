@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils';
 import type { ThreatClassification } from '@/types/analysis';
 
 const classificationStyles: Record<ThreatClassification, string> = {
-  phishing: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
-  suspicious: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-  safe: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+  phishing: 'border-danger/30 bg-danger/10 text-danger',
+  suspicious: 'border-warning/30 bg-warning/10 text-warning',
+  safe: 'border-success/30 bg-success/10 text-success',
 };
 
 export function ClassificationBadge({ classification, className }: { classification: ThreatClassification; className?: string }) {
