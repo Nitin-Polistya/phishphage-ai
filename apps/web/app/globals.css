@@ -54,6 +54,11 @@ html {
   html {
     scroll-behavior: auto;
   }
+
+  .animate-spin,
+  [class*='animate-['] {
+    animation: none !important;
+  }
 }
 
 html[data-theme='light'] body {

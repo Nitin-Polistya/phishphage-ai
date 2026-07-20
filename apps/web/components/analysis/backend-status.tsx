@@ -36,7 +36,7 @@ export function BackendStatus() {
   return (
     <div className="flex items-center gap-3 text-xs" aria-live="polite">
       <span className={`flex items-center gap-1.5 font-medium ${config.tone}`}>
-        <Icon className={`h-3.5 w-3.5 ${state === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true" />
+        <Icon className={`h-3.5 w-3.5 motion-reduce:animate-none ${state === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true" />
         <span>{config.label}</span>
       </span>
       {health?.model_version && <span className="hidden border-l border-slate-700 pl-3 text-slate-500 sm:inline">Model v{health.model_version}</span>}

@@ -6,7 +6,6 @@ import {
   BookOpen,
   BrainCircuit,
   Check,
-  ChevronRight,
   ClipboardPaste,
   FileCode2,
   FileSearch,
@@ -28,7 +27,7 @@ import { LandingSectionNavigation } from '@/components/landing/section-navigatio
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'PhishPhage AI — Explainable phishing detection',
+    absolute: 'PhishShield AI — Explainable phishing detection',
   },
   description: 'Analyze email content, headers, URLs, and attachment metadata with explainable phishing-risk scoring.',
 };
@@ -78,8 +77,8 @@ const howToUseSteps = [
   { title: 'Review the AI verdict', description: 'Check the final classification, risk score, and confidence.', icon: Gauge },
   { title: 'Review detected indicators', description: 'Inspect the evidence and signals that contributed to the result.', icon: FileSearch },
   { title: 'Follow recommended actions', description: 'Use the suggested next steps to respond safely and consistently.', icon: ShieldCheck },
-  { title: 'Save to Scan History', description: 'Successful analyses are retained locally when scan saving is enabled.', icon: ScanText },
-  { title: 'Export a report if needed', description: 'Open Reports to preview, download, print, or save the investigation.', icon: FileUp },
+  { title: 'Review the assessment', description: 'Use the result dashboard to understand score, confidence, and signal families.', icon: ScanText },
+  { title: 'Use human judgment', description: 'Follow practical recommendations and verify sensitive requests independently.', icon: FileUp },
 ];
 
 export default function LandingPage() {
@@ -91,7 +90,7 @@ export default function LandingPage() {
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white">
               <ShieldAlert size={19} aria-hidden="true" />
             </span>
-            <span className="font-semibold tracking-tight text-slate-50">PhishPhage AI</span>
+            <span className="font-semibold tracking-tight text-slate-50">PhishShield AI</span>
           </Link>
 
           <LandingSectionNavigation />
@@ -118,7 +117,7 @@ export default function LandingPage() {
                 Stop phishing before it becomes an incident.
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg sm:leading-8">
-                PhishPhage AI turns suspicious emails into clear, evidence-backed risk assessments—so you can understand the threat and act with confidence.
+                PhishShield AI turns suspicious emails into clear, evidence-backed risk assessments—so you can understand the threat and act with confidence.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="bg-blue-600 px-6 text-white hover:bg-blue-500">
@@ -142,45 +141,19 @@ export default function LandingPage() {
               <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                   <MailSearch size={15} className="text-blue-400" aria-hidden="true" />
-                  Analysis preview
+                  Analysis workflow
                 </div>
-                <span className="flex items-center gap-2 text-xs text-emerald-400">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" /> Ready
+                  <span className="flex items-center gap-2 text-xs text-blue-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-400" aria-hidden="true" /> In memory
                 </span>
               </div>
               <div className="p-5 sm:p-6">
-                <div className="flex items-start justify-between gap-6 border-b border-slate-800 pb-6">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Final classification</p>
-                    <p className="mt-2 text-2xl font-semibold text-amber-300">Suspicious</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Risk score</p>
-                    <p className="mt-2 text-2xl font-semibold tabular-nums text-slate-100">67<span className="text-sm text-slate-500">/100</span></p>
-                  </div>
-                </div>
-                <div className="space-y-4 py-6">
-                  {[
-                    ['Sender identity', 'Reply-to mismatch', 'medium'],
-                    ['Content signals', 'Credential request', 'high'],
-                    ['URL structure', 'Obfuscated destination', 'high'],
-                    ['Attachment', 'No executable content', 'clear'],
-                  ].map(([label, finding, tone]) => (
-                    <div key={label} className="grid grid-cols-[1fr_auto] items-center gap-4 text-sm">
-                      <div>
-                        <p className="text-slate-500">{label}</p>
-                        <p className="mt-0.5 text-slate-200">{finding}</p>
-                      </div>
-                      <span className={tone === 'clear' ? 'text-xs font-medium text-emerald-400' : tone === 'medium' ? 'text-xs font-medium text-amber-400' : 'text-xs font-medium text-rose-400'}>
-                        {tone}
-                      </span>
-                    </div>
+                <div className="space-y-3 py-6">
+                  {[['01', 'Parse locally', 'Normalize headers, body text, links, and attachment metadata.'], ['02', 'Evaluate signals', 'Combine deterministic indicators with the calibrated local candidate model.'], ['03', 'Explain safely', 'Return risk, confidence, signal families, and recommendations without retaining the email.']].map(([number, title, description]) => (
+                    <div key={number} className="grid grid-cols-[32px_1fr] gap-3 rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span className="text-xs font-semibold tabular-nums text-blue-400">{number}</span><div><p className="text-sm font-semibold text-slate-200">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{description}</p></div></div>
                   ))}
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-800 pt-5 text-xs text-slate-500">
-                  <span>4 explainable findings</span>
-                  <span className="flex items-center gap-1 text-blue-400">Review evidence <ChevronRight size={13} aria-hidden="true" /></span>
-                </div>
+                <div className="flex items-center gap-2 border-t border-slate-800 pt-5 text-xs text-slate-500"><LockKeyhole size={14} className="text-emerald-400" aria-hidden="true" />No persistence, URL fetching, or attachment execution.</div>
               </div>
             </div>
           </div>
@@ -249,6 +222,13 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="architecture" className="border-b border-slate-800/80 bg-slate-900/25 py-20 sm:py-24">
+          <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-6 lg:grid-cols-[0.7fr_1.3fr] lg:gap-20 lg:px-8">
+            <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-400">Technical foundation</p><h2 className="mt-4 text-3xl font-semibold tracking-tight text-white">Local-first by design.</h2><p className="mt-4 max-w-sm text-sm leading-6 text-slate-400">A small, inspectable path keeps the privacy boundary clear: browser to API, parser to rules and calibrated model, then back to a structured explanation.</p></div>
+            <div className="grid gap-3 sm:grid-cols-2"><div className="border border-slate-800 bg-slate-950/50 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Frontend</p><p className="mt-3 text-lg font-semibold text-slate-100">Next.js + TypeScript</p><p className="mt-2 text-sm leading-6 text-slate-500">Responsive workspace, typed API client, accessible status and result states.</p></div><div className="border border-slate-800 bg-slate-950/50 p-5"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Backend</p><p className="mt-3 text-lg font-semibold text-slate-100">FastAPI inference API</p><p className="mt-2 text-sm leading-6 text-slate-500">RFC822 parsing, deterministic indicators, model registry verification, and health reporting.</p></div><div className="border border-slate-800 bg-slate-950/50 p-5 sm:col-span-2"><p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Privacy boundary</p><p className="mt-3 text-lg font-semibold text-slate-100">No raw-email persistence</p><p className="mt-2 text-sm leading-6 text-slate-500">The analysis workflow does not render HTML, follow URLs, execute attachments, or store submitted content. Results are for human review, not a guarantee of safety.</p></div></div>
           </div>
         </section>
 
@@ -321,20 +301,20 @@ export default function LandingPage() {
                 <ShieldAlert size={18} aria-hidden="true" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-slate-200">PhishPhage AI</p>
+              <p className="text-sm font-semibold text-slate-200">PhishShield AI</p>
                 <p className="mt-0.5 text-xs text-slate-600">Explainable phishing detection</p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
               <a href="https://github.com/Nitin-Polistya/phishphage-ai" target="_blank" rel="noreferrer" className="theme-link rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">GitHub repository</a>
-              <span className="flex items-center gap-1.5" title="Documentation coming soon"><BookOpen size={14} aria-hidden="true" />Documentation · Coming soon</span>
-              <span className="flex items-center gap-1.5"><BadgeCheck size={14} aria-hidden="true" />Internship MVP</span>
+              <span className="flex items-center gap-1.5"><BookOpen size={14} aria-hidden="true" />Docs in repository</span>
+              <span className="flex items-center gap-1.5"><BadgeCheck size={14} aria-hidden="true" />Release candidate</span>
             </div>
           </div>
           <Separator className="my-8 bg-slate-800" />
           <div className="flex flex-col justify-between gap-2 text-xs text-slate-600 sm:flex-row">
             <p>Built for transparent, evidence-led email security analysis.</p>
-            <p>PhishPhage AI · Project information</p>
+            <p>PhishShield AI · Project information</p>
           </div>
         </div>
       </footer>

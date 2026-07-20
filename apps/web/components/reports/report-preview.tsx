@@ -50,7 +50,7 @@ export function ReportPreview({ scan, onClose, onJson, onCsv, onPrint }: ReportP
       <section role="dialog" aria-modal="true" aria-labelledby="report-preview-title" className="mx-auto flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl shadow-black/50">
         <header className="flex flex-col justify-between gap-4 border-b border-slate-800 bg-slate-950 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-400">PhishPhage AI report preview</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-400">PhishShield AI report preview</p>
             <h2 id="report-preview-title" className="mt-1 truncate text-lg font-semibold text-slate-100">{report.subject}</h2>
             <p className="mt-1 flex items-center gap-2 text-xs text-slate-500"><Clock size={13} aria-hidden="true" />Generated {formatReportDate(report.report_generated_at)}</p>
           </div>
@@ -65,7 +65,7 @@ export function ReportPreview({ scan, onClose, onJson, onCsv, onPrint }: ReportP
         <div className="flex-1 overflow-y-auto p-5 sm:p-7">
           <div className="mx-auto max-w-5xl space-y-6">
             <div className="flex flex-col justify-between gap-5 border-b border-slate-800 pb-6 sm:flex-row sm:items-start">
-              <div><p className="text-sm font-semibold text-blue-400">PhishPhage AI</p><h3 className="mt-1 text-2xl font-semibold text-slate-100">Email Analysis Report</h3></div>
+              <div><p className="text-sm font-semibold text-blue-400">PhishShield AI</p><h3 className="mt-1 text-2xl font-semibold text-slate-100">Email Analysis Report</h3></div>
               <div className="text-sm text-slate-500"><p>Scan ID</p><p className="mt-1 break-all font-mono text-xs text-slate-300">{report.scan_id}</p></div>
             </div>
 

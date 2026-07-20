@@ -62,9 +62,9 @@ export function Sidebar({ collapsed, mobileOpen, isDesktop, onToggleCollapsed, o
         )}
       >
         <div className="relative flex h-full flex-col px-3 py-4">
-          <Link href="/" aria-label="PhishPhage AI home" onClick={handleNavigate} className={cn('mb-10 flex items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500', collapsed && 'lg:justify-center lg:px-0')}>
+          <Link href="/" aria-label="PhishShield AI home" onClick={handleNavigate} className={cn('mb-10 flex items-center gap-2 rounded-md px-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500', collapsed && 'lg:justify-center lg:px-0')}>
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white"><ShieldAlert size={20} aria-hidden="true" /></span>
-            <span className={cn('whitespace-nowrap text-lg font-bold tracking-tight text-slate-100', collapsed && 'lg:sr-only')}>PhishPhage AI</span>
+            <span className={cn('whitespace-nowrap text-lg font-bold tracking-tight text-slate-100', collapsed && 'lg:sr-only')}>PhishShield AI</span>
           </Link>
 
           <Button ref={closeButtonRef} type="button" variant="ghost" size="icon" aria-label="Close navigation" onClick={onCloseMobile} className="theme-link absolute right-3 top-4 hover:bg-slate-900 lg:hidden"><X aria-hidden="true" /></Button>

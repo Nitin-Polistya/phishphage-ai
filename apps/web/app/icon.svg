@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>PhishShield AI</title>
+  <rect width="64" height="64" rx="14" fill="#2563eb"/>
+  <path d="M32 10 49 17v13c0 11-6.7 19.6-17 24C21.7 49.6 15 41 15 30V17l17-7Z" fill="#eff6ff"/>
+  <path d="m23 31 6 6 13-14" fill="none" stroke="#2563eb" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+</svg>
