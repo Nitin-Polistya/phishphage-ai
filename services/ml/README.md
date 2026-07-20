@@ -209,3 +209,41 @@ are intentionally Git-ignored.  They contain aggregate metrics, hashed probe
 feature identifiers and transform names only; raw EML, addresses and URL
 parameters must not be copied into reports.  Review
 `artifact_reduction_summary.md` before considering any subsequent experiment.
+
+## Phase B.3F — source-separability feature ablations (diagnostic only)
+
+Phase B.3F measures whether the weak-label recall change remains when
+source-identifying feature families are withheld.  It is a controlled
+diagnostic matrix, not a model-selection or deployment workflow.  The fixed
+threshold, evaluation manifests, estimator settings, and random seed are
+frozen; weak rows remain train-only and the active model is never overwritten.
+
+The versioned feature-family and ablation definitions are in
+`config/experiments/phishing_pot_feature_ablation_v1.json`.  Run the complete
+matrix (after reviewing the boundary audit) with:
+
+```powershell
+python services/ml/scripts/run_phishing_pot_feature_ablations.py --all
+python services/ml/scripts/compare_phishing_pot_feature_ablations.py
+```
+
+`--probe-only`, `--classifier-only`, and `--verify-only` are available for
+auditing individual stages.  Existing completed experiments are immutable
+unless `--force-retrain` is explicitly supplied.  Experimental Joblib bundles
+are written only below the ignored
+`services/ml/artifacts/experiments/phishing_pot_feature_ablation_v1/` tree and
+carry `experimental_only=true`, `deployment_allowed=false`, and
+`active_model_replacement_allowed=false` in their manifests.
+
+Reports are written to the ignored
+`services/ml/reports/phishing_pot_feature_ablation_v1/` directory.  They may
+contain aggregate counts, metric values, hashes, feature-family names,
+fold-level scores, and confidence intervals, but must never contain raw email
+bodies, complete addresses or sensitive domains, full URLs/query strings,
+Message-IDs, Received chains, attachment names/bytes, or unsanitized headers.
+Source-probe feature importance is reported at family level (or as one-way
+hashes) so it cannot become a source-data export.  A privacy scan and boundary
+audit are required before accepting any comparison; a failing scan aborts the
+run.  No conclusion from this phase automatically approves Phishing Pot,
+changes weak-label policy, retrains the provisioned classifier, or activates
+an artifact.

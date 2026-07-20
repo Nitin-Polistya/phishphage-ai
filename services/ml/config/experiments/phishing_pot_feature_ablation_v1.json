@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "experiment_suite": "phishing_pot_feature_ablation_v1",
+  "seed": 42,
+  "bootstrap_seed": 271828,
+  "bootstrap_iterations": 300,
+  "fixed_threshold": 0.5,
+  "feature_families": {
+    "lexical_text": ["subject_tokens", "plain_body_tokens", "html_visible_text_tokens", "word_ngrams", "character_ngrams"],
+    "sender_infrastructure": ["sender_domain_group", "reply_to_domain_group", "return_path_group", "sender_reply_mismatch"],
+    "url_infrastructure": ["url_domain_group", "url_path_pattern", "ip_host", "punycode", "suspicious_port", "shortened_link"],
+    "authentication_headers": ["spf", "dkim", "dmarc", "authentication_results", "from_return_path_mismatch"],
+    "mime_html_structure": ["mime_part_count", "multipart", "html_only", "plain_text_available", "html_tag_counts", "css_hidden_text", "encoding_pattern", "attachment_presence"],
+    "semantic_security_indicators": ["credential_request", "login_wording", "urgency", "account_security", "invoice_payment", "qr_mfa", "delivery", "impersonation", "suspicious_call_to_action", "authentication_failure", "attachment_indicator"],
+    "metadata_misc": ["safe_date_format", "safe_subject_prefix", "header_presence", "length_counts"]
+  },
+  "prohibited_raw_identifiers": ["raw_address", "full_domain", "full_url", "message_id", "filename", "message_content"],
+  "ablations": {
+    "baseline_full": {"include": ["lexical_text", "sender_infrastructure", "url_infrastructure", "authentication_headers", "mime_html_structure", "semantic_security_indicators", "metadata_misc"]},
+    "weak_035_full": {"include": ["lexical_text", "sender_infrastructure", "url_infrastructure", "authentication_headers", "mime_html_structure", "semantic_security_indicators", "metadata_misc"]},
+    "weak_050_full": {"include": ["lexical_text", "sender_infrastructure", "url_infrastructure", "authentication_headers", "mime_html_structure", "semantic_security_indicators", "metadata_misc"]},
+    "text_only": {"include": ["lexical_text"]},
+    "structured_only": {"include": ["sender_infrastructure", "url_infrastructure", "authentication_headers", "mime_html_structure", "semantic_security_indicators", "metadata_misc"]},
+    "without_sender_infrastructure": {"exclude": ["sender_infrastructure"]},
+    "without_url_infrastructure": {"exclude": ["url_infrastructure"]},
+    "without_mime_html_structure": {"exclude": ["mime_html_structure"]},
+    "without_authentication_headers": {"exclude": ["authentication_headers"]},
+    "without_lexical_text": {"exclude": ["lexical_text"]},
+    "semantic_indicators_only": {"include": ["semantic_security_indicators"]},
+    "lexical_plus_semantic": {"include": ["lexical_text", "semantic_security_indicators"]},
+    "infrastructure_only": {"include": ["sender_infrastructure", "url_infrastructure", "authentication_headers"]}
+  },
+  "data_treatments": {"baseline": {"weak_rows": 0, "weak_weight": null}, "weak_035": {"weak_rows": 107, "weak_weight": 0.35}, "weak_050": {"weak_rows": 107, "weak_weight": 0.5}},
+  "model_configuration": {"type": "logistic_regression", "class_weight": "balanced", "solver": "liblinear", "max_iter": 1000, "random_state": 42},
+  "paths": {"base_config": "services/ml/config/experiments/phishing_pot_weak_label_comparison_v1.json", "artifact_dir": "services/ml/artifacts/experiments/phishing_pot_feature_ablation_v1", "report_dir": "services/ml/reports/phishing_pot_feature_ablation_v1"},
+  "policy": {"external_recall_max_decrease": 0.02, "external_fpr_max_increase": 0.02, "brier_max_increase": 0.02, "template_shift_f1_max_decrease": 0.03}
+}
