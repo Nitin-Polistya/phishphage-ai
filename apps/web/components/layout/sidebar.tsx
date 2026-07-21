@@ -92,12 +92,12 @@ export function Sidebar({ collapsed, mobileOpen, isDesktop, onToggleCollapsed, o
                 </Link>
               );
 
-              return (
-                <Tooltip key={item.name} open={collapsed ? undefined : false}>
+              return collapsed ? (
+                <Tooltip key={item.name}>
                   <TooltipTrigger asChild>{link}</TooltipTrigger>
                   <TooltipContent side="right" className="hidden border-input bg-surface text-foreground lg:block">{item.name}</TooltipContent>
                 </Tooltip>
-              );
+              ) : <div key={item.name}>{link}</div>;
             })}
           </nav>
 
