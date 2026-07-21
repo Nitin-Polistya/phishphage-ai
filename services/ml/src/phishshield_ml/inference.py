@@ -36,11 +36,36 @@ def load_model_bundle(model_path: str | Path) -> LoadedModelBundle:
 
 
 class LocalInferenceService:
-    def __init__(self, model_path: str | Path):
-        self._bundle = load_model_bundle(model_path)
+    def __init__(self, model_path: str | Path, verified_model=None):
+        self._bundle = self._bundle_from_verified_model(verified_model) if verified_model is not None else load_model_bundle(model_path)
         self._pipeline = self._bundle.pipeline
         self._vectorizer = self._pipeline.named_steps.get("features") or self._pipeline.named_steps.get("tfidf")
         self._classifier = self._pipeline.named_steps["clf"]
+
+    @classmethod
+    def from_verified_model(cls, loaded_model) -> "LocalInferenceService":
+        """Create an inference service from a registry/hash-verified model."""
+        instance = cls.__new__(cls)
+        instance._bundle = cls._bundle_from_verified_model(loaded_model)
+        instance._pipeline = instance._bundle.pipeline
+        instance._vectorizer = instance._pipeline.named_steps.get("features") or instance._pipeline.named_steps.get("tfidf")
+        instance._classifier = instance._pipeline.named_steps["clf"]
+        return instance
+
+    @staticmethod
+    def _bundle_from_verified_model(loaded_model) -> LoadedModelBundle:
+        bundle = loaded_model.bundle
+        return LoadedModelBundle(
+            pipeline=loaded_model.predictor,
+            model_version=loaded_model.record.version,
+            label_mapping=bundle.get("label_mapping", {"legitimate": 0, "phishing": 1}),
+            preprocessing_version=bundle.get("preprocessing_version", "registry-approved"),
+            feature_config=bundle.get("feature_config", {}),
+            training_timestamp=loaded_model.record.training_timestamp,
+            dataset_summary=bundle.get("training_dataset_summary", {}),
+            evaluation_metrics=bundle.get("evaluation_metrics", {}),
+            decision_threshold=loaded_model.record.threshold,
+        )
 
     @property
     def model_version(self) -> str:

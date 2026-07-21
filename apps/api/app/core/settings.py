@@ -11,10 +11,15 @@ class Settings(BaseSettings):
     api_v1_prefix: str = Field(default='/api/v1', alias='API_V1_PREFIX')
     cors_origins: list[str] = Field(default_factory=lambda: ['http://localhost:3000'], alias='CORS_ORIGINS')
     log_level: str = Field(default='INFO', alias='LOG_LEVEL')
-    ml_model_path: str = Field(
-        default='services/ml/models/phishshield_model.joblib',
-        alias='ML_MODEL_PATH',
+    ml_registry_path: str = Field(
+        default='services/ml/models/registry.json',
+        alias='ML_REGISTRY_PATH',
     )
+    ml_model_id: str = Field(
+        default='phase-c-logistic-regression-v1',
+        alias='ML_MODEL_ID',
+    )
+    ml_artifact_path: str | None = Field(default=None, alias='ML_ARTIFACT_PATH')
     ml_required: bool = Field(default=False, alias='ML_REQUIRED')
     ml_marginal_alert_band: float = Field(
         default=0.08,

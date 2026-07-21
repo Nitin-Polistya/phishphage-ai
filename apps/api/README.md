@@ -63,14 +63,16 @@ Environment variables are loaded with `pydantic-settings` from `apps/api/.env`.
 
 ### Machine-learning availability
 
-- `ML_MODEL_PATH` identifies the Joblib model bundle. Relative paths are resolved from the repository root. The default is `services/ml/models/phishshield_model.joblib`.
-- `ML_REQUIRED=false` is the local MVP default. If the model cannot be loaded or inference fails, analysis returns HTTP 200 with the deterministic rule result and `ml_analysis.status` set to `unavailable`.
-- `ML_REQUIRED=true` makes ML mandatory. Model load or inference failure returns HTTP 503 with a safe client message.
+- `ML_REGISTRY_PATH` identifies the tracked model registry. Relative paths are resolved from the repository root.
+- `ML_MODEL_ID` selects the registry entry; the default is `phase-c-logistic-regression-v1`.
+- `ML_ARTIFACT_PATH` optionally points to a mounted/downloaded copy of the selected artifact. It is accepted only when its SHA-256 matches the registry entry. There is no standalone-model fallback.
+- `ML_REQUIRED=false` allows API startup when the approved artifact is unavailable; unified analysis returns HTTP 200 with deterministic rule results and `ml_analysis.status` set to `unavailable`.
+- `ML_REQUIRED=true` makes the approved model a readiness requirement. Health returns HTTP 503 and analysis returns HTTP 503 when it cannot be loaded or verified.
 - `ML_MARGINAL_ALERT_BAND=0.08` defines the maximum amount above the saved model threshold that can be treated as a marginal, uncorroborated alert. It does not change the model threshold.
 
 The optional fallback does not manufacture a prediction: prediction, probabilities, threshold, and model version are `null`. Classification, risk score, and recommendations come from rules; incomplete Safe evidence is explicitly qualified and its displayed confidence is capped at 0.65.
 
-The template-robust English-first academic baseline is provisioned at `services/ml/models/phishshield_model.joblib` and stores a fixed phishing threshold of `0.50`. The model loader remains backward-compatible with older bundles, which default to `0.50` when no threshold is present. See `services/ml/README.md` for source gates, grouped template-shift evaluation, candidate comparison, external evaluation, and limitations.
+The registry-selected deployment candidate is `services/ml/artifacts/phase_c_model_development_v1/deployment_candidate/fitted_pipeline.joblib` and stores a fixed phishing threshold of `0.50`. The registry hash is verified before loading. See [model artifact distribution](../../docs/MODEL_ARTIFACT_DISTRIBUTION.md) for fresh-clone setup and the release mechanism.
 
 ### Firebase Setup (Optional)
 

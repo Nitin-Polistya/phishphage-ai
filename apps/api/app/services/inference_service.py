@@ -8,11 +8,17 @@ import time
 from app.schemas.email import ParsedEmail
 from app.schemas.inference import InferenceSignals, PredictionResponse
 from app.services.model_manager import ModelManager
+from app.core.settings import get_settings
 
 
 class InferenceService:
     def __init__(self, manager: ModelManager | None = None):
-        self.manager = manager or ModelManager()
+        settings = get_settings()
+        self.manager = manager or ModelManager(
+            registry_path=settings.ml_registry_path,
+            selected_model_id=settings.ml_model_id,
+            artifact_override=settings.ml_artifact_path,
+        )
 
     def predict_email(self, parsed: ParsedEmail) -> PredictionResponse:
         started = time.perf_counter_ns()

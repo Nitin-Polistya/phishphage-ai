@@ -21,6 +21,7 @@ if ML_SRC_PATH not in sys.path:
 # Runtime import handled after sys.path modification
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
+from app.services.model_manager import ModelManager
 from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
 from app.analyzers.header_analyzer import evaluate_authentication
 from app.services.phishing_analyzer import analyze_parsed_email
@@ -58,8 +59,12 @@ class MLUnavailableError(RuntimeError):
 class AnalysisPipeline:
     def __init__(self, model_path: str | Path | None = None, ml_required: bool | None = None):
         settings = get_settings()
-        configured_path = Path(model_path or settings.ml_model_path)
-        self.model_path = configured_path if configured_path.is_absolute() else PROJECT_ROOT / configured_path
+        self.model_path = self._resolve_path(model_path) if model_path else None
+        self.model_manager = ModelManager(
+            registry_path=settings.ml_registry_path,
+            selected_model_id=settings.ml_model_id,
+            artifact_override=self.model_path,
+        )
         self.ml_required = settings.ml_required if ml_required is None else ml_required
         self.ml_marginal_alert_band = settings.ml_marginal_alert_band
         self._ml_service: LocalInferenceService | None = None
@@ -68,10 +73,19 @@ class AnalysisPipeline:
         """Lazy load the ML service."""
         if self._ml_service is None:
             try:
-                self._ml_service = LocalInferenceService(self.model_path)
+                # ModelManager is the sole authority for candidate selection and
+                # verifies every artifact hash before any inference object sees it.
+                self.model_manager.artifact_override = self.model_path
+                loaded = self.model_manager.load_deployment_candidate()
+                self._ml_service = LocalInferenceService(loaded.record.artifact_path, verified_model=loaded)
             except Exception:
                 raise MLUnavailableError(ML_UNAVAILABLE_REASON) from None
         return self._ml_service
+
+    @staticmethod
+    def _resolve_path(path: str | Path) -> Path:
+        candidate = Path(path)
+        return candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
 
     def run(self, raw_email: str) -> UnifiedAnalysisResponse:
         """
