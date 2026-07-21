@@ -2,8 +2,9 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
-  CircleDot,
+  CircleHelp,
   Clock3,
+  Info,
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react';
@@ -12,10 +13,13 @@ import {
   allSignalValues,
   displayPrediction,
   displayRisk,
+  explainabilitySummary,
+  findingCountLabel,
   topReasons,
-  uniqueSignalValues,
+  uniqueIndicatorPresentations,
 } from '@/lib/production-analysis-ui';
 import type { PredictionResponse } from '@/types/inference';
+import type { IndicatorPresentation, IndicatorTone } from '@/lib/production-analysis-ui';
 
 type Tone = 'danger' | 'warning' | 'success';
 
@@ -25,25 +29,36 @@ const toneClasses: Record<Tone, { text: string; border: string; background: stri
   success: { text: 'text-success', border: 'border-success/35', background: 'bg-success/10', bar: 'bg-success' },
 };
 
-function SignalList({ title, values }: { title: string; values: string[] }) {
-  const unique = uniqueSignalValues(values);
+const findingToneClasses: Record<IndicatorTone, { text: string; border: string; background: string }> = {
+  risk: { text: 'text-danger', border: 'border-danger/35', background: 'bg-danger/10' },
+  protective: { text: 'text-success', border: 'border-success/35', background: 'bg-success/10' },
+  neutral: { text: 'text-primary', border: 'border-primary/25', background: 'bg-primary/10' },
+  unknown: { text: 'text-muted-foreground', border: 'border-border', background: 'bg-background/55' },
+};
+
+function FindingIcon({ tone }: { tone: IndicatorTone }) {
+  if (tone === 'risk') return <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />;
+  if (tone === 'protective') return <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />;
+  if (tone === 'unknown') return <CircleHelp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />;
+  return <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />;
+}
+
+function FindingRow({ finding }: { finding: IndicatorPresentation }) {
+  const style = findingToneClasses[finding.tone];
   return (
-    <section className="rounded-lg border border-border bg-background/45 p-4" aria-labelledby={`signals-${title.toLowerCase().replaceAll(' ', '-')}`}>
-      <div className="flex items-center justify-between gap-3">
-        <h3 id={`signals-${title.toLowerCase().replaceAll(' ', '-')}`} className="text-sm font-semibold text-foreground">{title}</h3>
-        <span className="text-xs tabular-nums text-muted-foreground">{unique.length}</span>
+    <li className={`rounded-lg border p-4 ${style.border} ${style.background}`}>
+      <div className="flex items-start gap-3">
+        <FindingIcon tone={finding.tone} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <h4 className="text-sm font-semibold text-foreground">{finding.label}</h4>
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${style.text} ${style.border}`}>{finding.statusLabel}</span>
+          </div>
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{finding.description}</p>
+          <p className="mt-2 text-xs text-foreground0">Source: {finding.sourceCategories.join(', ')}</p>
+        </div>
       </div>
-      {unique.length ? (
-        <ul className="mt-3 space-y-2">
-          {unique.map((value, index) => (
-            <li key={`${value}-${index}`} className="flex gap-2 text-sm leading-5 text-muted-foreground">
-              <CircleDot className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>{value.replaceAll('_', ' ')}</span>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="mt-3 text-sm text-muted-foreground">No signals returned in this category.</p>}
-    </section>
+    </li>
   );
 }
 
@@ -73,6 +88,14 @@ export function ProductionAnalysisResults({
   const VerdictIcon = tone === 'success' ? ShieldCheck : tone === 'warning' ? AlertTriangle : ShieldAlert;
   const reasons = topReasons(result.signals);
   const detailedSignals = allSignalValues(result.signals);
+  const findings = uniqueIndicatorPresentations(result.signals);
+  const summary = explainabilitySummary(result.signals);
+  const categories = ['Message content', 'Links and destinations', 'Email authentication', 'Urgency and pressure', 'Other technical indicators'] as const;
+  const groupedFindings = categories.map((category) => ({ category, findings: findings.filter((finding) => finding.category === category) })).filter((group) => group.findings.length);
+  const reasonCategories = [...new Set(reasons.map((reason) => {
+    const finding = findings.find((item) => item.key === reason.replaceAll(/[^a-z0-9]+/gi, '_').toLowerCase());
+    return finding?.category;
+  }).filter(Boolean))];
   const riskScore = Math.max(0, Math.min(100, Math.round(result.risk_score)));
   const timeline = [
     ['Input received', `${attachmentCount} attachment metadata record${attachmentCount === 1 ? '' : 's'}`],
@@ -101,7 +124,7 @@ export function ProductionAnalysisResults({
 
             <div className="mt-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top reasons</p>
-              {reasons.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-3">{reasons.map((reason) => <li key={reason} className="flex gap-2 text-sm leading-5 text-muted-foreground"><CircleDot className={`mt-0.5 h-4 w-4 shrink-0 ${style.text}`} aria-hidden="true" />{reason.replaceAll('_', ' ')}</li>)}</ul> : <p className="mt-2 text-sm text-muted-foreground">No threat signals were returned.</p>}
+              {reasonCategories.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-3">{reasonCategories.slice(0, 3).map((category) => <li key={category} className="flex gap-2 text-sm leading-5 text-muted-foreground"><Info className={`mt-0.5 h-4 w-4 shrink-0 ${style.text}`} aria-hidden="true" />{category}</li>)}</ul> : <p className="mt-2 text-sm text-muted-foreground">No threat signals were returned.</p>}
             </div>
           </div>
 
@@ -127,15 +150,13 @@ export function ProductionAnalysisResults({
       </section>
 
       <section className="rounded-xl border border-border bg-surface/80 p-5" aria-labelledby="detailed-indicators-heading">
-        <h2 id="detailed-indicators-heading" className="text-base font-semibold text-foreground">Detailed indicators</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Only indicators returned by the analysis API are shown.</p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <SignalList title="Detected indicators" values={result.signals.detected_indicators} />
-          <SignalList title="Phishing signals" values={result.signals.phishing_signals} />
-          <SignalList title="Urgency indicators" values={result.signals.urgency_indicators} />
-          <SignalList title="URL indicators" values={result.signals.url_indicators} />
-          <SignalList title="Authentication signals" values={result.signals.authentication_signals} />
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h2 id="detailed-indicators-heading" className="text-base font-semibold text-foreground">Why this result?</h2><span className="sr-only">Detailed indicators</span><p className="mt-1 text-sm text-muted-foreground">{findingCountLabel(findings.length)} based on unique indicators returned by the analysis API.</p></div>
+          <span className="rounded-full border border-border px-2.5 py-1 text-xs font-semibold text-muted-foreground">{findingCountLabel(findings.length)}</span>
         </div>
+        {summary.length ? <ul className="mt-4 grid gap-2">{summary.map((item) => <li key={item} className="flex gap-2 text-sm leading-5 text-muted-foreground"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" /><span>{item}</span></li>)}</ul> : <p className="mt-4 rounded-lg border border-border bg-background/45 p-4 text-sm leading-6 text-muted-foreground">No specific indicators were returned by the analysis service. Review the overall verdict and recommended action.</p>}
+        {groupedFindings.length ? <div className="mt-6 space-y-5">{groupedFindings.map((group) => <section key={group.category} aria-labelledby={`finding-category-${group.category.toLowerCase().replaceAll(' ', '-')}`}><h3 id={`finding-category-${group.category.toLowerCase().replaceAll(' ', '-')}`} className="text-sm font-semibold text-foreground">{group.category} <span className="font-normal text-muted-foreground">({group.findings.length})</span></h3><ul className="mt-3 grid gap-3">{group.findings.map((finding) => <FindingRow key={finding.key} finding={finding} />)}</ul></section>)}</div> : null}
+        {findings.some((finding) => finding.category === 'Email authentication') && <p className="mt-5 flex gap-2 rounded-lg border border-border bg-background/45 p-3 text-xs leading-5 text-muted-foreground"><Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />Detection of SPF, DKIM, or DMARC references does not by itself mean authentication passed. Pass/fail status is shown only when provided by the analysis service.</p>}
       </section>
 
       <section className="rounded-xl border border-border bg-surface/80 p-5" aria-labelledby="analysis-timeline-heading">
@@ -162,6 +183,7 @@ export function ProductionAnalysisResults({
             ].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-words font-medium text-foreground">{value}</dd></div>)}
           </dl>
           <p className="mt-5 flex gap-2 rounded-lg border border-primary/25 bg-primary/10 p-3 text-sm leading-6 text-primary"><Clock3 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />Attachment contents were not uploaded, opened, previewed, or scanned.</p>
+          <div className="mt-5 border-t border-border pt-5"><h3 className="text-sm font-semibold text-foreground">Raw indicator references</h3><p className="mt-1 text-xs text-muted-foreground">Technical identifiers and their source categories are retained for review.</p>{findings.length ? <ul className="mt-3 space-y-2">{findings.map((finding) => <li key={finding.key} className="break-words text-xs text-muted-foreground"><span className="font-medium text-foreground">{finding.raw}</span> · {finding.sourceCategories.join(', ')}</li>)}</ul> : <p className="mt-3 text-xs text-muted-foreground">No raw indicator references were returned.</p>}</div>
         </div>
       </details>
     </section>

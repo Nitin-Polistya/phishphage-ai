@@ -9,9 +9,14 @@ import {
   completeRequestTiming,
   displayPrediction,
   displayRisk,
+  explainabilitySummary,
+  findingCountLabel,
   isCurrentRequest,
   isValidEmailAddress,
+  normalizeIndicatorKey,
+  presentIndicator,
   topReasons,
+  uniqueIndicatorPresentations,
   validateQuickPaste,
 } from './production-analysis-ui.ts';
 
@@ -91,6 +96,46 @@ test('result helpers derive concern, verdict, and top reasons from response data
   }), ['display_name_mismatch', 'credential_request', 'urgent_language']);
 });
 
+test('normalizes identifiers and maps known indicators to safe plain language', () => {
+  assert.equal(normalizeIndicatorKey(' unusual-custom_Feature '), 'unusual_custom_feature');
+  assert.deepEqual(presentIndicator('spf', 'authentication'), {
+    key: 'spf', raw: 'spf', label: 'SPF authentication record',
+    description: 'SPF helps receiving mail systems check whether a server is allowed to send email for a domain.',
+    category: 'Email authentication', tone: 'neutral', statusLabel: 'Detected', sourceCategories: ['Email authentication'],
+  });
+  assert.equal(presentIndicator('unusual_custom_feature').label, 'Unusual Custom Feature');
+  assert.equal(presentIndicator('unusual_custom_feature').tone, 'neutral');
+});
+
+test('deduplicates repeated indicators while retaining source provenance', () => {
+  const findings = uniqueIndicatorPresentations({
+    detected_indicators: ['account', 'actionable_url', 'spf', 'dkim', 'dmarc'],
+    phishing_signals: ['account', 'actionable_url'],
+    urgency_indicators: [],
+    url_indicators: ['actionable_url'],
+    authentication_signals: ['spf', 'dkim', 'dmarc'],
+  });
+  assert.equal(findings.length, 5);
+  assert.deepEqual(findings.map((finding) => finding.key), ['account', 'actionable_url', 'spf', 'dkim', 'dmarc']);
+  assert.deepEqual(findings.find((finding) => finding.key === 'spf')?.sourceCategories, ['Email authentication', 'Other technical indicators']);
+  assert.equal(findingCountLabel(findings.length), '5 unique findings');
+});
+
+test('authentication status is only shown when explicitly present', () => {
+  assert.equal(presentIndicator('spf').statusLabel, 'Detected');
+  assert.equal(presentIndicator('spf_failed', 'authentication').statusLabel, 'Failed');
+  assert.equal(presentIndicator('dkim_passed', 'authentication').statusLabel, 'Passed');
+  assert.equal(presentIndicator('dmarc_unavailable', 'authentication').statusLabel, 'Status unavailable');
+  assert.equal(presentIndicator('spf_failed', 'authentication').tone, 'risk');
+  assert.equal(presentIndicator('dkim_passed', 'authentication').tone, 'protective');
+});
+
+test('summary is limited and has a graceful empty state', () => {
+  const signals = { detected_indicators: [], phishing_signals: [], urgency_indicators: [], url_indicators: [], authentication_signals: [] };
+  assert.deepEqual(explainabilitySummary(signals), []);
+  assert.ok(explainabilitySummary({ ...signals, detected_indicators: ['account', 'actionable_url', 'spf', 'dkim', 'dmarc', 'custom'] }).length <= 5);
+});
+
 test('component contract includes accessible selected mode, roving keyboard focus, and mode-specific labels', async () => {
   const source = await readFile(new URL('../components/analysis/production-analysis.tsx', import.meta.url), 'utf8');
   assert.match(source, /aria-selected=\{active\}/);
@@ -109,7 +154,7 @@ test('component clears stale results before validation and exposes rich API-back
   const formSource = await readFile(new URL('../components/analysis/production-analysis.tsx', import.meta.url), 'utf8');
   const resultSource = await readFile(new URL('../components/analysis/production-analysis-results.tsx', import.meta.url), 'utf8');
   assert.ok(formSource.indexOf('setResult(null);') < formSource.indexOf("if (mode === 'quick_paste')"));
-  for (const heading of ['Final verdict', 'Recommended action', 'Top reasons', 'Relevant signal families', 'Detailed indicators', 'Analysis timeline', 'Recommendations', 'Technical metadata']) {
+  for (const heading of ['Final verdict', 'Recommended action', 'Top reasons', 'Relevant signal families', 'Why this result?', 'Detailed indicators', 'Analysis timeline', 'Recommendations', 'Technical metadata']) {
     assert.match(resultSource, new RegExp(heading));
   }
   assert.match(resultSource, /result\.recommendations\[0\]/);
