@@ -6,6 +6,7 @@ import re
 from typing import List
 
 from app.analyzers.content_analyzer import analyze_content
+from app.analyzers.feature_engineering import extract_features
 from app.analyzers.header_analyzer import analyze_headers
 from app.analyzers.header_analyzer import evaluate_authentication
 from app.analyzers.url_analyzer import analyze_urls
@@ -161,6 +162,7 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
     confidence = calculate_confidence(risk, signals)
 
     recommendations = _recommendations_from_signals(signals)
+    engineered_features, feature_explanations, feature_evidence = extract_features(parsed_email)
 
     return AnalysisResult(
         classification=ThreatClassification(classification),
@@ -168,5 +170,8 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
         confidence=confidence,
         signals=signals,
         recommendations=recommendations,
-        engine_version=ENGINE_VERSION
+        engine_version=ENGINE_VERSION,
+        engineered_features=engineered_features,
+        feature_explanations=feature_explanations,
+        feature_evidence=feature_evidence,
     )

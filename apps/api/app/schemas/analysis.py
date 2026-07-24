@@ -43,6 +43,9 @@ class AnalysisResult(BaseModel):
     signals: list[ThreatSignal] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     engine_version: str = Field(...)
+    engineered_features: dict[str, int | float | str] = Field(default_factory=dict)
+    feature_explanations: dict[str, str] = Field(default_factory=dict)
+    feature_evidence: dict[str, str] = Field(default_factory=dict)
 
 
 class MLStatus(str, Enum):
