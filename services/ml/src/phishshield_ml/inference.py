@@ -17,6 +17,52 @@ class ModelLoadError(RuntimeError):
     pass
 
 
+class ModelAdapterError(ModelLoadError):
+    """The approved artifact does not expose a supported prediction contract."""
+
+
+class ModelAdapter:
+    """Small, explicit adapter for approved direct and calibrated estimators.
+
+    Prediction always goes through the object's public ``predict_proba``.  A
+    wrapped pipeline is exposed only for explainability and diagnostics.
+    """
+
+    def __init__(self, predictor: object, label_mapping: dict[str, int]):
+        predict_proba = getattr(predictor, "predict_proba", None)
+        if not callable(predict_proba):
+            raise ModelAdapterError("Approved model does not support calibrated probability inference")
+        self.predictor = predictor
+        self.label_mapping = self._validate_label_mapping(label_mapping)
+        self.pipeline = getattr(predictor, "pipeline", None)
+
+    @staticmethod
+    def _validate_label_mapping(mapping: dict[str, int]) -> dict[str, int]:
+        if set(mapping) != {"legitimate", "phishing"}:
+            raise ModelAdapterError("Approved model label mapping is unsupported")
+        indices = list(mapping.values())
+        if mapping != {"legitimate": 0, "phishing": 1} or sorted(indices) != [0, 1]:
+            raise ModelAdapterError("Approved model class ordering is unsupported")
+        return dict(mapping)
+
+    def predict_proba(self, text: str) -> tuple[float, float]:
+        try:
+            values = np.asarray(self.predictor.predict_proba([text]), dtype=float)
+        except Exception as error:
+            raise ModelAdapterError("Approved model probability inference failed") from error
+        if values.shape != (1, 2) or not np.isfinite(values).all():
+            raise ModelAdapterError("Approved model returned an invalid probability shape")
+        if np.any(values < 0) or np.any(values > 1):
+            raise ModelAdapterError("Approved model returned an invalid probability")
+        # The serialized CalibratedModel returns [legitimate, phishing].  For
+        # estimators exposing classes_, validate that their columns agree with
+        # the registry-backed mapping before selecting the phishing class.
+        classes = getattr(self.predictor, "classes_", None)
+        if classes is not None and list(classes) != [self.label_mapping["legitimate"], self.label_mapping["phishing"]]:
+            raise ModelAdapterError("Approved model class ordering does not match label mapping")
+        return float(values[0, self.label_mapping["legitimate"]]), float(values[0, self.label_mapping["phishing"]])
+
+
 def load_model_bundle(model_path: str | Path) -> LoadedModelBundle:
     path = Path(model_path)
     if not path.exists():
@@ -38,19 +84,25 @@ def load_model_bundle(model_path: str | Path) -> LoadedModelBundle:
 class LocalInferenceService:
     def __init__(self, model_path: str | Path, verified_model=None):
         self._bundle = self._bundle_from_verified_model(verified_model) if verified_model is not None else load_model_bundle(model_path)
-        self._pipeline = self._bundle.pipeline
-        self._vectorizer = self._pipeline.named_steps.get("features") or self._pipeline.named_steps.get("tfidf")
-        self._classifier = self._pipeline.named_steps["clf"]
+        self._adapter = ModelAdapter(self._bundle.pipeline, self._bundle.label_mapping)
+        self._pipeline = self._adapter.pipeline
+        self._vectorizer, self._classifier = self._diagnostic_components()
 
     @classmethod
     def from_verified_model(cls, loaded_model) -> "LocalInferenceService":
         """Create an inference service from a registry/hash-verified model."""
         instance = cls.__new__(cls)
         instance._bundle = cls._bundle_from_verified_model(loaded_model)
-        instance._pipeline = instance._bundle.pipeline
-        instance._vectorizer = instance._pipeline.named_steps.get("features") or instance._pipeline.named_steps.get("tfidf")
-        instance._classifier = instance._pipeline.named_steps["clf"]
+        instance._adapter = ModelAdapter(instance._bundle.pipeline, instance._bundle.label_mapping)
+        instance._pipeline = instance._adapter.pipeline
+        instance._vectorizer, instance._classifier = instance._diagnostic_components()
         return instance
+
+    def _diagnostic_components(self):
+        steps = getattr(self._pipeline, "named_steps", {})
+        if not isinstance(steps, dict):
+            return None, None
+        return steps.get("features") or steps.get("tfidf"), steps.get("clf")
 
     @staticmethod
     def _bundle_from_verified_model(loaded_model) -> LoadedModelBundle:
@@ -77,9 +129,7 @@ class LocalInferenceService:
 
     def predict(self, text: str, top_k: int = 5) -> InferenceResult:
         normalized = validate_training_text(text)
-        probabilities = self._pipeline.predict_proba([normalized])[0]
-        legitimate_probability = float(probabilities[0])
-        phishing_probability = float(probabilities[1])
+        legitimate_probability, phishing_probability = self._adapter.predict_proba(normalized)
         predicted_label = "phishing" if phishing_probability >= self._bundle.decision_threshold else "legitimate"
         phishing_terms, legitimate_terms = self._explain(normalized, top_k=top_k)
         return InferenceResult(
@@ -92,6 +142,8 @@ class LocalInferenceService:
         )
 
     def _explain(self, text: str, top_k: int = 5) -> tuple[list[ExplainabilityTerm], list[ExplainabilityTerm]]:
+        if self._vectorizer is None or self._classifier is None:
+            return [], []
         vector = self._vectorizer.transform([text])
         feature_names = self._vectorizer.get_feature_names_out()
         if hasattr(self._classifier, "coef_"):
@@ -102,6 +154,8 @@ class LocalInferenceService:
                 axis=0,
             )
         else:
+            return [], []
+        if len(coefs) != len(feature_names):
             return [], []
         indices = vector.nonzero()[1]
         contributions = []
