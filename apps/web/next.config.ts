@@ -1,10 +1,12 @@
 import type { NextConfig } from 'next';
 
 const configuredApiOrigin = (() => {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
+  if (!configured) return '';
   try {
-    return new URL(process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').origin;
+    return new URL(configured).origin;
   } catch {
-    return 'http://localhost:8000';
+    return '';
   }
 })();
 

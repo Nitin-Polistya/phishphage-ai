@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.venv/
+tests/
+data/
+reports/
+services/ml/data/
+services/ml/reports/
+services/ml/artifacts/
+*.joblib

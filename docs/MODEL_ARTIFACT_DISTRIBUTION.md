@@ -1,36 +1,25 @@
-# Approved model artifact distribution
+# Model artifact distribution
 
-The tracked source of truth is `services/ml/models/registry.json`. The selected
-entry is `phase-c-logistic-regression-v1`, with deployment candidate state true,
-activation state false, threshold `0.5`, and the SHA-256 recorded in the registry.
+The registry remains the source of truth for model ID, version, threshold,
+calibration, and expected hashes. The approved binary is not tracked in Git or
+baked into the public image.
 
-The binary is intentionally excluded from Git. Production provisioning must
-retrieve the exact approved artifact from a private release attachment or
-provider-managed private/persistent storage, then place it at the registry
-relative path (or set `ML_ARTIFACT_PATH`). Do not choose a public host or commit
-the binary without an explicit repository policy decision.
+The primary workflow is a private HTTPS release/storage asset exposed to the
+deployment command as `MODEL_ARTIFACT_URL`, with an optional secret bearer
+token. `provision_model_artifact.py`:
 
-Before the API loads it, `ModelManager` resolves paths from the repository root,
-computes SHA-256, compares it with both registry hash fields, validates the
-registry metadata, and verifies the serialized model ID, inactive state, and
-threshold. A missing or mismatched artifact is never loaded.
+- requires HTTPS and deployment-provided configuration;
+- resolves the destination inside `services/ml` only;
+- applies a timeout and maximum byte limit;
+- writes to a same-directory temporary file;
+- fsyncs and verifies SHA-256 before atomic rename;
+- refuses to overwrite an existing artifact;
+- removes temporary files on every failure;
+- never prints URLs, tokens, email content, or credentials.
 
-## Fresh-clone verification
-
-From a fresh clone:
-
-1. Install `apps/api/requirements.txt`.
-2. Retrieve the private approved artifact through the release process and place
-   the three registry-referenced files under `services/ml/artifacts/...`, or
-   configure `ML_ARTIFACT_PATH` for the pipeline artifact.
-3. Set `ML_REGISTRY_PATH`, `ML_MODEL_ID`, and `ML_REQUIRED=true`.
-4. Start Uvicorn from either the repository root or `apps/api`.
-5. Check `GET /api/v1/health`; it must return readiness, hash verification, the
-   model ID, version, and deployment-candidate state without filesystem paths.
-6. Send one synthetic RFC822 message to `POST /api/v1/analyze` and verify the
-   returned model ID, version, threshold, and processing time.
-7. Remove the provisioned artifact and repeat the health check; readiness must
-   fail safely with HTTP 503 and no path or traceback leakage.
-
-For local development, leave `ML_REQUIRED=false` to keep the rule-based
-analysis available while reporting ML as unavailable.
+Run `python apps/api/scripts/provision_model_artifact.py --dry-run` to validate
+configuration without a network request. The normal provisioning command is
+called only by the deployment container command, not by local application
+imports. The registry, vectorizer, and feature manifest must be supplied by the
+private deployment bundle or mounted approved model directory and must pass
+the existing model-manager integrity checks before deserialization.

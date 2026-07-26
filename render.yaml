@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: phishshield-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: false
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: ML_REQUIRED
+        value: "true"
+      - key: CORS_ORIGINS
+        sync: false
+      - key: MODEL_ARTIFACT_URL
+        sync: false
+      - key: MODEL_ARTIFACT_TOKEN
+        sync: false
+      - key: ML_EXPECTED_SHA256
+        sync: false

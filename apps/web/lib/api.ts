@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000').replace(/\/$/, '');
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
 
 export function validateApiBaseUrl(url = API_BASE_URL): boolean {
   try {

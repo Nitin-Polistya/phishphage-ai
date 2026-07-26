@@ -1,32 +1,24 @@
-# Deployment preparation
+# Deployment guide
 
-This repository has not been deployed. This document describes preparation only.
+## Recommended topology
 
-## Frontend: Vercel
+Host the Next.js frontend on Vercel or an equivalent managed Next.js host and
+the FastAPI backend as a single non-root Docker service on Render or an
+equivalent container host. Provision the approved model artifact privately at
+startup, verify its SHA-256, then start Uvicorn with one worker initially.
 
-- Root directory: `apps/web`.
-- Build command: `npm run build`.
-- Output: Next.js default build output.
-- Required environment variable: `NEXT_PUBLIC_API_BASE_URL=https://<api-host>`.
-- Configure the production API origin before deploying the frontend.
-- Use HTTPS and verify browser requests reach `/api/v1/health` and `/api/v1/analyze`.
+Build the frontend with `npm ci` and `npm run build`. Start it with `npm start`
+and provide `NEXT_PUBLIC_API_BASE_URL` at build/runtime according to the host.
+Start the backend with the container command or:
 
-## Backend: Render (example compatible provider)
+```text
+python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}
+```
 
-- Root directory: repository root.
-- Build command: install the API environment/dependencies according to the provider's Python setup.
-- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir apps/api`.
-- Provide the API's environment variables, including `CORS_ORIGINS` for the deployed frontend origin.
-- Provide the inactive model artifact, vectorizer, feature manifest, and registry at the paths referenced by `services/ml/models/registry.json` (or use a mounted artifact directory without changing hashes).
+Set `ENVIRONMENT=production`, `ML_REQUIRED=true`, exact `CORS_ORIGINS`, and the
+private artifact provisioning variables. The health route is
+`/api/v1/health`; readiness is represented by `inference_ready` and returns
+503 when ML is required but unavailable.
 
-## Verification checklist
-
-- HTTPS terminates correctly.
-- `GET /api/v1/health` reports the expected pipeline SHA and `activated=false` until an explicit future release decision.
-- `POST /api/v1/analyze` returns the documented response.
-- CORS allows only the frontend origin; do not combine wildcard origins with credentials.
-- Cold-start model loading is measured and accepted.
-- No secrets, raw email, or generated local reports are committed.
-- Rollback restores the prior registry and matching artifact set as an atomic change.
-
-No deployment, activation, or production smoke test was performed in Phase F.
+No deployment is performed by this repository configuration. `autoDeploy` is
+disabled in the included provider manifest.
