@@ -49,3 +49,6 @@ services/ml/artifacts/*
 .DS_Store
 Thumbs.db
 .vscode/
+
+
+*.tsbuildinfo
