@@ -51,8 +51,8 @@ This is a test email body."""
             json={'raw_email': huge_email}
         )
         
-        assert response.status_code == 400
-        assert 'exceeds maximum size' in response.json()['detail']
+        assert response.status_code == 413
+        assert response.json()['detail']['code'] == 'payload_too_large'
 
     def test_missing_raw_email_field(self):
         """Test endpoint returns 422 for missing raw_email field."""

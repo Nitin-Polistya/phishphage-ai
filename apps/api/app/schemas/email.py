@@ -40,8 +40,8 @@ class EmailAddress(BaseModel):
 class EmailAttachmentMetadata(BaseModel):
     """Metadata about an email attachment without storing the file."""
 
-    filename: str | None = Field(default=None, description='Original filename')
-    content_type: str | None = Field(default=None, description='MIME content type')
+    filename: str | None = Field(default=None, max_length=255, description='Original filename')
+    content_type: str | None = Field(default=None, max_length=255, description='MIME content type')
     size_bytes: int = Field(..., ge=0, description='Size in bytes')
     disposition: str | None = Field(default=None, description='Content disposition')
     extension: str | None = Field(default=None, description='Lowercase file extension')

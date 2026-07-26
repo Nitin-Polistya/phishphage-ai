@@ -58,9 +58,9 @@ def _initialize_firebase() -> None:
         cred = credentials.Certificate(cred_dict)
         _firebase_app = firebase_admin.initialize_app(cred, name='phishshield')
         _firebase_configured = True
-        logger.info(f'Firebase initialized for project: {settings.firebase_project_id}')
-    except Exception as e:
-        logger.error(f'Failed to initialize Firebase: {e}')
+        logger.info('Firebase initialized')
+    except Exception:
+        logger.error('Failed to initialize Firebase safely')
         _firebase_configured = False
 
 

@@ -13,6 +13,16 @@ coverage/
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
+!apps/api/.env.example
+!apps/web/.env.example
+!services/ml/.env.example
+
+# Runtime and browser test output
+*.log
+playwright-report/
+test-results/
 
 # ML artifacts
 services/ml/data/raw/*

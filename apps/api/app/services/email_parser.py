@@ -23,6 +23,12 @@ from app.services.domain_utils import domains_align
 logger = logging.getLogger(__name__)
 
 MAX_EMAIL_SIZE_BYTES = 2 * 1024 * 1024
+MAX_MIME_PARTS = 100
+MAX_ATTACHMENTS = 25
+MAX_HEADER_LINES = 200
+MAX_HEADER_LINE_BYTES = 998
+MAX_EXTRACTED_URLS = 200
+MAX_URL_LENGTH = 2048
 RAW_SOURCE_ERROR = "This looks like copied inbox text, not full email source. Use Quick Paste, or paste the message from 'Show original' / 'View source'."
 STANDARD_SOURCE_HEADERS = {'from', 'to', 'subject', 'date', 'message-id', 'mime-version', 'content-type'}
 URL_PATTERN = re.compile(
@@ -169,13 +175,30 @@ def validate_email_input(raw_email: str) -> None:
     if not raw_email or not raw_email.strip():
         raise ValueError('Email content cannot be empty')
 
+    if '\x00' in raw_email:
+        raise ValueError('Email content contains unsupported control characters')
+
     if len(raw_email.encode('utf-8')) > MAX_EMAIL_SIZE_BYTES:
         raise ValueError(f'Email exceeds maximum size of {MAX_EMAIL_SIZE_BYTES} bytes')
+
+    header_block = re.split(r'\r?\n\r?\n', raw_email, maxsplit=1)[0]
+    header_lines = header_block.splitlines()
+    if len(header_lines) > MAX_HEADER_LINES:
+        raise ValueError('Email contains too many headers')
+    if any(len(line.encode('utf-8', errors='ignore')) > MAX_HEADER_LINE_BYTES for line in header_lines):
+        raise ValueError('Email contains an oversized header line')
+    if any(line and not line[:1].isspace() and ':' not in line for line in header_lines):
+        raise ValueError('Email contains a malformed header')
 
 
 def validate_rfc822_source(raw_email: str) -> None:
     """Reject copied display text while accepting a real RFC822 header block."""
-    validate_email_input(raw_email)
+    if not raw_email or not raw_email.strip():
+        raise ValueError('Email content cannot be empty')
+    if '\x00' in raw_email:
+        raise ValueError('Email content contains unsupported control characters')
+    if len(raw_email.encode('utf-8')) > MAX_EMAIL_SIZE_BYTES:
+        raise ValueError(f'Email exceeds maximum size of {MAX_EMAIL_SIZE_BYTES} bytes')
     header_block = re.split(r'\r?\n\r?\n', raw_email, maxsplit=1)[0]
     recognized = set()
     for line in header_block.splitlines():
@@ -184,6 +207,7 @@ def validate_rfc822_source(raw_email: str) -> None:
             recognized.add(match.group(1).lower())
     if len(recognized) < 2:
         raise ValueError(RAW_SOURCE_ERROR)
+    validate_email_input(raw_email)
 
 
 def parse_email_address(address_str: str | None) -> EmailAddress | None:
@@ -220,7 +244,7 @@ def parse_email_address(address_str: str | None) -> EmailAddress | None:
     try:
         return EmailAddress(name=name, address=address)
     except Exception as e:
-        logger.debug(f'Failed to parse email address "{address_str}": {e}')
+        logger.debug('Failed to parse email address')
         return None
 
 
@@ -257,8 +281,8 @@ def extract_urls(text: str) -> list[str]:
     if not text:
         return []
 
-    urls = URL_PATTERN.findall(text)
-    return list(dict.fromkeys(urls))
+    urls = [url[:MAX_URL_LENGTH] for url in URL_PATTERN.findall(text) if len(url) <= MAX_URL_LENGTH]
+    return list(dict.fromkeys(urls))[:MAX_EXTRACTED_URLS]
 
 
 def get_header_value(message: Any, header_name: str) -> str | None:
@@ -286,7 +310,7 @@ def get_header_value(message: Any, header_name: str) -> str | None:
                     result += str(part)
             return result.strip() if result else None
         except Exception as e:
-            logger.debug(f'Failed to decode header "{header_name}": {e}')
+            logger.debug('Failed to decode header')
             return value.strip() if value.strip() else None
 
     return str(value).strip() if value else None
@@ -322,7 +346,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
                     else:
                         body_text = str(text)
                 except Exception as e:
-                    logger.debug(f'Failed to extract plain text body: {e}')
+                    logger.debug('Failed to extract plain text body')
             elif content_type == 'text/html':
                 try:
                     html = part.get_payload(decode=True)
@@ -331,7 +355,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
                     else:
                         body_html = str(html)
                 except Exception as e:
-                    logger.debug(f'Failed to extract HTML body: {e}')
+                    logger.debug('Failed to extract HTML body')
     else:
         try:
             payload = message.get_payload(decode=True)
@@ -344,7 +368,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
             else:
                 body_text = decoded
         except Exception as e:
-            logger.debug(f'Failed to extract body: {e}')
+            logger.debug('Failed to extract body')
 
     all_urls.extend(extract_urls(body_text))
     if body_html:
@@ -395,8 +419,10 @@ def extract_attachment_metadata(message: Any) -> list[EmailAttachmentMetadata]:
                 disposition=content_disposition,
             )
             attachments.append(metadata)
+            if len(attachments) > MAX_ATTACHMENTS:
+                raise ValueError('Email contains too many attachments')
         except Exception as e:
-            logger.debug(f'Failed to extract attachment metadata: {e}')
+            logger.debug('Failed to extract attachment metadata')
 
     return attachments
 
@@ -418,8 +444,16 @@ def parse_email(raw_email: str) -> ParsedEmail:
     try:
         message = message_from_string(raw_email)
     except Exception as e:
-        logger.error(f'Failed to parse email: {e}')
-        raise ValueError(f'Failed to parse email: {e}')
+        logger.error('Failed to parse email safely')
+        raise ValueError('Failed to parse email') from None
+
+    try:
+        if sum(1 for _ in message.walk()) > MAX_MIME_PARTS:
+            raise ValueError('Email contains too many MIME parts')
+    except ValueError:
+        raise
+    except Exception:
+        raise ValueError('Failed to inspect email structure') from None
 
     subject = get_header_value(message, 'Subject')
     sender = parse_email_address(get_header_value(message, 'From'))

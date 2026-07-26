@@ -13,6 +13,7 @@ from typing import Any
 import joblib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
+APPROVED_ARTIFACT_ROOT = (PROJECT_ROOT / 'services' / 'ml').resolve()
 ML_SRC_PATH = PROJECT_ROOT / "services" / "ml" / "src"
 if str(ML_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(ML_SRC_PATH))
@@ -210,14 +211,23 @@ class ModelManager:
 
     @staticmethod
     def _resolve_path(path: str | Path) -> Path:
-        resolved = Path(path)
-        return resolved if resolved.is_absolute() else PROJECT_ROOT / resolved
+        candidate = Path(path)
+        resolved = (candidate if candidate.is_absolute() else PROJECT_ROOT / candidate).resolve(strict=False)
+        try:
+            resolved.relative_to(APPROVED_ARTIFACT_ROOT)
+        except ValueError:
+            raise ModelRegistryError('Model artifact path is outside the approved model directory') from None
+        return resolved
 
     def _artifact_path(self, record: ModelRecord) -> Path:
         return self.artifact_override or record.artifact_path
 
     def _load(self, record: ModelRecord) -> LoadedModel:
         artifact_path = self._artifact_path(record)
+        try:
+            artifact_path.resolve(strict=False).relative_to(APPROVED_ARTIFACT_ROOT)
+        except ValueError:
+            raise ModelIntegrityError('Model artifact path is outside the approved model directory') from None
         cached = self._cache.get(record.model_id)
         if cached and _sha256(artifact_path) == record.sha256:
             return cached

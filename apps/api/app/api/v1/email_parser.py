@@ -33,11 +33,11 @@ def preview_email_parser(request: EmailParserRequest) -> ParsedEmail:
     """
     try:
         parsed = parse_email(request.raw_email)
-        logger.info(f'Email parsed successfully: {len(parsed.body_text)} chars')
+        logger.info('Email parsed successfully', extra={'body_length': len(parsed.body_text)})
         return parsed
     except ValueError as e:
-        logger.warning(f'Email validation failed: {e}')
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f'Email parsing failed: {e}')
-        raise HTTPException(status_code=500, detail='Failed to parse email')
+        logger.warning('Email validation failed', extra={'reason_code': 'invalid_email_format'})
+        raise HTTPException(status_code=400, detail=str(e)) from None
+    except Exception:
+        logger.error('Email parsing failed safely')
+        raise HTTPException(status_code=500, detail={'code': 'analysis_failed', 'message': 'Failed to parse email'}) from None

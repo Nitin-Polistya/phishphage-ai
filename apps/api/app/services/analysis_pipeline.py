@@ -21,7 +21,7 @@ if ML_SRC_PATH not in sys.path:
 # Runtime import handled after sys.path modification
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
-from app.services.model_manager import ModelManager
+from app.services.model_manager import APPROVED_ARTIFACT_ROOT, ModelManager
 from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
 from app.analyzers.header_analyzer import evaluate_authentication
 from app.services.phishing_analyzer import analyze_parsed_email
@@ -60,10 +60,17 @@ class AnalysisPipeline:
     def __init__(self, model_path: str | Path | None = None, ml_required: bool | None = None):
         settings = get_settings()
         self.model_path = self._resolve_path(model_path) if model_path else None
+        configured_override = self.model_path
+        if configured_override:
+            try:
+                configured_override.resolve(strict=False).relative_to(APPROVED_ARTIFACT_ROOT)
+            except ValueError:
+                # Keep the pipeline safely unavailable; never make an external path loadable.
+                configured_override = APPROVED_ARTIFACT_ROOT / '__invalid_external_override__'
         self.model_manager = ModelManager(
             registry_path=settings.ml_registry_path,
             selected_model_id=settings.ml_model_id,
-            artifact_override=self.model_path,
+            artifact_override=configured_override,
         )
         self.ml_required = settings.ml_required if ml_required is None else ml_required
         self.ml_marginal_alert_band = settings.ml_marginal_alert_band
