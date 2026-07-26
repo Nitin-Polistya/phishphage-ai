@@ -2,7 +2,6 @@ import unittest
 import json
 import csv
 from pathlib import Path
-import os
 
 class TestFeatureCoverageEvaluation(unittest.TestCase):
     def setUp(self):
