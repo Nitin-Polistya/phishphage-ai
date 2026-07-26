@@ -1,0 +1,7 @@
+method,route,purpose,authentication,request_schema,response_schema,payload_limit,content_type,file_or_network_activity,rate_limit,error_behavior,sensitive_data,security_notes
+GET,/,liveness message,none,none,JSON,none,none,no external activity,health bucket,safe JSON,none,security headers and request ID
+GET,/health,liveness,none,none,HealthResponse,none,none,local model health only,health bucket,safe JSON,model metadata,model status is metadata not authentication
+GET,/api/v1/health,readiness/model status,none,none,HealthResponse,none,none,local registry/hash checks,health bucket,503 with safe code when required model unavailable,model metadata,no secrets or paths returned
+POST,/api/v1/parser/preview,parse RFC822 preview,none,EmailParserRequest,ParsedEmail,2 MiB email; 2.2 MB request,application/json,local MIME parsing only,parser bucket,400/413/422/500 safe messages,parsed email,HTML is not rendered; attachments are metadata only
+POST,/api/v1/analysis/preview,rule plus optional ML analysis,none,AnalysisPreviewRequest,UnifiedAnalysisResponse,2 MiB email/body; 2.2 MB request,application/json,local parser and model only,analysis bucket,400/413/422/429/503/500 safe codes,parsed email and indicators,expensive endpoint is rate limited
+POST,/api/v1/analyze,production inference,none,AnalyzeRequest,PredictionResponse,2 million-character raw email; 2.2 MB request,application/json,local parser and verified model only,analysis bucket,422/413/429/503/500 safe codes,parsed email-derived signals,no user model selection or URL fetching
