@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import logging
 import threading
 import time
 import uuid
@@ -12,7 +13,11 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.core.logging import log_event, privacy_safe_client_ip, request_id_context
+from app.core.runtime_metrics import runtime_metrics
+
 REQUEST_ID_RE = re.compile(r'^[A-Za-z0-9._-]{1,80}$')
+request_logger = logging.getLogger('phishshield.request')
 
 
 class FixedWindowLimiter:
@@ -70,41 +75,70 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         return None
 
     async def dispatch(self, request: Request, call_next):
+        started = time.perf_counter()
         supplied_id = request.headers.get('x-request-id', '')
         request_id = supplied_id if REQUEST_ID_RE.fullmatch(supplied_id) else str(uuid.uuid4())
         request.state.request_id = request_id
+        context_token = request_id_context.set(request_id)
 
-        content_length = request.headers.get('content-length')
-        if content_length and (not content_length.isdigit() or int(content_length) > self.settings.max_request_bytes):
-            response = JSONResponse({'detail': {'code': 'payload_too_large', 'message': 'Request payload is too large.'}}, status_code=413)
-            response.headers['Retry-After'] = '0'
+        def finalize(response):
             response.headers['X-Request-ID'] = request_id
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['Referrer-Policy'] = 'no-referrer'
+            response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+            if request.url.path.startswith('/api/'):
+                response.headers['Cache-Control'] = 'no-store'
+            if self.settings.environment.lower() == 'production':
+                response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            latency_ms = (time.perf_counter() - started) * 1000
+            preflight = request.method == 'OPTIONS' and bool(request.headers.get('origin'))
+            preflight_allowed = not preflight or bool(response.headers.get('access-control-allow-origin'))
+            successful_preflight = preflight and response.status_code < 400 and preflight_allowed
+            event_name = 'request.complete' if response.status_code < 400 else 'request.failed'
+            event_level = logging.INFO
+            if request.method == 'OPTIONS' and successful_preflight:
+                event_level = logging.DEBUG
+            runtime_metrics.record_request(request.method, request.url.path, response.status_code, latency_ms)
+            log_event(
+                request_logger,
+                event_level,
+                event_name,
+                method=request.method,
+                path=request.url.path,
+                endpoint=request.url.path,
+                response_status=response.status_code,
+                latency_ms=round(latency_ms, 3),
+                client_ip=privacy_safe_client_ip(self._client_key(request)),
+                user_agent=request.headers.get('user-agent', '')[:200],
+                success=response.status_code < 400,
+                preflight=preflight,
+                preflight_allowed=preflight_allowed,
+            )
             return response
-        if request.method in {'POST', 'PUT', 'PATCH'}:
-            body = await request.body()
-            if len(body) > self.settings.max_request_bytes:
+
+        try:
+            content_length = request.headers.get('content-length')
+            if content_length and (not content_length.isdigit() or int(content_length) > self.settings.max_request_bytes):
                 response = JSONResponse({'detail': {'code': 'payload_too_large', 'message': 'Request payload is too large.'}}, status_code=413)
-                response.headers['X-Request-ID'] = request_id
-                return response
+                response.headers['Retry-After'] = '0'
+                return finalize(response)
+            if request.method in {'POST', 'PUT', 'PATCH'}:
+                body = await request.body()
+                if len(body) > self.settings.max_request_bytes:
+                    response = JSONResponse({'detail': {'code': 'payload_too_large', 'message': 'Request payload is too large.'}}, status_code=413)
+                    return finalize(response)
 
-        category = self._category(request.url.path, request.method)
-        if self.settings.rate_limit_enabled and category:
-            allowed, retry_after = self.limiter.allow(category, self._client_key(request))
-            if not allowed:
-                response = JSONResponse({'detail': {'code': 'rate_limit_exceeded', 'message': 'Too many requests.'}}, status_code=429)
-                response.headers['Retry-After'] = str(retry_after)
-                response.headers['X-Request-ID'] = request_id
-                return response
+            category = self._category(request.url.path, request.method)
+            if self.settings.rate_limit_enabled and category:
+                allowed, retry_after = self.limiter.allow(category, self._client_key(request))
+                if not allowed:
+                    runtime_metrics.record_rate_limit_hit()
+                    response = JSONResponse({'detail': {'code': 'rate_limit_exceeded', 'message': 'Too many requests.'}}, status_code=429)
+                    response.headers['Retry-After'] = str(retry_after)
+                    return finalize(response)
 
-        response = await call_next(request)
-        response.headers['X-Request-ID'] = request_id
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Referrer-Policy'] = 'no-referrer'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['Content-Security-Policy'] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
-        if request.url.path.startswith('/api/'):
-            response.headers['Cache-Control'] = 'no-store'
-        if self.settings.environment.lower() == 'production':
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        return response
+            return finalize(await call_next(request))
+        finally:
+            request_id_context.reset(context_token)

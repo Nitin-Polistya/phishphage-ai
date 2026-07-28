@@ -6,6 +6,7 @@ import hashlib
 import json
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -94,6 +95,18 @@ class ModelManager:
         self._unsupported_models = 0
         self._cache: dict[str, LoadedModel] = {}
         self._registry_signature: tuple[int, int] | None = None
+        self._registry_version: str | None = None
+        self._last_timings: dict[str, float] = {}
+
+    @property
+    def last_timings(self) -> dict[str, float]:
+        with self._lock:
+            return dict(self._last_timings)
+
+    def clear_loaded_state(self) -> None:
+        """Discard partially prepared model objects after a failed required startup."""
+        with self._lock:
+            self._cache.clear()
 
     def discover_models(self) -> list[ModelRecord]:
         with self._lock:
@@ -130,6 +143,7 @@ class ModelManager:
             base = {
                 "loaded_model": None, "model_version": None, "calibration": None,
                 "deployment_candidate": False, "activated": False, "pipeline_sha": None,
+                "artifact_hash": None, "registry_version": None,
                 "registry_status": "unavailable", "registry_loaded": False,
                 "artifact_found": False, "hash_verified": False, "model_available": False,
                 "inference_ready": False, "reason_code": None,
@@ -148,6 +162,8 @@ class ModelManager:
                     "deployment_candidate": True,
                     "activated": candidate.activated,
                     "pipeline_sha": candidate.pipeline_hash,
+                    "artifact_hash": candidate.sha256,
+                    "registry_version": self._registry_version,
                     "registry_loaded": True,
                     "artifact_found": self._artifact_path(candidate).exists(),
                 })
@@ -162,11 +178,13 @@ class ModelManager:
                 return base
 
     def _refresh_registry(self) -> None:
+        started = time.perf_counter()
         if not self.registry_path.exists():
             raise ModelRegistryError("Model registry is missing")
         stat = self.registry_path.stat()
         signature = (stat.st_mtime_ns, stat.st_size)
         if signature == self._registry_signature:
+            self._last_timings['registry_load_ms'] = 0.0
             return
         try:
             payload = json.loads(self.registry_path.read_text(encoding="utf-8"))
@@ -200,8 +218,10 @@ class ModelManager:
                 records[record.model_id] = record
             self._records = records
             self._unsupported_models = unsupported
+            self._registry_version = payload.get('registry_version')
             self._cache.clear()
             self._registry_signature = signature
+            self._last_timings['registry_load_ms'] = round((time.perf_counter() - started) * 1000, 3)
         except KeyError as error:
             raise ModelRegistryError(f"Model registry entry missing field: {error.args[0]}") from None
         except json.JSONDecodeError:
@@ -223,25 +243,37 @@ class ModelManager:
         return self.artifact_override or record.artifact_path
 
     def _load(self, record: ModelRecord) -> LoadedModel:
+        started = time.perf_counter()
         artifact_path = self._artifact_path(record)
         try:
             artifact_path.resolve(strict=False).relative_to(APPROVED_ARTIFACT_ROOT)
         except ValueError:
             raise ModelIntegrityError('Model artifact path is outside the approved model directory') from None
         cached = self._cache.get(record.model_id)
-        if cached and _sha256(artifact_path) == record.sha256:
-            return cached
+        if cached and artifact_path.exists():
+            hash_started = time.perf_counter()
+            cached_hash = _sha256(artifact_path)
+            self._last_timings['artifact_hash_ms'] = round((time.perf_counter() - hash_started) * 1000, 3)
+            if cached_hash == record.sha256:
+                self._last_timings['model_load_ms'] = 0.0
+                return cached
         for path in (artifact_path, record.vectorizer_path, record.feature_manifest_path):
             if not path.exists():
                 raise ModelManagerError("Approved model artifact is missing")
-        if _sha256(artifact_path) != record.sha256:
+        hash_started = time.perf_counter()
+        artifact_hash = _sha256(artifact_path)
+        vectorizer_hash = _sha256(record.vectorizer_path)
+        feature_manifest_hash = _sha256(record.feature_manifest_path)
+        self._last_timings['artifact_hash_ms'] = round((time.perf_counter() - hash_started) * 1000, 3)
+        if artifact_hash != record.sha256:
             raise ModelIntegrityError("Pipeline hash does not match the signed registry hash")
-        if _sha256(artifact_path) != record.pipeline_hash:
+        if artifact_hash != record.pipeline_hash:
             raise ModelIntegrityError("Pipeline hash does not match pipeline_hash")
-        if _sha256(record.vectorizer_path) != record.vectorizer_hash:
+        if vectorizer_hash != record.vectorizer_hash:
             raise ModelIntegrityError("Vectorizer hash does not match the signed registry hash")
-        if _sha256(record.feature_manifest_path) != record.feature_manifest_hash:
+        if feature_manifest_hash != record.feature_manifest_hash:
             raise ModelIntegrityError("Feature manifest hash does not match the signed registry hash")
+        deserialization_started = time.perf_counter()
         try:
             bundle = joblib.load(artifact_path)
             if not isinstance(bundle, dict):
@@ -255,5 +287,7 @@ class ModelManager:
             raise
         except Exception as error:
             raise ModelIntegrityError(f"Pipeline could not be loaded: {type(error).__name__}") from None
+        self._last_timings['model_load_ms'] = round((time.perf_counter() - deserialization_started) * 1000, 3)
+        self._last_timings['model_prepare_ms'] = round((time.perf_counter() - started) * 1000, 3)
         self._cache[record.model_id] = loaded
         return loaded

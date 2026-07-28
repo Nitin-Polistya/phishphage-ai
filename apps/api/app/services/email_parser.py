@@ -18,6 +18,7 @@ from app.schemas.email import (
     ParsedEmail,
     UrlSourceType,
 )
+from app.core.logging import log_event
 from app.services.domain_utils import domains_align
 
 logger = logging.getLogger(__name__)
@@ -147,7 +148,7 @@ def extract_html_links(html: str | None) -> list[EmailHtmlLink]:
     try:
         parser.feed(html)
     except Exception:
-        logger.debug('Failed to parse HTML anchors', exc_info=True)
+        log_event(logger, logging.DEBUG, 'parser.component_failed', component='html_anchors')
     return parser.links
 
 
@@ -158,7 +159,7 @@ def extract_html_semantics(html: str | None) -> tuple[list[EmailHtmlLink], list[
     try:
         parser.feed(html)
     except Exception:
-        logger.debug('Failed to parse HTML semantics', exc_info=True)
+        log_event(logger, logging.DEBUG, 'parser.component_failed', component='html_semantics')
     visible_text = re.sub(r'\s+', ' ', ' '.join(parser.visible_text_parts)).strip()
     return parser.links, parser.url_evidence, visible_text
 
@@ -244,7 +245,7 @@ def parse_email_address(address_str: str | None) -> EmailAddress | None:
     try:
         return EmailAddress(name=name, address=address)
     except Exception as e:
-        logger.debug('Failed to parse email address')
+        log_event(logger, logging.DEBUG, 'parser.component_failed', component='email_address')
         return None
 
 
@@ -310,7 +311,7 @@ def get_header_value(message: Any, header_name: str) -> str | None:
                     result += str(part)
             return result.strip() if result else None
         except Exception as e:
-            logger.debug('Failed to decode header')
+            log_event(logger, logging.DEBUG, 'parser.component_failed', component='header_decode')
             return value.strip() if value.strip() else None
 
     return str(value).strip() if value else None
@@ -346,7 +347,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
                     else:
                         body_text = str(text)
                 except Exception as e:
-                    logger.debug('Failed to extract plain text body')
+                    log_event(logger, logging.DEBUG, 'parser.component_failed', component='plain_text_body')
             elif content_type == 'text/html':
                 try:
                     html = part.get_payload(decode=True)
@@ -355,7 +356,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
                     else:
                         body_html = str(html)
                 except Exception as e:
-                    logger.debug('Failed to extract HTML body')
+                    log_event(logger, logging.DEBUG, 'parser.component_failed', component='html_body')
     else:
         try:
             payload = message.get_payload(decode=True)
@@ -368,7 +369,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
             else:
                 body_text = decoded
         except Exception as e:
-            logger.debug('Failed to extract body')
+            log_event(logger, logging.DEBUG, 'parser.component_failed', component='body')
 
     all_urls.extend(extract_urls(body_text))
     if body_html:
@@ -422,7 +423,7 @@ def extract_attachment_metadata(message: Any) -> list[EmailAttachmentMetadata]:
             if len(attachments) > MAX_ATTACHMENTS:
                 raise ValueError('Email contains too many attachments')
         except Exception as e:
-            logger.debug('Failed to extract attachment metadata')
+            log_event(logger, logging.DEBUG, 'parser.component_failed', component='attachment_metadata')
 
     return attachments
 
@@ -444,7 +445,8 @@ def parse_email(raw_email: str) -> ParsedEmail:
     try:
         message = message_from_string(raw_email)
     except Exception as e:
-        logger.error('Failed to parse email safely')
+        log_event(logger, logging.ERROR, 'parser.failed',
+                  reason_code='message_parse_error', exception_class=type(e).__name__)
         raise ValueError('Failed to parse email') from None
 
     try:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
@@ -21,6 +22,8 @@ if ML_SRC_PATH not in sys.path:
 # Runtime import handled after sys.path modification
 from phishshield_ml.inference import LocalInferenceService
 from app.core.settings import get_settings
+from app.core.runtime_metrics import runtime_metrics
+from app.core.logging import log_event
 from app.services.model_manager import APPROVED_ARTIFACT_ROOT, ModelManager
 from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
 from app.analyzers.header_analyzer import evaluate_authentication
@@ -57,7 +60,14 @@ class MLUnavailableError(RuntimeError):
     """Raised when ML is configured as required but cannot be used."""
 
 class AnalysisPipeline:
-    def __init__(self, model_path: str | Path | None = None, ml_required: bool | None = None):
+    STARTUP_WARMUP_TEXT = 'Synthetic startup warmup text for analysis adapter readiness.'
+
+    def __init__(
+        self,
+        model_path: str | Path | None = None,
+        ml_required: bool | None = None,
+        manager: ModelManager | None = None,
+    ):
         settings = get_settings()
         self.model_path = self._resolve_path(model_path) if model_path else None
         configured_override = self.model_path
@@ -67,14 +77,47 @@ class AnalysisPipeline:
             except ValueError:
                 # Keep the pipeline safely unavailable; never make an external path loadable.
                 configured_override = APPROVED_ARTIFACT_ROOT / '__invalid_external_override__'
-        self.model_manager = ModelManager(
+        self.model_manager = manager or ModelManager(
             registry_path=settings.ml_registry_path,
             selected_model_id=settings.ml_model_id,
             artifact_override=configured_override,
         )
+        self._default_artifact_override = self.model_manager.artifact_override
+        self.model_manager.artifact_override = self.model_path or self._default_artifact_override
         self.ml_required = settings.ml_required if ml_required is None else ml_required
         self.ml_marginal_alert_band = settings.ml_marginal_alert_band
         self._ml_service: LocalInferenceService | None = None
+        self._last_timings: dict[str, float] = {}
+
+    @property
+    def inference_ready(self) -> bool:
+        return self._ml_service is not None
+
+    def clear_loaded_state(self) -> None:
+        self._ml_service = None
+
+    @property
+    def model_path(self) -> Path | None:
+        return self._model_path
+
+    @model_path.setter
+    def model_path(self, value: str | Path | None) -> None:
+        self._model_path = value
+        if hasattr(self, 'model_manager') and hasattr(self, '_default_artifact_override'):
+            self.model_manager.artifact_override = value or self._default_artifact_override
+
+    def prepare(self, warmup_text: str | None = None) -> dict[str, float]:
+        """Construct the adapter and run one privacy-safe synthetic prediction."""
+        adapter_started = time.perf_counter()
+        ml_service = self._get_ml_service()
+        adapter_construction_ms = (time.perf_counter() - adapter_started) * 1000
+        warmup_started = time.perf_counter()
+        ml_service.predict(warmup_text or self.STARTUP_WARMUP_TEXT)
+        warmup_ms = (time.perf_counter() - warmup_started) * 1000
+        return {
+            'adapter_construction_ms': round(adapter_construction_ms, 3),
+            'model_warmup_ms': round(warmup_ms, 3),
+        }
 
     def _get_ml_service(self) -> LocalInferenceService:
         """Lazy load the ML service."""
@@ -82,12 +125,28 @@ class AnalysisPipeline:
             try:
                 # ModelManager is the sole authority for candidate selection and
                 # verifies every artifact hash before any inference object sees it.
-                self.model_manager.artifact_override = self.model_path
+                self.model_manager.artifact_override = self.model_path or self._default_artifact_override
                 loaded = self.model_manager.load_deployment_candidate()
                 self._ml_service = LocalInferenceService(loaded.record.artifact_path, verified_model=loaded)
             except Exception:
                 raise MLUnavailableError(ML_UNAVAILABLE_REASON) from None
         return self._ml_service
+
+    def _publish_analysis_timing(
+        self,
+        started: float,
+        parser_ms: float,
+        rules_ms: float,
+        inference_ms: float,
+    ) -> None:
+        fields = {
+            'parser_ms': round(max(0.0, parser_ms), 3),
+            'rules_ms': round(max(0.0, rules_ms), 3),
+            'inference_ms': round(max(0.0, inference_ms), 3),
+            'total_ms': round(max(0.0, (time.perf_counter() - started) * 1000), 3),
+        }
+        self._last_timings = fields
+        log_event(logger, logging.DEBUG, 'analysis.timing', **fields)
 
     @staticmethod
     def _resolve_path(path: str | Path) -> Path:
@@ -106,6 +165,8 @@ class AnalysisPipeline:
 
     def run_request(self, request: AnalysisPreviewRequest) -> UnifiedAnalysisResponse:
         """Execute one normalized analysis path for every supported input mode."""
+        started = time.perf_counter()
+        parser_started = time.perf_counter()
         if request.input_mode == AnalysisInputMode.quick_paste:
             size = len((request.body or '').encode('utf-8'))
             if size > MAX_EMAIL_SIZE_BYTES:
@@ -138,6 +199,9 @@ class AnalysisPipeline:
                 raise error
             parsed_email = parse_email(request.raw_email or '')
 
+        parser_ms = (time.perf_counter() - parser_started) * 1000
+
+        rules_started = time.perf_counter()
         completeness = self._analysis_completeness(request, parsed_email)
         authentication = evaluate_authentication(
             parsed_email.headers,
@@ -150,14 +214,21 @@ class AnalysisPipeline:
         
         # Step 2: Run rule-based analyzer
         rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
+        rules_ms = (time.perf_counter() - rules_started) * 1000
         
         # Step 3: Run ML inference
         ml_result: MLAnalysisResult
+        inference_ms = 0.0
         try:
             ml_service = self._get_ml_service()
             # Combine subject and body for ML analysis
             text_for_ml = f"{parsed_email.subject or ''}\n{parsed_email.body_text}"
-            inference = ml_service.predict(text_for_ml)
+            inference_started = time.perf_counter()
+            try:
+                inference = ml_service.predict(text_for_ml)
+            finally:
+                inference_ms = (time.perf_counter() - inference_started) * 1000
+                runtime_metrics.record_inference(inference_ms)
             
             ml_result = MLAnalysisResult(
                 status='available',
@@ -169,7 +240,8 @@ class AnalysisPipeline:
                 decision_threshold=float(ml_service.decision_threshold),
             )
         except Exception:
-            logger.warning("ML analysis is unavailable; applying configured availability policy")
+            log_event(logger, logging.WARNING, 'model.inference_unavailable',
+                      reason_code='model_unavailable', fallback_allowed=not self.ml_required)
             if self.ml_required:
                 raise MLUnavailableError(ML_UNAVAILABLE_REASON)
             ml_result = MLAnalysisResult(
@@ -191,6 +263,7 @@ class AnalysisPipeline:
             response_completeness = self._qualify_safe_warning(
                 completeness, str(rule_result.classification.value) == 'safe'
             )
+            self._publish_analysis_timing(started, parser_ms, rules_ms, inference_ms)
             return UnifiedAnalysisResponse(
                 parser=parsed_email,
                 rule_analysis=rule_result,
@@ -252,6 +325,7 @@ class AnalysisPipeline:
         )
         
         # Step 5: Generate unified response
+        self._publish_analysis_timing(started, parser_ms, rules_ms, inference_ms)
         return UnifiedAnalysisResponse(
             parser=parsed_email,
             rule_analysis=rule_result,
@@ -365,5 +439,8 @@ class AnalysisPipeline:
         detail = completeness.warning.removeprefix('Limited evidence:').strip()
         return completeness.model_copy(update={'warning': f'Safe based on limited evidence: {detail}'})
 
-# Singleton instance for the API
-pipeline = AnalysisPipeline()
+# Singleton instance for the API. Both supported analysis endpoints share the
+# same verified ModelManager cache, so startup preparation covers both paths.
+from app.services.inference_service import inference_service
+
+pipeline = AnalysisPipeline(manager=inference_service.manager)

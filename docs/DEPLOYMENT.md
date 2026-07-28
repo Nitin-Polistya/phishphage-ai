@@ -35,7 +35,9 @@ The Dockerfile installs `apps/api/requirements.txt`, copies the API and provisio
 python -m uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-1}
 ```
 
-The container health check calls `/api/v1/health`. Use `ENVIRONMENT=production`, `ML_REQUIRED=true`, exact `CORS_ORIGINS`, `TRUSTED_PROXY_IPS` only when the provider peer addresses are known, and private model provisioning variables. Do not use reload mode in deployment.
+The container health check calls `/api/v1/health`. Use `ENVIRONMENT=production`, `ML_REQUIRED=true`, `UVICORN_ACCESS_LOG=false`, exact `CORS_ORIGINS`, `TRUSTED_PROXY_IPS` only when the provider peer addresses are known, and private model provisioning variables. Do not use reload mode in deployment. The application’s JSON `phishshield.request` events remain enabled; `UVICORN_ACCESS_LOG=false` (or adding `--no-access-log` to an externally managed Uvicorn command) only removes duplicate access lines.
+
+Startup logs include safe registry/hash/model/warm-up timings and readiness state. The process must not be considered ready until required model initialization and the privacy-safe warm-up have completed. If `ML_REQUIRED=true` and initialization fails, startup exits rather than serving a partially initialized process.
 
 ## Provider manifests
 

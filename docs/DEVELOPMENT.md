@@ -41,7 +41,7 @@ Keep Firebase and provisioning secrets empty for ordinary local work. The defaul
 .\apps\api\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir apps/api
 ```
 
-The API listens on `http://localhost:8000`. Use `/api/v1/health` to inspect registry/model status and `/ready` to inspect the readiness gate.
+The API listens on `http://localhost:8000`. Development defaults to `UVICORN_ACCESS_LOG=true`; use `/api/v1/health` to inspect registry/model status, `/ready` to inspect the readiness gate, and `/metrics` for process-local counters and startup timings.
 
 ## Frontend startup
 
@@ -73,8 +73,11 @@ $env:ENVIRONMENT='production'
 $env:HOST='127.0.0.1'
 $env:PORT='8000'
 $env:ML_REQUIRED='true'
+$env:UVICORN_ACCESS_LOG='false'
 .\apps\api\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --app-dir apps/api
 ```
+
+The application keeps structured request/error/startup logs enabled. `UVICORN_ACCESS_LOG=false` suppresses duplicate Uvicorn access lines; the equivalent CLI flag is `--no-access-log` when the server command is managed externally.
 
 Production mode assumes HTTPS at an ingress; local HTTP is for validation only. Do not interpret a local run as a deployment.
 

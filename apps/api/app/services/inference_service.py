@@ -9,9 +9,12 @@ from app.schemas.email import ParsedEmail
 from app.schemas.inference import InferenceSignals, PredictionResponse
 from app.services.model_manager import ModelManager
 from app.core.settings import get_settings
+from app.core.runtime_metrics import runtime_metrics
 
 
 class InferenceService:
+    STARTUP_WARMUP_TEXT = 'Synthetic startup warmup text for model readiness.'
+
     def __init__(self, manager: ModelManager | None = None):
         settings = get_settings()
         self.manager = manager or ModelManager(
@@ -20,12 +23,31 @@ class InferenceService:
             artifact_override=settings.ml_artifact_path,
         )
 
+    def prepare(self, warmup_text: str | None = None) -> dict[str, float]:
+        """Load and exercise the approved predictor before serving requests."""
+        load_started = time.perf_counter()
+        loaded = self.manager.load_deployment_candidate()
+        load_call_ms = (time.perf_counter() - load_started) * 1000
+        warmup_started = time.perf_counter()
+        loaded.predictor.predict_proba([warmup_text or self.STARTUP_WARMUP_TEXT])
+        warmup_ms = (time.perf_counter() - warmup_started) * 1000
+        timings = self.manager.last_timings
+        return {
+            'model_load_ms': round(max(load_call_ms, timings.get('model_load_ms', 0.0)), 3),
+            'artifact_hash_ms': round(timings.get('artifact_hash_ms', 0.0), 3),
+            'model_warmup_ms': round(warmup_ms, 3),
+        }
+
     def predict_email(self, parsed: ParsedEmail) -> PredictionResponse:
         started = time.perf_counter_ns()
         text = f"{parsed.subject or ''}\n{parsed.body_text or ''}".strip()
         if not text:
             raise ValueError("Email must contain a subject or body")
-        loaded, probabilities = self.manager.predict(text)
+        inference_started = time.perf_counter()
+        try:
+            loaded, probabilities = self.manager.predict(text)
+        finally:
+            runtime_metrics.record_inference((time.perf_counter() - inference_started) * 1000)
         probability = float(probabilities[1])
         prediction = "phishing" if probability >= loaded.record.threshold else "legitimate"
         indicators = self._signals(parsed)
