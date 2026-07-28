@@ -1,51 +1,52 @@
 # Environment variable contract
 
-This document defines deployment inputs. Example values are placeholders only;
-credentials and private artifact URLs must be supplied by the hosting provider.
+Values below are configuration placeholders, not secrets. The backend reads `apps/api/.env`; the frontend reads `apps/web/.env.local`. A root `.env.example` mirrors the main names for orientation. Do not commit populated environment files.
 
 ## Backend
 
-| Variable | Required | Safe default | Secret | Purpose and failure behavior |
-|---|---:|---|---:|---|
-| `APP_NAME` | no | `PhishPhage AI API` | no | Service label. |
-| `APP_VERSION` | no | `0.1.0` | no | Release label. |
-| `ENVIRONMENT` | no | `development` | no | `production` enables HSTS and production validation. |
-| `API_V1_PREFIX` | no | `/api/v1` | no | API namespace contract. |
-| `HOST` | no | command-specific | no | Production command should use `0.0.0.0`. |
-| `PORT` | no | `8000` | no | Hosting-assigned listening port. |
-| `LOG_LEVEL` | no | `INFO` | no | Structured stdout severity. |
-| `CORS_ORIGINS` | yes in production | localhost development origin | no | Comma-separated exact origins; wildcard and localhost production origins are rejected. |
-| `TRUSTED_PROXY_IPS` | provider-dependent | empty | no | Exact trusted proxy addresses; empty means forwarded headers are ignored. |
-| `RATE_LIMIT_ENABLED` | no | `true` | no | Enables process-local fixed-window limits. |
-| `RATE_LIMIT_WINDOW_SECONDS` | no | `60` | no | Rate-limit window. |
-| `RATE_LIMIT_HEALTH` | no | `300` | no | Health request limit per client/window. |
-| `RATE_LIMIT_PARSER` | no | `60` | no | Parser request limit per client/window. |
-| `RATE_LIMIT_ANALYSIS` | no | `120` | no | Analysis request limit per client/window. |
-| `MAX_REQUEST_BYTES` | no | `2200000` | no | HTTP body ceiling. |
-| `ML_REQUIRED` | no | `false` | no | In production use `true`; readiness and analysis fail safely if inference is unavailable. |
-| `ML_REGISTRY_PATH` | no | registry path | no | Approved registry location; paths remain inside the model directory. |
-| `ML_MODEL_ID` | no | approved candidate ID | no | Registry selection only; must match an existing compatible candidate. |
-| `ML_ARTIFACT_PATH` | deployment | registry artifact path | no | Provisioned artifact destination inside the approved model directory. |
-| `ML_MARGINAL_ALERT_BAND` | no | `0.08` | no | Existing alert-band setting; do not change without model review. |
-| `MODEL_ARTIFACT_URL` | deployment | unset | no | HTTPS private artifact source used only by the provisioning command. |
-| `MODEL_ARTIFACT_TOKEN` | deployment | unset | yes | Optional bearer token; never logged. |
-| `ML_EXPECTED_SHA256` | deployment | registry hash | no | Fixed artifact hash; mismatch aborts provisioning. |
-| `MODEL_ARTIFACT_MAX_BYTES` | no | `10485760` | no | Download ceiling. |
-| `MODEL_ARTIFACT_TIMEOUT_SECONDS` | no | `30` | no | Download timeout. |
-| `FIREBASE_PROJECT_ID` | optional | unset | no | Firebase is disabled when the complete credential set is absent. |
-| `FIREBASE_CLIENT_EMAIL` | optional | unset | yes | Firebase service identity. |
-| `FIREBASE_PRIVATE_KEY` | optional | unset | yes | Firebase private key; escaped newlines are accepted. |
+| Variable | Default/requiredness | Purpose |
+| --- | --- | --- |
+| `APP_NAME` | `PhishPhage AI API`; optional | Internal API service label. Public product name is PhishShield AI. |
+| `APP_VERSION` | `0.1.0`; optional | API/application version returned by health metadata. |
+| `ENVIRONMENT` | `development`; set `production` for deployment | Enables production validation/HSTS behavior. |
+| `API_V1_PREFIX` | `/api/v1`; optional | Intended API namespace setting. Current router registration is explicitly `/api/v1`; changing this variable alone does not remount routes. |
+| `HOST` | command-specific; use `0.0.0.0` in a container | Bind address. |
+| `PORT` | `8000`; provider may override | Listening port. |
+| `CORS_ORIGINS` | localhost development default; required in production | Comma-separated exact browser origins. Wildcard/localhost production values are rejected. |
+| `LOG_LEVEL` | `INFO`; optional | Structured log level. |
+| `MAX_REQUEST_BYTES` | `2200000`; optional | HTTP body ceiling; accepted range is 1 KiB to 10 MB. |
+| `RATE_LIMIT_ENABLED` | `true`; optional | Enables process-local fixed-window limits. |
+| `RATE_LIMIT_WINDOW_SECONDS` | `60`; optional | Window duration. |
+| `RATE_LIMIT_HEALTH` | `300`; optional | Health/root requests per client/window. |
+| `RATE_LIMIT_PARSER` | `60`; optional | Parser requests per client/window. |
+| `RATE_LIMIT_ANALYSIS` | `120`; optional | Analysis requests per client/window. |
+| `TRUSTED_PROXY_IPS` | empty; provider-dependent | Exact direct peer IPs allowed to supply forwarded client identity. Empty ignores forwarded headers. |
+| `ML_REGISTRY_PATH` | `services/ml/models/registry.json`; optional | Registry metadata location. |
+| `ML_MODEL_ID` | `phase-c-logistic-regression-v1`; optional | Registry candidate selection. |
+| `ML_ARTIFACT_PATH` | unset; deployment/local bundle | Optional artifact override, still contained and hash-checked. |
+| `ML_REQUIRED` | `false`; use `true` for deployment | Required mode returns 503/readiness failure when inference is unavailable. |
+| `ML_MARGINAL_ALERT_BAND` | `0.08`; optional | Existing narrowly gated fusion band; it does not change the model threshold. |
+| `MODEL_ARTIFACT_URL` | unset; deployment only | Private HTTPS source for provisioning. Never publish it. |
+| `MODEL_ARTIFACT_TOKEN` | unset; deployment only; secret | Optional bearer token for provisioning. Never log or commit it. |
+| `ML_EXPECTED_SHA256` | unset or registry-matching; deployment only | Expected artifact hash. Mismatch aborts provisioning. |
+| `MODEL_ARTIFACT_MAX_BYTES` | `10485760` in provisioning code; optional | Provisioning download ceiling. |
+| `MODEL_ARTIFACT_TIMEOUT_SECONDS` | `30` in provisioning code; optional | Provisioning timeout. |
+| `FIREBASE_PROJECT_ID` | unset; optional | Firebase project identifier. |
+| `FIREBASE_CLIENT_EMAIL` | unset; optional secret | Firebase service identity. |
+| `FIREBASE_PRIVATE_KEY` | unset; optional secret | Firebase private key; escaped newlines are accepted. |
+
+The complete Firebase credential set is required before the optional SDK initializes. Firebase presence does not add API authentication or authorization.
 
 ## Frontend
 
-| Variable | Required | Safe default | Secret | Purpose and failure behavior |
-|---|---:|---|---:|---|
-| `NEXT_PUBLIC_API_BASE_URL` | yes in production | unset | no | Exact HTTPS backend origin. Invalid or missing values make API calls unavailable. |
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | optional | unset | no | Public Firebase client configuration only if Firebase is introduced. |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | optional | unset | no | Public Firebase client configuration. |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | optional | unset | no | Public Firebase client configuration. |
-| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | optional | unset | no | Public Firebase client configuration. |
-| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | optional | unset | no | Public Firebase client configuration. |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | optional | unset | no | Public Firebase client configuration. |
+| Variable | Default/requiredness | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `http://localhost:8000` in the example; required for a deployed frontend | Backend origin used by browser fetches. Use HTTPS outside local development. |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | unset; optional | Public Firebase client configuration only if a future frontend integration uses it. |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | unset; optional | Public Firebase client configuration. |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | unset; optional | Public Firebase client configuration. |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | unset; optional | Public Firebase client configuration. |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | unset; optional | Public Firebase client configuration. |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | unset; optional | Public Firebase client configuration. |
 
-No service-account credential may use a `NEXT_PUBLIC_` name.
+Anything prefixed `NEXT_PUBLIC_` is browser-visible. Never use that prefix for service-account credentials, private artifact tokens, or other secrets.

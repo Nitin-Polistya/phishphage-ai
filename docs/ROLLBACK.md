@@ -1,16 +1,21 @@
 # Rollback strategy
 
-Frontend and backend releases roll back independently to the last known-good
-release. Environment changes are reverted through the hosting provider's
-versioned configuration, never by deleting application data.
+Rollback is a release operation, not a deletion operation. Preserve the last known-good frontend/backend configuration, registry entry, artifact hash, and validation evidence.
 
-Model rollback selects the previous approved registry entry and its preserved
-SHA-256, then provisions that artifact into a new immutable release. A failed
-provision, hash mismatch, unsupported registry version, or missing artifact
-keeps the service from becoming ready when `ML_REQUIRED=true`.
+## Frontend and backend
 
-Security regressions require restoring the last known-good frontend/backend
-release and configuration, then rerunning the security and deployment gates.
-Firebase changes, if introduced later, require a separately reviewed backward-
-compatible migration and rules rollback; this phase makes no Firebase schema
-or data changes.
+Roll back the Next.js and FastAPI releases independently when their contracts remain compatible. Revert provider environment configuration through the provider's versioned mechanism. Do not delete browser data or application data to recover from a release problem.
+
+After rollback, verify the frontend can reach the exact API origin, CORS is correct, `/api/v1/health` and `/ready` are healthy, and synthetic analysis returns the expected contract.
+
+## Model rollback
+
+Select the previous reviewed registry entry and its matching private artifact/vectorizer/manifest hashes. Provision them into a new immutable release. A missing file, hash mismatch, unsupported registry version, invalid threshold/metadata, or failed inference adapter keeps required-ML readiness at HTTP 503. Never overwrite an existing artifact in place.
+
+## Security rollback
+
+For a security regression, restore the last known-good application and configuration release, then rerun security-control, dependency, readiness, and synthetic API gates. If the regression concerns the unauthenticated API, restrict ingress access while the fix is reviewed. Do not claim the browser security gate passed while host-level browser launch remains blocked.
+
+## Firebase and state
+
+Firebase is optional and the repository defines no schema or authorization boundary. Any future Firebase change requires a separate migration/rules rollback plan. Browser-local history can be cleared by the user but is not a server rollback mechanism.

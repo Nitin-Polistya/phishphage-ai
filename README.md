@@ -1,123 +1,181 @@
 # PhishShield AI
 
-PhishShield AI is an explainable phishing-risk analysis workspace for suspicious email. It combines local email parsing, deterministic security indicators, and a calibrated ML candidate model behind a typed FastAPI API and responsive Next.js interface.
+PhishShield AI is a defensive cybersecurity workspace for analyzing suspicious email. It combines a Next.js interface, a FastAPI service, local RFC822/MIME parsing, deterministic security indicators, and a hash-checked local machine-learning candidate. It is intended to support human review during triage; it does not guarantee safety, identify every phishing message, or replace mail security controls.
 
-> Release-candidate status: local integration is validated. The deployment-candidate model is inactive and the application has not been deployed.
+## Problem statement
 
-## What it does
+Email risk evidence is distributed across wording, headers, authentication results, links, HTML, and attachment metadata. PhishShield AI makes those signals easier to inspect without rendering email HTML, following URLs, executing attachments, or requiring the user to send raw email to a third-party analysis API.
 
-- Accepts raw RFC822 email source from the browser.
-- Parses headers, body text, links, and attachment metadata locally.
-- Runs rule-based indicators and the hash-verified calibrated ML candidate.
-- Returns risk score, probability, confidence, signal families, and recommendations.
-- Keeps the current analysis in memory; it does not store raw email content.
-- Does not render email HTML, follow URLs, or execute attachments.
+## Core capabilities
 
-This is decision support, not a guarantee of safety or a replacement for mail security controls and human review.
+- Quick Paste, raw RFC822 source, and `.eml` input modes.
+- Local parsing of headers, plain text, visible HTML text, URL evidence, and attachment metadata.
+- Rule-based indicators with signal severity, evidence, and recommendations.
+- Optional calibrated text-model inference through a versioned registry.
+- Explicit model/rule agreement, limited-evidence warnings, and safe fallback behavior.
+- Optional browser-local scan history and browser-generated reports. History is disabled unless the user enables it; raw bodies and complete raw headers are excluded from saved records.
+- Request IDs, bounded payloads, process-local rate limits, safe errors, security headers, CSP, privacy-safe logs, health, readiness, and metrics endpoints.
 
-## Product preview
+## Screenshots
 
-Capture these deterministic views using the safe example in the Analyze workspace:
+Screenshot capture is intentionally a placeholder until real local captures are reviewed. See [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md). Do not use real email or edit a capture to imply that the backend or model is available.
 
-- `docs/images/landing-page.png` — landing page at 1440 px.
-- `docs/images/analysis-input.png` — `/analyze` before submission at 1440 px.
-- `docs/images/phishing-result.png` — `/analyze` after the safe synthetic example is submitted.
-- `docs/images/mobile-analysis.png` — `/analyze` at 390 px.
+## Architecture overview
 
-No screenshots are committed yet. See [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md) for capture instructions.
+The browser submits synthetic or user-provided email to the FastAPI boundary. The service parses it in memory, runs rule analysis, optionally loads the registry-selected candidate after hash validation, fuses the available evidence, and returns a typed response. The frontend may store sanitized scan records in browser storage only when the user enables that preference.
 
-## Architecture
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
 
-```mermaid
-flowchart LR
-  U[User] --> W[Next.js frontend]
-  W -->|POST /api/v1/analyze| A[FastAPI API]
-  A --> P[Email parser]
-  P --> F[Local feature extraction]
-  F --> R[Rule-based indicators]
-  F --> M[Hash-verified calibrated ML model]
-  R --> E[Explanation layer]
-  M --> E
-  E -->|structured response| W
-  H[GET /api/v1/health] --> W
-  G[Versioned model registry] --> M
-  B[Privacy boundary: in-memory, no raw-email persistence] -.-> A
-```
-
-Detailed diagram: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Technology
+## Technology stack
 
 - Frontend: Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Lucide icons.
-- Backend: FastAPI, Pydantic, local RFC822 parsing, rule analysis.
-- ML: scikit-learn, TF-IDF, calibrated Logistic Regression candidate, versioned registry.
-- Validation: pytest, Node test runner, ESLint, TypeScript, Next.js production build.
+- Backend: Python 3.11+, FastAPI, Pydantic, Uvicorn, Python email/MIME parsing.
+- Analysis: deterministic Python analyzers, offline domain comparison, scikit-learn, Joblib, NumPy, SciPy.
+- Optional integration: Firebase Admin SDK is present but not an authorization layer.
+- Validation: pytest, Node's built-in test runner, TypeScript, ESLint, Next.js build, pip check, npm audit, and static security/deployment tests.
 
-## Local setup
+## Repository structure
 
-Requirements: Python 3.11+, Node.js, and npm.
+```text
+apps/api/       FastAPI application, parser, rules, inference, and tests
+apps/web/       Next.js application, browser-local history, reports, and tests
+services/ml/    Dataset controls, model development, registry, artifacts, and research reports
+docs/           Public architecture, API, model, security, deployment, and contributor guides
+reports/        Generated audit, performance, security, deployment, and research evidence
+```
+
+## Quick start
+
+Prerequisites are Python 3.11+, Node.js, and npm. From the repository root on Windows:
 
 ```powershell
-# backend
-apps\api\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir apps/api
+py -3.11 -m venv apps\api\.venv
+.\apps\api\.venv\Scripts\python.exe -m pip install -r apps\api\requirements.txt
+Copy-Item apps\api\.env.example apps\api\.env
 
-# frontend
-cd apps/web
-npm install
+# terminal 1
+.\apps\api\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir apps/api
+
+# terminal 2
+cd apps\web
+npm ci
 Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. The API is expected at `http://localhost:8000`.
+Open `http://localhost:3000`. The local API listens on `http://localhost:8000` by default. The full Windows workflow and troubleshooting notes are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-Frontend configuration:
+## Backend setup
 
-```text
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
-See [apps/web/README.md](apps/web/README.md) for troubleshooting and the complete local workflow.
-
-## API
-
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/health` | API, model, calibration, candidate, and activation status |
-| `POST` | `/api/v1/analyze` | Parse and analyze `{ "raw_email": "..." }` |
-
-The analysis response includes `model_id`, `model_version`, `prediction`, `probability`, `risk_score`, `confidence`, `threshold_used`, `feature_families`, `signals`, `recommendations`, and `processing_time_ms`.
-
-## Model and evidence boundaries
-
-The selected candidate is `phase-c-logistic-regression-v1`, calibrated with isotonic regression at threshold `0.5`. It remains `deployment_candidate=true` and `activated=false`. Phase C found useful external performance but material template-shift and hard-negative limitations; no production accuracy claim is made.
-
-The model registry and training/evaluation evidence are documented under `services/ml/`. Model binaries and generated reports remain Git-ignored.
-
-## Privacy and security
-
-The frontend does not persist submitted email, render HTML, create clickable extracted URLs, send analytics, or expose model internals. The backend processes content in memory and avoids URL fetching and attachment execution. Please do not test with real sensitive mail in public issue reports. See [SECURITY.md](SECURITY.md) and [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
-## Project layout
-
-```text
-apps/api/       FastAPI application, parser, rules, and inference endpoint
-apps/web/       Next.js interface and typed API client
-services/ml/    Dataset controls, model development, registry, and reports
-docs/           Architecture, release, demo, screenshot, and deployment guides
-```
-
-## Checks
+The API can start without Firebase. With `ML_REQUIRED=false` it can return deterministic rule analysis when the model candidate is unavailable; the response marks ML as unavailable and does not invent probabilities. Set `ML_REQUIRED=true` for a deployment-like readiness gate. Backend routes and response contracts are documented in [docs/API.md](docs/API.md).
 
 ```powershell
-cd apps/web
-npm run lint
-npx tsc --noEmit
-npm test
-npm run build
+.\apps\api\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir apps/api
+```
 
-cd ../..
-apps\api\.venv\Scripts\python.exe -m pytest apps/api/tests services/ml/tests -q
+## Frontend setup
+
+The frontend reads `NEXT_PUBLIC_API_BASE_URL` from `apps/web/.env.local`. The Analyze workspace calls the unified analysis preview route for its mode-aware workflow; the production raw-email client also supports `/api/v1/analyze`. Browser history and reports are independent of backend persistence.
+
+```powershell
+cd apps\web
+Copy-Item .env.example .env.local
+npm run dev
+```
+
+## Environment variables
+
+Use the example files as the contract. Backend variables live in `apps/api/.env`; frontend variables live in `apps/web/.env.local`. Important production requirements are an exact HTTPS `CORS_ORIGINS` value, `ML_REQUIRED=true`, a private artifact provisioning configuration, and a valid `NEXT_PUBLIC_API_BASE_URL`. Never put service-account credentials in a `NEXT_PUBLIC_` variable.
+
+See [docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md) for every supported variable.
+
+## Model artifact setup
+
+The tracked registry metadata selects `phase-c-logistic-regression-v1`, version `1.0.0`, with isotonic calibration and threshold `0.50`. Its registry record is `deployment_candidate=true` and `activated=false`. Candidate binaries, vectorizers, and feature manifests are ignored by Git and must be supplied through a reviewed local or private release bundle; they are not publicly stored in the repository.
+
+The model manager contains paths under the approved model directory, verifies the registry, pipeline, vectorizer, and feature-manifest hashes before deserialization, and never changes activation metadata. See [docs/MODEL.md](docs/MODEL.md) and [docs/MODEL_ARTIFACT_DISTRIBUTION.md](docs/MODEL_ARTIFACT_DISTRIBUTION.md).
+
+## Running tests and checks
+
+```powershell
+.\apps\api\.venv\Scripts\python.exe -m pytest -q apps/api/tests
+.\apps\api\.venv\Scripts\python.exe -m compileall apps/api/app apps/api/scripts services/ml/src
+.\apps\api\.venv\Scripts\python.exe -m pip check
+
+cd apps\web
+npm test
+npx --no-install tsc --noEmit
+npm run lint
+npm run build
+npm audit
+cd ..\..
+
 git diff --check
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for the unreleased release-candidate work and [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) for sign-off items.
+The browser security suite is separate from the normal frontend test script and currently depends on a host that permits browser child processes. See [docs/TESTING.md](docs/TESTING.md).
+
+## Security posture
+
+The service enforces a 2,200,000-byte HTTP body ceiling, a 2 MiB email parser ceiling, MIME/header/attachment/URL bounds, exact CORS configuration, request IDs, safe error bodies, no-store API responses, CSP, framing protection, HSTS in production, and configurable process-local rate limits. It parses email as data only: it does not fetch URLs, render HTML, execute attachments, or authenticate callers. Trusted Joblib/Pickle artifacts remain a supply-chain trust boundary.
+
+See [docs/SECURITY.md](docs/SECURITY.md) and the generated security evidence under [reports/security_audit/](reports/security_audit/).
+
+## Privacy guarantees
+
+The analysis workflow processes input in memory. The API does not persist raw email or attachment bytes, and logs/metrics exclude email content, headers, addresses, URLs, credentials, and model contents. Browser-local history is optional and stores sanitized summaries for the current browser profile; users can clear or export those records. Do not submit real sensitive email to public development environments or issue trackers.
+
+## Model limitations
+
+The current candidate is a text-oriented calibrated Logistic Regression artifact. It does not establish sender reputation, verify live SPF/DKIM/DMARC, follow redirects, inspect attachment content, consult external threat intelligence, or guarantee detection of multilingual, image-only, compromised-account, novel, or template-shift phishing. External qualification of the rejected SVM candidate failed its precision/FPR gates, and hybrid structured-feature experiments also failed their declared gates. Those experiments were research-only and are not activated models. No model should be described as universally accurate.
+
+## Known environment limitations
+
+The repository contains local deployment preparation, but no deployment has occurred. Provider quotas, pricing, cloud capacity, provider-like container startup, and production HTTPS smoke testing remain unverified. The recorded security audit is inconclusive for interactive browser testing because the host rejected browser child processes with `spawn EPERM`/access denied. Multi-instance rate limiting is process-local, and optional Firebase has no authorization boundary in this repository.
+
+## Deployment status
+
+Current status: local integration and deployment preparation only. The included Render and Vercel manifests are configuration artifacts; Render auto-deploy is disabled and Vercel deployment is disabled. No public URL, cloud deployment, production approval, or production certification is claimed. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), [docs/ROLLBACK.md](docs/ROLLBACK.md), and [docs/CI_CD.md](docs/CI_CD.md).
+
+## Roadmap
+
+- Reconcile registry/runtime version metadata before a release decision.
+- Add provenance-complete, privacy-reviewed, campaign-grouped legitimate hard negatives and modern phishing families.
+- Re-run independent qualification with explicit precision, FPR, calibration, and false-negative gates.
+- Decide whether authentication/authorization and a shared rate limiter are required for the deployment context.
+- Restore browser automation and complete provider-like HTTPS, capacity, and container validation.
+- Capture reviewed portfolio screenshots using synthetic data.
+
+## Documentation index
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [API](docs/API.md)
+- [Model](docs/MODEL.md)
+- [Datasets](docs/DATASETS.md)
+- [Security](docs/SECURITY.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Development](docs/DEVELOPMENT.md)
+- [Testing](docs/TESTING.md)
+- [Research](docs/RESEARCH.md)
+- [Observability](docs/OBSERVABILITY.md)
+- [Environment variables](docs/ENVIRONMENT_VARIABLES.md)
+- [Model artifact distribution](docs/MODEL_ARTIFACT_DISTRIBUTION.md)
+- [Rollback](docs/ROLLBACK.md)
+- [CI/CD](docs/CI_CD.md)
+- [Screenshots](docs/SCREENSHOTS.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security policy](SECURITY.md)
+
+## Contribution guidance
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing code, data, model artifacts, security controls, or public documentation. Contributions must preserve privacy boundaries and include evidence for claims.
+
+## License
+
+No root project license file is present. A license decision is required before the repository is redistributed as a licensed project. Dataset licenses and restrictions are separate from the project license.
+
+## Disclaimer
+
+PhishShield AI is a defensive research and decision-support project. A result is not a verdict, legal advice, incident-response instruction, or guarantee that an email is safe or malicious. Verify sensitive requests through an independently opened trusted channel and follow your organization’s security process.

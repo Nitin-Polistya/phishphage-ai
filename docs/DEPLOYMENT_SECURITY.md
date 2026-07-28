@@ -1,19 +1,25 @@
 # Deployment security assumptions
 
-TLS must terminate at the hosting provider or an equivalent trusted ingress.
-The backend must receive external HTTPS traffic only through that ingress;
-`ENVIRONMENT=production` enables HSTS because HTTPS is then an operational
-precondition.
+This is the deployment-specific companion to [SECURITY.md](SECURITY.md). It records controls that must be supplied by the hosting environment.
 
-`TRUSTED_PROXY_IPS` must contain only exact proxy addresses supplied by the
-provider. With an empty list, the application uses the direct peer address and
-ignores `X-Forwarded-For`. Arbitrary forwarded headers are never trusted.
+## TLS and ingress
 
-Production CORS is an exact, comma-separated origin allowlist. Wildcards,
-localhost, and loopback origins are rejected in production. Credentials are
-disabled, and allowed methods/headers are limited by the existing middleware.
+Terminate TLS at a trusted ingress and expose the API externally through HTTPS only. The provider must preserve the original scheme and enforce redirect policy. `ENVIRONMENT=production` enables HSTS (`max-age=31536000; includeSubDomains`), so enabling production mode without guaranteed HTTPS is an operator error.
 
-The proxy is responsible for TLS redirect policy and preserving the original
-scheme. The application supplies HSTS only after HTTPS is guaranteed. Request
-IDs, safe error bodies, no-store API responses, CSP, framing protection, and
-privacy-safe structured logs remain active.
+## CORS and proxy identity
+
+Set `CORS_ORIGINS` to the exact frontend origin(s). Wildcards, localhost, loopback, and credentialed cross-origin requests are not valid production assumptions. Credentials are disabled in the API middleware.
+
+Set `TRUSTED_PROXY_IPS` only to exact ingress peer addresses. The application ignores `X-Forwarded-For` unless the direct peer is trusted; arbitrary forwarded headers cannot choose a rate-limit identity.
+
+## Runtime controls
+
+Keep request-size bounds, no-store API responses, request IDs, safe errors, security headers, CSP, and process-local rate limits enabled. Use a shared gateway or limiter before horizontal scaling. Do not expose the unauthenticated API directly to sensitive organizational mail without an access-control decision.
+
+## Artifact and secret controls
+
+Inject private artifact source/token/hash and Firebase service credentials through provider secret configuration. Do not put them in Docker build arguments, public frontend variables, logs, reports, or public documentation. Provision only reviewed artifacts and require hash verification before readiness.
+
+## Operational verification
+
+Before any deployment, complete a clean container build, private artifact provisioning, readiness check, HTTPS/CORS smoke test, dependency scan, capacity check, and browser security verification. The repository has not completed those provider-specific steps; browser launch is currently blocked by host `spawn EPERM`.

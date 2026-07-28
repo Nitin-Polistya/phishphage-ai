@@ -1,23 +1,20 @@
 # Security policy
 
+The detailed security architecture, threat model, residual risks, disclosure guidance, and control assumptions are in [docs/SECURITY.md](docs/SECURITY.md).
+
 ## Reporting
 
-Please use a private repository security advisory when available. If that is not available, open a minimal issue asking for a private reporting channel; do not include real email content, personal data, credentials, live malicious URLs, or attachment files in public issues.
-
-Include the affected route/component, a sanitized reproduction, expected versus observed behavior, and the environment/tool versions. Allow maintainers reasonable time to validate and remediate before public disclosure.
+Use a private repository security advisory when available. If no private channel exists, open a minimal public issue requesting one; do not include real email content, personal data, credentials, live malicious URLs, attachment files, or exploit payloads. Include only a sanitized reproduction, affected route/component, expected versus observed behavior, and tool versions. Allow maintainers reasonable time to validate and remediate before public disclosure.
 
 ## Supported versions
 
-The current repository state is the only supported development line. There is no deployed service or formal long-term support policy yet.
+The current repository development line is the only supported line. There is no deployed service or formal long-term support policy.
 
 ## Security boundaries
 
-- Raw analysis is intended to remain in memory and is not persisted by the production analysis workflow.
-- Email HTML is not rendered, URLs are not followed, and attachments are not executed.
-- The frontend must not log or persist submitted email.
-- The model is decision support and does not guarantee phishing detection.
+- Raw analysis is intended to remain in memory; the API does not persist raw email or attachment bytes.
+- HTML is not rendered, URLs are not followed, and attachments are not executed.
+- Browser-local history is optional and stores sanitized summaries only.
+- Model artifacts are hash-checked and path-contained, but trusted Joblib/Pickle loading remains an operator trust boundary.
+- The model supports human review and does not guarantee phishing detection.
 - The deployment candidate is inactive until a separate release decision.
-
-## Safe testing
-
-Use the built-in synthetic `example.com` message or another fully fabricated message. Do not upload real customer, employee, or incident-response email to development environments.

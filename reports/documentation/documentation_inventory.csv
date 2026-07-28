@@ -1,0 +1,23 @@
+path,category,status,evidence_basis,notes
+README.md,public entry point,complete,repository audit and current source,Uses PhishShield AI and documents status/limitations
+docs/ARCHITECTURE.md,public guide,complete,current routes/middleware/parser/pipeline,Includes required Mermaid diagrams
+docs/API.md,public guide,complete,current FastAPI routes and Pydantic schemas,Covers root and v1 endpoints with synthetic examples
+docs/MODEL.md,public guide,complete,registry/artifact manager/audit reports,Distinguishes candidate/activated/experimental/rejected
+docs/DATASETS.md,public guide,complete,source registries/corpus audits/dataset reports,No raw data included
+docs/SECURITY.md,public guide,complete,security audit/source controls/current middleware,Does not claim browser security pass
+docs/DEPLOYMENT.md,public guide,complete,Docker/provider manifests/deployment reports,No deployment claim
+docs/DEPLOYMENT_SECURITY.md,public guide,complete,current security middleware/provider assumptions,Deployment companion
+docs/ENVIRONMENT_VARIABLES.md,public guide,complete,settings and example env files,No secrets/private URLs
+docs/MODEL_ARTIFACT_DISTRIBUTION.md,public guide,complete,provisioner/model manager/Dockerfile,Private artifact workflow only
+docs/OBSERVABILITY.md,public guide,complete,runtime metrics/logging implementation and reports,Process-local limitation documented
+docs/ROLLBACK.md,public guide,complete,rollback and deployment reports,No destructive rollback commands
+docs/CI_CD.md,public guide,complete,provider manifests and validation evidence,No automatic deployment workflow
+docs/DEVELOPMENT.md,public guide,complete,package manifests/.vscode/settings and tooling reports,Windows and tooling limitations included
+docs/TESTING.md,public guide,complete,test trees/manifests/security reports,Unavailable browser tests not claimed
+docs/RESEARCH.md,public guide,complete,git history and experiment reports,Required phase conclusions included
+CONTRIBUTING.md,community guide,complete,repository policies and security boundaries,Dataset/model contribution rules included
+CODE_OF_CONDUCT.md,community guide,complete,concise community standard,No unapproved contact details
+CHANGELOG.md,project history,complete,existing milestone evidence,Keep a Changelog Unreleased only
+SECURITY.md,security policy,complete,existing reporting policy and docs security guide,Links detailed controls
+docs/SCREENSHOTS.md,portfolio guide,complete,existing capture procedure,Images intentionally not committed
+reports/documentation/,generated audit output,complete,documentation phase requirements,Required reports generated
