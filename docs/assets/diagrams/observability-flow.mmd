@@ -1,0 +1,14 @@
+flowchart TD
+    request[API request] --> middleware[Request ID, bounds, rate limit, security headers]
+    middleware --> route[Route handler]
+    route --> metrics[Process-local counters and timings]
+    route --> completion[Structured privacy-safe completion event]
+    startup[Startup and model checks] --> health[/health]
+    startup --> ready[/ready]
+    metrics --> metric_endpoint[/metrics]
+    completion --> stdout[Service stdout]
+    health --> operator[Human/operator review]
+    ready --> operator
+    metric_endpoint --> operator
+    stdout --> operator
+    redact[No email bodies, headers, URLs, credentials, or artifact contents] -.-> completion

@@ -2,11 +2,13 @@
 
 Screenshots are intentionally placeholders until they are captured from a real local run. Do not fabricate images or edit a capture to imply that the API/model is available.
 
-1. Start FastAPI and Next.js using [DEVELOPMENT.md](DEVELOPMENT.md).
-2. Use a 1440x900 viewport for the landing page, Analyze input, and result captures.
-3. Use a 390x844 viewport for the mobile Analyze capture.
-4. On `/analyze`, use the synthetic built-in example and submit it for the result view.
-5. Record the actual Connected/Degraded/Offline state shown by the application.
-6. Save reviewed captures under `docs/images/` only after confirming they contain no real email, personal data, secrets, or raw backend errors.
+The complete Phase I.6 capture matrix is [SCREENSHOT_PLAN.md](SCREENSHOT_PLAN.md). It covers the landing page, dashboard, all analyzer input modes, results, decision safety, indicators, history, reports, settings, Swagger, health/readiness, and architecture.
 
-Suggested placeholder names are `landing-page.png`, `analysis-input.png`, `phishing-result.png`, and `mobile-analysis.png`. Add links only after those files exist.
+Before a capture:
+
+1. Start FastAPI and Next.js using [DEVELOPMENT.md](DEVELOPMENT.md).
+2. Use the planned viewport and theme for the route.
+3. Use only the synthetic fixtures under [assets/demo/](assets/demo/).
+4. Record the actual Connected/Degraded/Offline and model/readiness state shown by the application.
+5. Save reviewed captures under [assets/screenshots/](assets/screenshots/) only after confirming they contain no real email, personal data, secrets, raw backend errors, or local paths.
+6. Apply [PORTFOLIO_ASSET_CHECKLIST.md](PORTFOLIO_ASSET_CHECKLIST.md) and add links only after each file exists.

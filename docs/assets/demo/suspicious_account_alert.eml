@@ -1,0 +1,21 @@
+From: Account Review Desk <review-desk@example.net>
+To: Avery Example <avery@example.com>
+Reply-To: verify@example.org
+Date: Tue, 14 Jul 2026 11:00:00 +0000
+Subject: Action required: verify your example account today
+Message-ID: <account-alert-002@example.net>
+Authentication-Results: example.net; spf=fail smtp.mailfrom=example.net; dkim=none; dmarc=fail header.from=example.net
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello Avery Example,
+
+We detected unusual activity and need you to verify your account today to
+avoid a temporary access interruption.
+
+Review details at: https://verify.example.org/account
+
+Do not share a password or security code by reply. This is a synthetic
+demonstration message; the example destination is inert and must not be opened.
+
+Example Account Review

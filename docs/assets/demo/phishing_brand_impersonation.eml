@@ -1,0 +1,23 @@
+From: Microsoft Security <security-alert@example.net>
+To: Avery Example <avery@example.com>
+Reply-To: account-team@example.org
+Return-Path: <bounce@example.org>
+Date: Tue, 14 Jul 2026 12:00:00 +0000
+Subject: Microsoft security alert: verify your account
+Message-ID: <microsoft-style-regression-003@example.net>
+Authentication-Results: example.net; spf=fail smtp.mailfrom=example.net; dkim=none; dmarc=fail header.from=example.net
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello Avery Example,
+
+Microsoft Security noticed an unusual sign-in. Confirm your identity within
+24 hours to keep the account active.
+
+Open the review page: https://account-check.example.org/microsoft
+
+Never provide a password, payment detail, or security code in response to an
+email. This is a synthetic regression fixture. The example destination is
+inert, must not be opened, and does not represent a live service.
+
+Microsoft Security (synthetic example)

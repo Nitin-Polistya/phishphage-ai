@@ -1,0 +1,12 @@
+flowchart LR
+    rules[Rule score and evidence families] --> summary[Independent-family summary]
+    ml[Raw calibrated ML probability] --> preserve[Preserve raw probability]
+    summary --> policy[Asymmetric safety policy]
+    preserve --> policy
+    policy --> safe[Safe presentation eligible only when evidence is complete]
+    policy --> review[Needs review or unable to verify]
+    policy --> floor[Bounded phishing/suspicious safety floor]
+    floor --> result[Final displayed risk and explanation]
+    preserve --> result
+    safe --> result
+    review --> result

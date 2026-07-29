@@ -1,0 +1,13 @@
+flowchart LR
+    user[Reviewer browser] --> frontend[Managed Next.js host]
+    frontend -->|HTTPS and exact CORS origin| ingress[Trusted HTTPS ingress]
+    ingress --> api[Non-root FastAPI service]
+    api --> provision[Private artifact provisioning]
+    provision --> registry[Registry and hash verification]
+    registry --> model[Approved model in memory]
+    api --> endpoints[Health, readiness, metrics, logs]
+    frontend -. opt-in .-> local[(Browser-local history)]
+    firebase[Optional Firebase] -. future reviewed integration .-> api
+    note[No deployment is claimed in this repository]:::note
+    note -.-> api
+    classDef note fill:#fef3c7,stroke:#b45309,color:#78350f;

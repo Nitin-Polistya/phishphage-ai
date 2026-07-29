@@ -1,0 +1,23 @@
+From: Avery Example <avery@example.com>
+To: Team Example <team@example.com>
+Date: Tue, 14 Jul 2026 10:00:00 +0000
+Subject: Weekly engineering meeting notes
+Message-ID: <weekly-meeting-001@example.com>
+Authentication-Results: example.com; spf=pass smtp.mailfrom=example.com; dkim=pass header.d=example.com; dmarc=pass header.from=example.com
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello team,
+
+The notes from this week's engineering meeting are attached to the internal
+project record.
+
+The next scheduled meeting is Tuesday at 10:00 AM in Conference Room B.
+
+Agenda:
+- Sprint updates
+- Documentation review
+- Upcoming maintenance window
+
+Regards,
+Avery Example

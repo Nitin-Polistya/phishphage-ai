@@ -1,0 +1,12 @@
+flowchart TD
+    input[Quick Paste, raw RFC822, or .eml] --> bounds[Request and parser bounds]
+    bounds --> parse[Parse as data in memory]
+    parse --> evidence[Headers, body text, URLs, attachment metadata]
+    evidence --> rule[Rule analysis]
+    evidence --> infer[Optional local ML inference]
+    rule --> fuse[Decision and explanation fusion]
+    infer --> fuse
+    fuse --> response[Typed response with freshness and completeness]
+    response --> ui[Frontend result, recommendations, optional local summary]
+    bounds --> log[Privacy-safe request event]
+    response --> log

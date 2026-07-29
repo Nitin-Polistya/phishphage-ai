@@ -1,0 +1,16 @@
+flowchart LR
+    reviewer[Human reviewer] --> browser[Next.js browser frontend]
+    browser -->|configured JSON request| api[FastAPI backend]
+    api --> parser[RFC822/MIME parser]
+    parser --> rules[Deterministic rule engine]
+    parser --> ml[Approved calibrated ML model]
+    rules --> safety[Decision-safety layer]
+    ml --> safety
+    safety --> api
+    api --> browser
+    browser -. opt-in sanitized summary .-> history[(Browser-local history and reports)]
+    registry[Versioned model registry] --> loader[Model manager]
+    private[Private artifact provisioning] --> loader
+    loader --> ml
+    api --> obs[Health, readiness, metrics, privacy-safe logs]
+    firebase[Optional Firebase integration] -. future persistence/auth boundary .-> api

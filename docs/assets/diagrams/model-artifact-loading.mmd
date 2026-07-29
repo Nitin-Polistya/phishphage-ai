@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant API as FastAPI startup/request
+    participant R as Versioned registry
+    participant M as Model manager
+    participant P as Private artifact bundle
+    participant A as Verified inference adapter
+    API->>R: Read selected model metadata
+    R-->>M: ID, version, threshold, calibration, hashes
+    M->>M: Contain paths under approved model directory
+    M->>P: Check files and verify SHA-256 hashes
+    M->>P: Validate manifest and compatibility metadata
+    P-->>A: Trusted pipeline and vectorizer
+    A-->>API: Finite class probabilities
+    Note over M,P: Missing, mismatched, inactive, or unsafe artifacts fail closed
