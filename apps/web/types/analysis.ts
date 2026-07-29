@@ -31,8 +31,18 @@ export interface ParsedEmail {
   extracted_urls: string[];
   url_evidence?: Array<{
     url: string;
-    source_type: 'anchor_href' | 'plain_text' | 'form_action' | 'image_src' | 'css_resource' | 'tracking_pixel' | 'document_metadata' | 'namespace_or_dtd';
+    source_type: 'anchor_href' | 'plain_text' | 'form_action' | 'image_src' | 'css_resource' | 'tracking_pixel' | 'document_metadata' | 'namespace_or_dtd' | 'mailto';
     user_actionable: boolean;
+    external_domain?: boolean | null;
+    security_relevance?: string;
+  }>;
+  mailto_evidence?: Array<{
+    destination_domains: string[];
+    recipient_count: number;
+    visible_text: string;
+    action_type: string;
+    user_actionable: boolean;
+    malformed: boolean;
   }>;
   html_links?: Array<{
     visible_text: string;
@@ -41,6 +51,22 @@ export interface ParsedEmail {
     href_domain: string | null;
     domain_mismatch: boolean;
   }>;
+  link_language_present?: boolean;
+  actual_url_count?: number;
+  html_anchor_count?: number;
+  url_extraction_status?: string;
+  url_extraction_reason?: string | null;
+  actionable_url_count?: number;
+  tracking_pixel_count?: number;
+  external_tracking_pixel_count?: number;
+  mailto_count?: number;
+  actionable_mailto_count?: number;
+  mailto_destinations_redacted_or_normalized?: string[];
+  mailto_domain_count?: number;
+  mailto_external_domain_mismatch?: boolean;
+  mailto_personal_provider?: boolean;
+  mailto_action_types?: string[];
+  mailto_action_type?: string;
   attachments: EmailAttachmentMetadata[];
 }
 
@@ -52,6 +78,16 @@ export interface ThreatSignal {
   description: string;
   score: number;
   evidence: string | null;
+  recommendation?: string;
+  source_engine?: string;
+  evidence_type?: string;
+  user_impact?: string | null;
+  tone?: string;
+  confidence?: number | null;
+  mapped_title?: string | null;
+  mapped_description?: string | null;
+  contributes_to_score?: boolean;
+  provenance?: string | null;
 }
 
 export interface RuleAnalysis {
@@ -74,6 +110,7 @@ export interface MLAnalysis {
 }
 
 export type AnalysisCompletenessState = 'body_text_only' | 'structured_fields' | 'html_content' | 'complete_raw_email';
+export type AnalysisCompletenessLevel = 'complete' | 'partial' | 'incomplete' | 'stale' | 'unavailable';
 
 export interface AnalysisCompleteness {
   state: AnalysisCompletenessState;
@@ -90,6 +127,13 @@ export interface AnalysisCompleteness {
   has_real_href_destinations: boolean;
   has_attachment_metadata: boolean;
   has_complete_raw_headers: boolean;
+  analysis_state?: AnalysisCompletenessLevel;
+  missing_evidence?: string[];
+  incomplete_reason_codes?: string[];
+  parser_success?: boolean;
+  rules_available?: boolean;
+  ml_available?: boolean;
+  fusion_available?: boolean;
 }
 
 export interface FinalDecision {
@@ -98,6 +142,22 @@ export interface FinalDecision {
   confidence: number;
   fusion_reason?: string | null;
   limited_authentication_evidence?: boolean;
+  fusion_policy_version?: string;
+  fusion_inputs?: Record<string, unknown>;
+  fusion_components?: string[];
+  rule_weight?: number;
+  ml_weight?: number;
+  applied_floor?: boolean;
+  applied_floor_reason?: string | null;
+  dominant_evidence_source?: string;
+  disagreement_resolution?: string | null;
+  safety_floor_applied?: boolean;
+  safety_floor_rule_id?: string | null;
+  pre_floor_score?: number | null;
+  post_floor_score?: number | null;
+  evidence_families?: string[];
+  high_confidence_rule_evidence?: boolean;
+  protective_evidence?: string[];
 }
 
 export interface UnifiedAnalysisResponse {
@@ -118,13 +178,72 @@ export interface UnifiedAnalysisResponse {
   fusion_reason?: string | null;
   positive_authentication_evidence?: Array<{
     mechanism: string;
-    state: 'pass' | 'fail' | 'inconclusive' | 'missing';
+    state: 'pass' | 'fail' | 'inconclusive' | 'missing' | 'unavailable' | 'malformed' | 'conflicting' | string;
     domain: string | null;
     aligned_with_from: boolean | null;
+    result?: string | null;
+    display_label?: string;
+    detail?: string | null;
   }>;
   authentication_evidence_status?: 'available' | 'unavailable' | 'failed' | 'inconclusive';
   analysis_freshness?: 'current' | 'stale';
   stale_reason?: string | null;
+  analysis_completeness_status?: AnalysisCompletenessLevel;
+  missing_evidence?: string[];
+  incomplete_reason_codes?: string[];
+  decision_safety_status?: 'eligible' | 'needs_review' | 'unable_to_verify' | 'rescan_required';
+  presentation_state?: 'safe' | 'suspicious' | 'phishing' | 'needs_review' | 'unable_to_verify' | 'rescan_required';
+  requires_rescan?: boolean;
+  safe_verdict_allowed?: boolean;
+  engines_requested?: string[];
+  engines_completed?: string[];
+  engines_failed?: string[];
+  decision_source?: string;
+  fusion_performed?: boolean;
+  fallback_used?: boolean;
+  fallback_reason?: string | null;
+  authentication_evidence?: Array<{
+    mechanism: string;
+    state: string;
+    domain: string | null;
+    aligned_with_from: boolean | null;
+    result?: string | null;
+    display_label?: string;
+    detail?: string | null;
+  }>;
+  link_language_present?: boolean;
+  actual_url_count?: number;
+  html_anchor_count?: number;
+  url_extraction_status?: string;
+  url_extraction_reason?: string | null;
+  current_rule_version?: string | null;
+  stored_rule_version?: string | null;
+  fusion_policy_version?: string;
+  fusion_inputs?: Record<string, unknown>;
+  fusion_components?: string[];
+  rule_weight?: number;
+  ml_weight?: number;
+  safety_floor_applied?: boolean;
+  safety_floor_rule_id?: string | null;
+  applied_floor_reason?: string | null;
+  disagreement_resolution?: string | null;
+  pre_floor_score?: number | null;
+  post_floor_score?: number | null;
+  dominant_evidence_source?: string;
+  evidence_families?: string[];
+  high_confidence_rule_evidence?: boolean;
+  protective_evidence?: string[];
+  actionable_url_count?: number;
+  tracking_pixel_count?: number;
+  external_tracking_pixel_count?: number;
+  mailto_count?: number;
+  actionable_mailto_count?: number;
+  mailto_destinations_redacted_or_normalized?: string[];
+  mailto_domain_count?: number;
+  mailto_external_domain_mismatch?: boolean;
+  mailto_personal_provider?: boolean;
+  mailto_action_types?: string[];
+  mailto_action_type?: string;
 }
 
 export interface AnalysisRequest {

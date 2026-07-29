@@ -82,24 +82,44 @@ export function ProductionAnalysisResults({
   attachmentCount: number;
 }) {
   const verdict = displayPrediction(result);
-  const concern = displayRisk(result.risk_score);
-  const tone: Tone = verdict === 'Phishing' ? 'danger' : verdict === 'Suspicious' ? 'warning' : 'success';
+  const riskValue = result.final_risk_score ?? result.risk_score;
+  const concern = displayRisk(riskValue);
+  const tone: Tone = verdict === 'Phishing' ? 'danger' : verdict === 'Low risk' ? 'success' : 'warning';
   const style = toneClasses[tone];
   const VerdictIcon = tone === 'success' ? ShieldCheck : tone === 'warning' ? AlertTriangle : ShieldAlert;
-  const reasons = topReasons(result.signals);
-  const detailedSignals = allSignalValues(result.signals);
-  const findings = uniqueIndicatorPresentations(result.signals);
-  const summary = explainabilitySummary(result.signals);
+  const displaySignals = {
+    ...result.signals,
+    detected_indicators: [...result.signals.detected_indicators, ...(result.rule_findings ?? []).map((signal) => signal.code)],
+  };
+  const modelReasons = topReasons(result.signals);
+  const reasons = [...new Set([...modelReasons, ...topReasons(displaySignals)])];
+  const detailedSignals = allSignalValues(displaySignals);
+  const findings = uniqueIndicatorPresentations(displaySignals, result.rule_findings ?? []);
+  const summary = explainabilitySummary(displaySignals);
   const categories = ['Message content', 'Links and destinations', 'Email authentication', 'Urgency and pressure', 'Other technical indicators'] as const;
   const groupedFindings = categories.map((category) => ({ category, findings: findings.filter((finding) => finding.category === category) })).filter((group) => group.findings.length);
   const reasonCategories = [...new Set(reasons.map((reason) => {
     const finding = findings.find((item) => item.key === reason.replaceAll(/[^a-z0-9]+/gi, '_').toLowerCase());
     return finding?.category;
   }).filter(Boolean))];
-  const riskScore = Math.max(0, Math.min(100, Math.round(result.risk_score)));
+  const riskScore = Math.max(0, Math.min(100, Math.round(riskValue)));
+  const safetyBanner = result.analysis_freshness === 'stale' || result.presentation_state === 'rescan_required'
+    ? {
+      title: 'Re-scan required',
+      body: result.stale_reason || 'This result is stale and must not be treated as a current low-risk assessment.',
+      action: 'Re-scan the original email to replace this result with fresh rule and model evidence.',
+    }
+    : result.presentation_state === 'needs_review' || result.presentation_state === 'unable_to_verify'
+      ? {
+        title: result.presentation_state === 'unable_to_verify' ? 'Unable to verify this result' : 'Needs review — evidence is incomplete',
+        body: result.missing_evidence?.length ? `Missing evidence: ${result.missing_evidence.join(', ')}.` : 'The available evidence does not support a confident low-risk presentation.',
+        action: 'Do not click message links or provide credentials. Verify the claimed service independently and re-scan the original email.',
+      }
+      : null;
   const timeline = [
     ['Input received', `${attachmentCount} attachment metadata record${attachmentCount === 1 ? '' : 's'}`],
     ['Signals extracted', `${detailedSignals.length} unique indicators returned`],
+    ['Rules evaluated', result.engines_completed?.includes('rules') ? (result.current_rule_version || 'Completed') : 'Unavailable'],
     ['Model evaluated', `${result.model_id} · ${result.model_version}`],
     ['Decision prepared', `${verdict} · ${riskScore}/100`],
   ];
@@ -109,6 +129,7 @@ export function ProductionAnalysisResults({
       <div className={`overflow-hidden rounded-xl border bg-surface/90 ${style.border}`}>
         <div className="grid lg:grid-cols-[minmax(0,1fr)_280px]">
           <div className="p-5 sm:p-7">
+            {safetyBanner && <div role="alert" className="mb-5 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm leading-6 text-warning"><p className="font-semibold">{safetyBanner.title}</p><p className="mt-1">{safetyBanner.body}</p><p className="mt-2 font-medium">{safetyBanner.action}</p></div>}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-lg ${style.background} ${style.text}`}><VerdictIcon aria-hidden="true" /></span>
@@ -119,7 +140,7 @@ export function ProductionAnalysisResults({
 
             <div className="mt-6 rounded-lg border border-border bg-background/55 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recommended action</p>
-              <p className="mt-2 text-base font-medium leading-7 text-foreground">{result.recommendations[0] ?? 'No recommended action was returned.'}</p>
+              <p className="mt-2 text-base font-medium leading-7 text-foreground">{safetyBanner?.action ?? result.recommendations[0] ?? 'No recommended action was returned.'}</p>
             </div>
 
             <div className="mt-5">
@@ -136,6 +157,18 @@ export function ProductionAnalysisResults({
           </aside>
         </div>
       </div>
+
+      <section className="rounded-xl border border-border bg-surface/80 p-5" aria-labelledby="decision-safety-heading">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 id="decision-safety-heading" className="text-base font-semibold text-foreground">Decision safety</h2><p className="mt-1 text-sm text-muted-foreground">Presentation state reflects which evidence actually completed.</p></div><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${safetyBanner ? 'border-warning/35 bg-warning/10 text-warning' : 'border-success/35 bg-success/10 text-success'}`}>{result.decision_safety_status?.replaceAll('_', ' ') || 'status unavailable'}</span></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Metric label="Rules" value={result.engines_completed?.includes('rules') ? 'Completed' : 'Unavailable'} detail={result.current_rule_version || 'Version unavailable'} />
+          <Metric label="ML" value={result.engines_completed?.includes('ml') ? 'Completed' : 'Unavailable'} detail={result.model_version || 'Model unavailable'} />
+          <Metric label="URLs" value={`${result.actual_url_count ?? result.extracted_urls?.length ?? 0} extracted`} detail={result.url_extraction_status || 'Status unavailable'} />
+          <Metric label="Authentication" value={result.authentication_evidence_status === 'available' ? 'Evidence present' : 'Status unavailable'} detail="Presence is not the same as pass" />
+        </div>
+        {result.authentication_evidence?.length ? <div className="mt-4 grid gap-2 sm:grid-cols-3">{result.authentication_evidence.map((item) => <div key={item.mechanism} className="rounded-lg border border-border bg-background/45 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.mechanism}</p><p className="mt-1 text-sm font-medium text-foreground">{item.display_label || item.state}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail || 'No additional authentication detail was recorded.'}</p></div>)}</div> : null}
+        {result.missing_evidence?.length ? <p className="mt-4 rounded-lg border border-warning/25 bg-warning/10 p-3 text-sm leading-6 text-warning"><strong>Missing evidence:</strong> {result.missing_evidence.join(', ')}.</p> : null}
+      </section>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Analysis metrics">
         <Metric label="Phishing probability" value={`${(result.probability * 100).toFixed(1)}%`} />
@@ -161,7 +194,7 @@ export function ProductionAnalysisResults({
 
       <section className="rounded-xl border border-border bg-surface/80 p-5" aria-labelledby="analysis-timeline-heading">
         <h2 id="analysis-timeline-heading" className="text-base font-semibold text-foreground">Analysis timeline</h2>
-        <ol className="mt-4 grid gap-4 sm:grid-cols-4">{timeline.map(([label, detail]) => <li key={label} className="flex gap-3 sm:block"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-success/40 bg-success/10 text-success"><Check className="h-3.5 w-3.5" aria-hidden="true" /></span><div className="sm:mt-3"><p className="text-sm font-semibold text-foreground">{label}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p></div></li>)}</ol>
+        <ol className="mt-4 grid gap-4 sm:grid-cols-5">{timeline.map(([label, detail]) => <li key={label} className="flex gap-3 sm:block"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-success/40 bg-success/10 text-success"><Check className="h-3.5 w-3.5" aria-hidden="true" /></span><div className="sm:mt-3"><p className="text-sm font-semibold text-foreground">{label}</p><p className="mt-1 text-xs leading-5 text-muted-foreground">{detail}</p></div></li>)}</ol>
       </section>
 
       <section className="rounded-xl border border-border bg-surface/80 p-5" aria-labelledby="recommendations-heading">

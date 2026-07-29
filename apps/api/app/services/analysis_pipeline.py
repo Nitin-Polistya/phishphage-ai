@@ -25,15 +25,20 @@ from app.core.settings import get_settings
 from app.core.runtime_metrics import runtime_metrics
 from app.core.logging import log_event
 from app.services.model_manager import APPROVED_ARTIFACT_ROOT, ModelManager
-from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
+from app.services.email_parser import MAX_EMAIL_SIZE_BYTES, classify_url_extraction, extract_urls, normalize_defanged_indicator, parse_email, parse_email_address, validate_rfc822_source
 from app.analyzers.header_analyzer import evaluate_authentication
-from app.services.phishing_analyzer import analyze_parsed_email
+from app.services.phishing_analyzer import analyze_parsed_email, normalize_recommendations
 from app.services.decision_engine import fuse_analysis_results
+from app.services.decision_safety import assess_decision_safety
+from app.services.safety_fusion import FUSION_POLICY_VERSION
 from app.schemas.analysis import (
     AnalysisCompleteness,
+    AnalysisCompletenessLevel,
     AnalysisCompletenessState,
     AnalysisFreshness,
+    DecisionSafetyStatus,
     EngineAgreement,
+    PresentationState,
     UnifiedAnalysisResponse,
     MLAnalysisResult,
 )
@@ -46,13 +51,18 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 ML_UNAVAILABLE_REASON = "Machine-learning analysis is unavailable."
 CURRENT_RULE_VERSION = 'rules-v3.1.0'
-CURRENT_MODEL_VERSION = 'ml-english-template-robust-v3.0.0'
+CURRENT_MODEL_VERSION = '1.0.0'
 LIMITED_AUTH_WARNING = (
-    'Safe based on limited authentication evidence: SPF, DKIM, and DMARC results were unavailable, '
+    'Limited authentication evidence: SPF, DKIM, and DMARC results were unavailable, '
     'and a marginal ML alert had no corroborating malicious rule evidence.'
 )
 SENSITIVE_ACTION_RECOMMENDATION = (
     'If the message requests a sensitive action, open the official service independently rather than using the email link.'
+)
+SAFETY_RECOMMENDATIONS = (
+    'Do not click links in the message or provide credentials, payment details, or security codes.',
+    'Open the claimed service directly using a trusted bookmark or a manually typed official address.',
+    'Verify the sender through an independent channel and re-scan the original email after obtaining fresh source data.',
 )
 
 
@@ -177,17 +187,31 @@ class AnalysisPipeline:
             recipient_value = str(request.recipient_email) if request.recipient_email else None
             if recipient_value and request.recipient_name:
                 recipient_value = f'{request.recipient_name} <{recipient_value}>'
+            quick_text = f'{request.subject or ""}\n{request.body or ""}'
+            quick_urls = extract_urls(quick_text)
+            quick_link_language, quick_url_count, quick_anchor_count, quick_url_status, quick_url_reason = classify_url_extraction(
+                subject=request.subject,
+                body_text=request.body or '',
+                body_html=None,
+                urls=quick_urls,
+                html_links=[],
+            )
             parsed_email = ParsedEmail(
                 subject=request.subject,
                 sender=parse_email_address(sender_value),
                 reply_to=parse_email_address(str(request.reply_to)) if request.reply_to else None,
                 recipients=[parsed for parsed in [parse_email_address(recipient_value)] if parsed] if recipient_value else [],
                 body_text=request.body or '',
-                extracted_urls=extract_urls(f'{request.subject or ""}\n{request.body or ""}'),
+                extracted_urls=quick_urls,
                 url_evidence=[
                     EmailUrlEvidence(url=url, source_type=UrlSourceType.plain_text, user_actionable=True)
-                    for url in extract_urls(f'{request.subject or ""}\n{request.body or ""}')
+                    for url in quick_urls
                 ],
+                link_language_present=quick_link_language,
+                actual_url_count=quick_url_count,
+                html_anchor_count=quick_anchor_count,
+                url_extraction_status=quick_url_status,
+                url_extraction_reason=quick_url_reason,
                 attachments=request.attachments,
             )
         else:
@@ -214,6 +238,11 @@ class AnalysisPipeline:
         
         # Step 2: Run rule-based analyzer
         rule_result = analyze_parsed_email(parsed_email, input_mode=request.input_mode)
+        parsed_email = parsed_email.model_copy(update={
+            'mailto_external_domain_mismatch': any(
+                signal.code == 'mailto_destination_mismatch' for signal in rule_result.signals
+            ),
+        })
         rules_ms = (time.perf_counter() - rules_started) * 1000
         
         # Step 3: Run ML inference
@@ -257,19 +286,40 @@ class AnalysisPipeline:
                 'classification': rule_result.classification,
                 'risk_score': rule_result.risk_score,
                 'confidence': rule_result.confidence,
+                'decision_source': 'rules_fallback',
+                'fusion_performed': False,
+                'fallback_used': True,
+                'fallback_reason': ML_UNAVAILABLE_REASON,
             }
             if completeness.limited_evidence and str(rule_result.classification.value) == 'safe':
                 fallback_decision['confidence'] = min(float(rule_result.confidence), 0.65)
-            response_completeness = self._qualify_safe_warning(
-                completeness, str(rule_result.classification.value) == 'safe'
+            safety = assess_decision_safety(
+                parser_success=True,
+                rule_available=True,
+                ml_available=False,
+                fusion_performed=False,
+                freshness='stale',
+                stale_reason=ML_UNAVAILABLE_REASON,
+                parsed=parsed_email,
+                rule_result=rule_result,
+                input_evidence_complete=not completeness.limited_evidence,
             )
+            response_completeness = completeness.model_copy(update={
+                'analysis_state': safety.analysis_state,
+                'missing_evidence': list(dict.fromkeys([*completeness.missing_evidence, *safety.missing_evidence])),
+                'incomplete_reason_codes': safety.reason_codes,
+                'rules_available': True,
+                'ml_available': False,
+                'fusion_available': False,
+            })
+            recommendations = normalize_recommendations([*SAFETY_RECOMMENDATIONS, *rule_result.recommendations])
             self._publish_analysis_timing(started, parser_ms, rules_ms, inference_ms)
             return UnifiedAnalysisResponse(
                 parser=parsed_email,
                 rule_analysis=rule_result,
                 ml_analysis=ml_result,
                 decision=fallback_decision,
-                recommendations=rule_result.recommendations,
+                recommendations=recommendations,
                 analysis_completeness=response_completeness,
                 engine_agreement=EngineAgreement.ml_unavailable,
                 rule_raw_score=calculate_raw_risk_score(rule_result.signals),
@@ -278,12 +328,52 @@ class AnalysisPipeline:
                 ml_phishing_probability=None,
                 ml_threshold=None,
                 final_decision_confidence=fallback_decision['confidence'],
-                rule_ml_agreement=EngineAgreement.ml_unavailable,
-                fusion_reason='ML was unavailable; the decision uses deterministic rule evidence only.',
+                rule_ml_agreement=None,
+                fusion_reason=None,
                 positive_authentication_evidence=positive_authentication,
+                authentication_evidence=list(authentication.evidence),
                 authentication_evidence_status=authentication_status,
                 analysis_freshness=AnalysisFreshness.stale,
                 stale_reason=ML_UNAVAILABLE_REASON,
+                analysis_completeness_status=safety.analysis_state,
+                missing_evidence=response_completeness.missing_evidence,
+                incomplete_reason_codes=safety.reason_codes,
+                decision_safety_status=safety.status,
+                presentation_state=safety.presentation_state,
+                requires_rescan=safety.requires_rescan,
+                safe_verdict_allowed=False,
+                engines_completed=['rules'],
+                engines_failed=['ml', 'fusion'],
+                decision_source='rules_fallback',
+                fusion_performed=False,
+                fallback_used=True,
+                fallback_reason=ML_UNAVAILABLE_REASON,
+                current_rule_version=CURRENT_RULE_VERSION,
+                stored_rule_version=rule_result.engine_version,
+                link_language_present=parsed_email.link_language_present,
+                actual_url_count=parsed_email.actual_url_count,
+                html_anchor_count=parsed_email.html_anchor_count,
+                url_extraction_status=parsed_email.url_extraction_status,
+                url_extraction_reason=parsed_email.url_extraction_reason,
+                fusion_policy_version=FUSION_POLICY_VERSION,
+                fusion_components=['rules_only_fallback'],
+                dominant_evidence_source='rules',
+                pre_floor_score=None,
+                post_floor_score=rule_result.risk_score,
+                evidence_families=[],
+                high_confidence_rule_evidence=False,
+                protective_evidence=[],
+                actionable_url_count=parsed_email.actionable_url_count,
+                tracking_pixel_count=parsed_email.tracking_pixel_count,
+                external_tracking_pixel_count=parsed_email.external_tracking_pixel_count,
+                mailto_count=parsed_email.mailto_count,
+                actionable_mailto_count=parsed_email.actionable_mailto_count,
+                mailto_destinations_redacted_or_normalized=parsed_email.mailto_destinations_redacted_or_normalized,
+                mailto_domain_count=parsed_email.mailto_domain_count,
+                mailto_external_domain_mismatch=parsed_email.mailto_external_domain_mismatch,
+                mailto_personal_provider=parsed_email.mailto_personal_provider,
+                mailto_action_types=parsed_email.mailto_action_types,
+                mailto_action_type=parsed_email.mailto_action_type,
             )
 
         # Step 4: Final Decision Fusion
@@ -302,27 +392,62 @@ class AnalysisPipeline:
             ml_threshold=ml_result.decision_threshold or 0.5,
             marginal_alert_band=self.ml_marginal_alert_band,
             marginal_alert_eligible=marginal_alert_eligible,
+            parsed_email=parsed_email,
         )
         if completeness.limited_evidence and str(decision.classification.value) == 'safe':
             decision = decision.model_copy(update={'confidence': min(decision.confidence, 0.65)})
         rule_suspicious = str(rule_result.classification.value) != 'safe'
         ml_suspicious = ml_result.prediction == 'phishing'
         agreement = EngineAgreement.agreement if rule_suspicious == ml_suspicious else EngineAgreement.disagreement
-        response_completeness = self._qualify_safe_warning(
-            completeness, str(decision.classification.value) == 'safe'
+        freshness, stale_reason = self._engine_freshness(
+            rule_result.engine_version, ml_result.status.value, ml_result.model_version
         )
-        recommendations = list(rule_result.recommendations)
+        safety = assess_decision_safety(
+            parser_success=True,
+            rule_available=True,
+            ml_available=True,
+            fusion_performed=True,
+            freshness=freshness.value,
+            stale_reason=stale_reason,
+            parsed=parsed_email,
+            rule_result=rule_result,
+            input_evidence_complete=not completeness.limited_evidence,
+        )
+        # Quick Paste and partial source remain valid analyses, but their input
+        # evidence is explicitly marked partial rather than promoted to full.
+        completeness_status = safety.analysis_state
+        if completeness.limited_evidence and completeness_status == AnalysisCompletenessLevel.complete:
+            completeness_status = AnalysisCompletenessLevel.partial
+        response_completeness = completeness.model_copy(update={
+            'analysis_state': completeness_status,
+            'missing_evidence': list(dict.fromkeys([*completeness.missing_evidence, *safety.missing_evidence])),
+            'incomplete_reason_codes': safety.reason_codes,
+            'rules_available': True,
+            'ml_available': True,
+            'fusion_available': True,
+        })
+        recommendations = normalize_recommendations(list(rule_result.recommendations))
         if decision.limited_authentication_evidence:
             response_completeness = response_completeness.model_copy(update={
                 'limited_evidence': True,
                 'warning': LIMITED_AUTH_WARNING,
             })
-            if SENSITIVE_ACTION_RECOMMENDATION not in recommendations:
-                recommendations.append(SENSITIVE_ACTION_RECOMMENDATION)
-
-        freshness, stale_reason = self._engine_freshness(
-            rule_result.engine_version, ml_result.status.value, ml_result.model_version
-        )
+            recommendations = normalize_recommendations([*recommendations, SENSITIVE_ACTION_RECOMMENDATION])
+        if safety.status != DecisionSafetyStatus.eligible or not safety.safe_verdict_allowed:
+            recommendations = normalize_recommendations([*SAFETY_RECOMMENDATIONS, *recommendations])
+        safe_allowed = safety.safe_verdict_allowed and decision.classification == 'safe'
+        if freshness == AnalysisFreshness.stale:
+            presentation_state = PresentationState.rescan_required
+        elif not safe_allowed and decision.classification == 'safe':
+            presentation_state = PresentationState.needs_review
+        else:
+            presentation_state = PresentationState(str(decision.classification.value))
+        decision = decision.model_copy(update={
+            'decision_source': 'rule_ml_fusion',
+            'fusion_performed': True,
+            'fallback_used': False,
+            'fallback_reason': None,
+        })
         
         # Step 5: Generate unified response
         self._publish_analysis_timing(started, parser_ms, rules_ms, inference_ms)
@@ -339,13 +464,60 @@ class AnalysisPipeline:
             ml_prediction=ml_result.prediction,
             ml_phishing_probability=ml_result.phishing_probability,
             ml_threshold=ml_result.decision_threshold,
-            final_decision_confidence=decision.confidence,
+            final_decision_confidence=decision.confidence if safe_allowed or decision.classification != 'safe' else min(decision.confidence, 0.5),
             rule_ml_agreement=agreement,
             fusion_reason=decision.fusion_reason,
             positive_authentication_evidence=positive_authentication,
+            authentication_evidence=list(authentication.evidence),
             authentication_evidence_status=authentication_status,
             analysis_freshness=freshness,
             stale_reason=stale_reason,
+            analysis_completeness_status=completeness_status,
+            missing_evidence=response_completeness.missing_evidence,
+            incomplete_reason_codes=safety.reason_codes,
+            decision_safety_status=safety.status,
+            presentation_state=presentation_state,
+            requires_rescan=safety.requires_rescan,
+            safe_verdict_allowed=safe_allowed,
+            engines_completed=['rules', 'ml', 'fusion'],
+            engines_failed=[],
+            decision_source='rule_ml_fusion',
+            fusion_performed=True,
+            fallback_used=False,
+            fallback_reason=None,
+            current_rule_version=CURRENT_RULE_VERSION,
+            stored_rule_version=rule_result.engine_version,
+            link_language_present=parsed_email.link_language_present,
+            actual_url_count=parsed_email.actual_url_count,
+            html_anchor_count=parsed_email.html_anchor_count,
+            url_extraction_status=parsed_email.url_extraction_status,
+            url_extraction_reason=parsed_email.url_extraction_reason,
+            fusion_policy_version=decision.fusion_policy_version,
+            fusion_inputs=decision.fusion_inputs,
+            fusion_components=decision.fusion_components,
+            rule_weight=decision.rule_weight,
+            ml_weight=decision.ml_weight,
+            safety_floor_applied=decision.safety_floor_applied,
+            safety_floor_rule_id=decision.safety_floor_rule_id,
+            applied_floor_reason=decision.applied_floor_reason,
+            disagreement_resolution=decision.disagreement_resolution,
+            pre_floor_score=decision.pre_floor_score,
+            post_floor_score=decision.post_floor_score,
+            dominant_evidence_source=decision.dominant_evidence_source,
+            evidence_families=decision.evidence_families,
+            high_confidence_rule_evidence=decision.high_confidence_rule_evidence,
+            protective_evidence=decision.protective_evidence,
+            actionable_url_count=parsed_email.actionable_url_count,
+            tracking_pixel_count=parsed_email.tracking_pixel_count,
+            external_tracking_pixel_count=parsed_email.external_tracking_pixel_count,
+            mailto_count=parsed_email.mailto_count,
+            actionable_mailto_count=parsed_email.actionable_mailto_count,
+            mailto_destinations_redacted_or_normalized=parsed_email.mailto_destinations_redacted_or_normalized,
+            mailto_domain_count=parsed_email.mailto_domain_count,
+            mailto_external_domain_mismatch=parsed_email.mailto_external_domain_mismatch,
+            mailto_personal_provider=parsed_email.mailto_personal_provider,
+            mailto_action_types=parsed_email.mailto_action_types,
+            mailto_action_type=parsed_email.mailto_action_type,
         )
 
     @staticmethod
@@ -415,6 +587,17 @@ class AnalysisPipeline:
         else:
             state = AnalysisCompletenessState.body_text_only
             warning = 'Limited evidence: only subject/body text was available. Sender authentication, real HTML destinations, and transport headers were not analyzed.'
+        missing_evidence: list[str] = []
+        if not parsed_email.sender:
+            missing_evidence.append('sender identity')
+        if not has_auth:
+            missing_evidence.append('authentication status')
+        if parsed_email.link_language_present and not parsed_email.extracted_urls:
+            missing_evidence.append('verifiable link destination')
+        if not parsed_email.body_html:
+            missing_evidence.append('HTML anchor destinations')
+        if not complete_headers:
+            missing_evidence.append('complete transport headers')
         return AnalysisCompleteness(
             state=state,
             limited_evidence=state != AnalysisCompletenessState.complete_raw_email,
@@ -430,14 +613,18 @@ class AnalysisPipeline:
             has_real_href_destinations=bool(parsed_email.html_links),
             has_attachment_metadata=is_raw or bool(parsed_email.attachments),
             has_complete_raw_headers=complete_headers,
+            analysis_state=AnalysisCompletenessLevel.partial if state != AnalysisCompletenessState.complete_raw_email else AnalysisCompletenessLevel.partial,
+            missing_evidence=list(dict.fromkeys(missing_evidence)),
+            parser_success=True,
         )
 
     @staticmethod
     def _qualify_safe_warning(completeness: AnalysisCompleteness, is_safe: bool) -> AnalysisCompleteness:
-        if not is_safe or not completeness.warning:
+        if not completeness.warning:
             return completeness
-        detail = completeness.warning.removeprefix('Limited evidence:').strip()
-        return completeness.model_copy(update={'warning': f'Safe based on limited evidence: {detail}'})
+        return completeness.model_copy(update={
+            'warning': completeness.warning.replace('Safe based on limited evidence:', 'Limited evidence:')
+        })
 
 # Singleton instance for the API. Both supported analysis endpoints share the
 # same verified ModelManager cache, so startup preparation covers both paths.

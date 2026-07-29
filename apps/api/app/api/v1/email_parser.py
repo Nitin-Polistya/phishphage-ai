@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from app.core.logging import log_event
 from app.schemas.email import EmailParserRequest, ParsedEmail
 from app.services.email_parser import parse_email
 
@@ -33,11 +34,13 @@ def preview_email_parser(request: EmailParserRequest) -> ParsedEmail:
     """
     try:
         parsed = parse_email(request.raw_email)
-        logger.info('Email parsed successfully', extra={'body_length': len(parsed.body_text)})
+        log_event(logger, logging.INFO, 'parser.complete', success=True)
         return parsed
     except ValueError as e:
-        logger.warning('Email validation failed', extra={'reason_code': 'invalid_email_format'})
+        log_event(logger, logging.WARNING, 'parser.failed', success=False,
+                  reason_code='invalid_email_format', exception_class=type(e).__name__)
         raise HTTPException(status_code=400, detail=str(e)) from None
-    except Exception:
-        logger.error('Email parsing failed safely')
+    except Exception as error:
+        log_event(logger, logging.ERROR, 'parser.failed', success=False,
+                  reason_code='parser_error', exception_class=type(error).__name__)
         raise HTTPException(status_code=500, detail={'code': 'analysis_failed', 'message': 'Failed to parse email'}) from None

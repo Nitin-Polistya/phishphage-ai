@@ -12,7 +12,7 @@ from app.analyzers.header_analyzer import analyze_headers, evaluate_authenticati
 from app.analyzers.url_analyzer import analyze_urls
 from app.schemas.analysis import AnalysisResult, ThreatClassification, ThreatSignal
 from app.schemas.email import AnalysisInputMode, AnalysisPreviewRequest, EmailUrlEvidence, UrlSourceType
-from app.services.analysis_pipeline import AnalysisPipeline
+from app.services.analysis_pipeline import AnalysisPipeline, CURRENT_MODEL_VERSION
 from app.services.decision_engine import fuse_analysis_results
 from app.services.domain_utils import domains_align, registrable_domain
 from app.services.email_parser import parse_email
@@ -39,7 +39,7 @@ def _run_fixture(filename: str):
             phishing_probability=probability,
             legitimate_probability=1.0 - probability,
         )
-        service.model_version = 'ml-english-template-robust-v3.0.0'
+        service.model_version = CURRENT_MODEL_VERSION
         service.decision_threshold = 0.5
         return pipeline.run_request(AnalysisPreviewRequest(
             input_mode=AnalysisInputMode.raw_email,
@@ -53,13 +53,13 @@ def test_sanitized_legitimate_fixture_is_not_phishing(filename):
     assert result.rule_analysis.classification == ThreatClassification.safe
     assert result.decision.classification == ThreatClassification.safe
     assert result.rule_analysis.engine_version == 'rules-v3.1.0'
-    assert result.ml_analysis.model_version == 'ml-english-template-robust-v3.0.0'
+    assert result.ml_analysis.model_version == CURRENT_MODEL_VERSION
     if 'missing_auth' in filename:
         assert result.positive_authentication_evidence == []
         assert result.authentication_evidence_status == 'unavailable'
         assert result.engine_agreement == 'disagreement'
         assert result.analysis_completeness.limited_evidence is True
-        assert result.analysis_completeness.warning.startswith('Safe based on limited authentication evidence:')
+        assert result.analysis_completeness.warning.startswith('Limited authentication evidence:')
         assert result.decision.confidence <= 0.60
         assert result.decision.limited_authentication_evidence is True
         assert any('official service' in recommendation for recommendation in result.recommendations)
@@ -116,7 +116,9 @@ def test_non_actionable_http_assets_do_not_create_transport_or_keyword_findings(
         EmailUrlEvidence(url='http://track.example/open.gif', source_type='tracking_pixel'),
         EmailUrlEvidence(url='http://schema.example/account', source_type='namespace_or_dtd'),
     ]
-    assert analyze_urls([item.url for item in evidence], sender_domain='example.com', url_evidence=evidence) == []
+    findings = analyze_urls([item.url for item in evidence], sender_domain='example.com', url_evidence=evidence)
+    assert {signal.code for signal in findings} == {'url_tracking_pixel'}
+    assert findings[0].contributes_to_score is False
 
 
 @pytest.mark.parametrize(('hostname', 'expected'), [
@@ -225,7 +227,7 @@ def test_marginal_exception_rejects_corroborating_malicious_evidence(mutation):
         service.predict.return_value = MagicMock(
             predicted_label='phishing', phishing_probability=0.531410, legitimate_probability=0.468590,
         )
-        service.model_version = 'ml-english-template-robust-v3.0.0'
+        service.model_version = CURRENT_MODEL_VERSION
         service.decision_threshold = 0.5
         result = pipeline.run(raw)
     assert result.decision.classification != ThreatClassification.safe

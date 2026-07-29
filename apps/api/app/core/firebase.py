@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -10,6 +9,7 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import firestore
 
+from app.core.logging import log_event
 from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -22,23 +22,24 @@ _firebase_configured: bool = False
 def _initialize_firebase() -> None:
     """Initialize Firebase Admin SDK if credentials are available.
     
-    This function is called once at module import time.
-    If Firebase credentials are not configured, initialization is skipped
-    and a warning is logged. The API will continue to run normally.
+    This function is called once at module import time. Firebase is optional;
+    absence of configuration is an informational, structured state.
     """
     global _firebase_app, _firebase_configured
 
     settings = get_settings()
 
-    if (
-        not settings.firebase_project_id
-        or not settings.firebase_client_email
-        or not settings.firebase_private_key
-    ):
-        logger.warning(
-            'Firebase credentials not configured. '
-            'Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY to enable Firebase.'
-        )
+    configured_values = (
+        settings.firebase_project_id,
+        settings.firebase_client_email,
+        settings.firebase_private_key,
+    )
+    if not any(configured_values):
+        log_event(logger, logging.INFO, 'firebase.disabled', firebase_enabled=False, reason_code='not_configured')
+        return
+    if not all(configured_values):
+        log_event(logger, logging.WARNING, 'firebase.partial_configuration',
+                  firebase_enabled=False, reason_code='partial_configuration')
         return
 
     try:
@@ -58,9 +59,11 @@ def _initialize_firebase() -> None:
         cred = credentials.Certificate(cred_dict)
         _firebase_app = firebase_admin.initialize_app(cred, name='phishshield')
         _firebase_configured = True
-        logger.info('Firebase initialized')
-    except Exception:
-        logger.error('Failed to initialize Firebase safely')
+        log_event(logger, logging.INFO, 'firebase.initialized', firebase_enabled=True, reason_code='configured')
+    except Exception as error:
+        log_event(logger, logging.ERROR, 'firebase.initialization_failed',
+                  firebase_enabled=False, reason_code='initialization_error',
+                  exception_class=type(error).__name__)
         _firebase_configured = False
 
 

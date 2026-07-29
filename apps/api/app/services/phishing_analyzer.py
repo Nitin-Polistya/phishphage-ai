@@ -10,6 +10,8 @@ from app.analyzers.feature_engineering import extract_features
 from app.analyzers.header_analyzer import analyze_headers
 from app.analyzers.header_analyzer import evaluate_authentication
 from app.analyzers.url_analyzer import analyze_urls
+from app.analyzers.brand_identity import assess_claimed_brand, brand_identity_signals
+from app.analyzers.mailto_analyzer import analyze_mailto_destinations
 from app.schemas.analysis import AnalysisResult, ThreatSignal, ThreatClassification
 from app.schemas.analysis import ThreatSeverity
 from app.schemas.email import AnalysisInputMode
@@ -20,16 +22,52 @@ ENGINE_VERSION = 'rules-v3.1.0'
 
 
 def _recommendations_from_signals(signals: List[ThreatSignal]) -> List[str]:
-    recs = [signal.recommendation for signal in signals if signal.recommendation]
+    recs = [signal.recommendation for signal in sorted(
+        signals,
+        key=lambda signal: ({ThreatSeverity.high: 0, ThreatSeverity.medium: 1, ThreatSeverity.low: 2}[signal.severity], signals.index(signal)),
+    ) if signal.recommendation]
     if not recs:
-        recs.append('Report the email to your security team or email provider if suspicious.')
-    # Deduplicate while preserving order
-    seen = set()
-    out = []
-    for r in recs:
-        if r not in seen:
-            seen.add(r)
-            out.append(r)
+        return ['Report or delete the message according to your local policy.']
+    return normalize_recommendations(recs)
+
+
+def normalize_recommendations(recommendations: List[str]) -> List[str]:
+    """Deduplicate semantically equivalent advice with stable severity ordering."""
+    recs = [re.sub(r'\s+', ' ', recommendation).strip() for recommendation in recommendations if recommendation and recommendation.strip()]
+    if not recs:
+        return ['Report or delete the message according to your local policy.']
+
+    def recommendation_key(value: str) -> str:
+        lowered = re.sub(r'\s+', ' ', value.casefold())
+        if 'do not click' in lowered or 'do not use the supplied action' in lowered:
+            return 'do_not_interact'
+        if any(token in lowered for token in ('credential', 'password', 'security code', 'one-time code', 'otp')):
+            return 'protect_secrets'
+        if 'official service' in lowered or 'trusted bookmark' in lowered or 'manually typed official' in lowered or 'claimed service directly' in lowered or 'open the service independently' in lowered:
+            return 'open_official_service'
+        if any(token in lowered for token in ('independent channel', 'separate channel', 'known requester', 'verify the sender')):
+            return 'verify_independently'
+        if any(token in lowered for token in ('report the email', 'report or delete', 'security team')):
+            return 'report_or_delete'
+        return lowered
+
+    canonical = {
+        'do_not_interact': 'Do not click links, buttons, or reply to addresses in the message.',
+        'protect_secrets': 'Do not send credentials, codes, payment details, or account information.',
+        'open_official_service': 'Open the official service directly through a trusted bookmark or typed official address.',
+        'verify_independently': 'Verify the request through an independent channel before taking action.',
+        'report_or_delete': 'Report or delete the message according to your local policy.',
+    }
+    seen: set[str] = set()
+    out: list[str] = []
+    for recommendation in recs:
+        key = recommendation_key(recommendation)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(canonical.get(key, recommendation))
+        if len(out) == 5:
+            break
     return out
 
 
@@ -96,7 +134,50 @@ def _quick_paste_metadata_signals(parsed_email) -> List[ThreatSignal]:
         score=0,
         evidence=sender,
         recommendation='No action is required for this fact alone; consider it only with other evidence.',
+        source_engine='rules',
+        evidence_type='parser_evidence',
+        tone='informational',
+        user_impact='This is contextual metadata and does not indicate a threat by itself.',
+        contributes_to_score=False,
+        provenance='normalized sender and recipient fields',
     )]
+
+
+def _decision_safety_signals(parsed_email, authentication) -> List[ThreatSignal]:
+    """Return non-scoring findings for evidence contradictions and identity claims."""
+    sender_domain = None
+    if parsed_email.sender:
+        sender_domain = str(parsed_email.sender.address).rsplit('@', 1)[-1]
+    assessment = assess_claimed_brand(
+        display_name=parsed_email.sender.name if parsed_email.sender else None,
+        subject=parsed_email.subject,
+        body=' '.join(filter(None, [parsed_email.body_text, parsed_email.body_visible_text])),
+        sender_domain=sender_domain,
+        authenticated_sender=authentication.trusted_sender,
+    )
+    findings = brand_identity_signals(assessment)
+    findings.extend(analyze_mailto_destinations(parsed_email, assessment))
+    if parsed_email.link_language_present and parsed_email.actual_url_count == 0:
+        findings.append(ThreatSignal(
+            code='url_destination_unverified',
+            category='decision_safety',
+            severity=ThreatSeverity.medium,
+            title='Link destination could not be verified',
+            description='The message appears to request link interaction, but the destination could not be verified.',
+            score=0,
+            evidence=parsed_email.url_extraction_reason or 'link_language_without_url',
+            recommendation='Do not click message links. Open the claimed service directly using a trusted bookmark or manually typed official address.',
+            source_engine='decision_safety',
+            evidence_type='decision_safety_finding',
+            user_impact='The requested destination is not available for local inspection.',
+            tone='high_concern',
+            confidence=0.9,
+            mapped_title='Destination could not be verified',
+            mapped_description='The message appears to request link interaction, but the destination could not be verified.',
+            contributes_to_score=False,
+            provenance='local URL extraction metadata',
+        ))
+    return findings
 
 
 def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisInputMode.raw_email) -> AnalysisResult:
@@ -151,9 +232,13 @@ def analyze_parsed_email(parsed_email, input_mode: AnalysisInputMode = AnalysisI
         if input_mode == AnalysisInputMode.quick_paste else []
     )
 
-    # Combine signals and deduplicate by code
+    safety_signals = _decision_safety_signals(parsed_email, authentication)
+
+    # Combine signals and deduplicate by code. Safety findings are intentionally
+    # non-scoring; they gate presentation without changing the approved model or
+    # the deterministic risk score.
     combined = {s.code: s for s in (
-        content_signals + url_signals + header_signals + attachment_signals + metadata_signals
+        content_signals + url_signals + header_signals + attachment_signals + metadata_signals + safety_signals
     )}
     signals = list(combined.values())
 

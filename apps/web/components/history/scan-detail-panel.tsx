@@ -10,6 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { scanPresentationState } from '@/lib/scan-store';
 import type { ScanRecord } from '@/types';
 
 interface ScanDetailPanelProps {
@@ -45,7 +46,8 @@ function UnavailableDetails({ label }: { label: string }) {
 }
 
 export function ScanDetailPanel({ scan, onClose, onDelete }: ScanDetailPanelProps) {
-  const style = verdictStyles[scan.classification];
+  const presentation = scanPresentationState(scan);
+  const style = presentation === 'Re-scan required' || presentation === 'Needs review' ? verdictStyles.suspicious : verdictStyles[scan.classification];
   const VerdictIcon = style.icon;
   const details = scan.details;
 
@@ -79,13 +81,19 @@ export function ScanDetailPanel({ scan, onClose, onDelete }: ScanDetailPanelProp
               This record predates detailed history storage. Its verdict, score, confidence, counts, and indicators remain available.
             </div>
           )}
+          {scanPresentationState(scan) !== scan.classification && (
+            <div role="alert" className="flex gap-3 rounded-lg border border-warning/35 bg-warning/10 p-4 text-sm leading-6 text-warning">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <div><p className="font-semibold">{scanPresentationState(scan)}</p><p className="mt-1">{details?.staleReason || details?.missingEvidence?.join(', ') || 'The stored evidence does not support a confident safe presentation.'}</p><p className="mt-1 font-medium">Do not click links or provide credentials. Verify the claimed service independently and re-scan the original email.</p></div>
+            </div>
+          )}
 
           <Card className={cn('border bg-surface/90', style.border)}>
             <CardHeader className="pb-4">
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div className="flex items-center gap-3">
                   <VerdictIcon className={style.text} aria-hidden="true" />
-                  <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground0">Final verdict</p><CardTitle className={cn('mt-1 text-2xl capitalize', style.text)}>{scan.classification}</CardTitle></div>
+                  <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground0">Final verdict</p><CardTitle className={cn('mt-1 text-2xl capitalize', style.text)}>{presentation}</CardTitle></div>
                 </div>
                 <Badge variant="outline" className={style.badge}>{scan.riskScore >= 70 ? 'Immediate action' : scan.riskScore >= 30 ? 'Review advised' : 'Low concern'}</Badge>
               </div>

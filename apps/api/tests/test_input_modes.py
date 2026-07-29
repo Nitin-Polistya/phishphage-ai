@@ -111,19 +111,12 @@ def test_same_sender_and_recipient_is_zero_point_safe_context():
     assert response.status_code == 200
     data = response.json()
     finding = next(signal for signal in data['rule_analysis']['signals'] if signal['code'] == 'SELF_ADDRESSED_EMAIL')
-    assert finding == {
-        'code': 'SELF_ADDRESSED_EMAIL',
-        'category': 'metadata',
-        'severity': 'low',
-        'title': 'Sender and recipient are the same',
-        'description': (
-            'The message appears to have been sent to the same address it originated from. '
-            'This can be legitimate, such as a self-sent or test email.'
-        ),
-        'score': 0,
-        'evidence': 'user@example.com',
-        'recommendation': 'No action is required for this fact alone; consider it only with other evidence.',
-    }
+    assert finding['code'] == 'SELF_ADDRESSED_EMAIL'
+    assert finding['category'] == 'metadata'
+    assert finding['score'] == 0
+    assert finding['evidence'] == 'user@example.com'
+    assert finding['source_engine'] == 'rules'
+    assert finding['contributes_to_score'] is False
     assert finding['score'] <= 5
     assert data['rule_analysis']['risk_score'] == 0
     assert data['rule_analysis']['classification'] == 'safe'

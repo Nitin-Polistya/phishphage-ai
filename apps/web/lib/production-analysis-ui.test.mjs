@@ -101,7 +101,7 @@ test('normalizes identifiers and maps known indicators to safe plain language', 
   assert.deepEqual(presentIndicator('spf', 'authentication'), {
     key: 'spf', raw: 'spf', label: 'SPF authentication record',
     description: 'SPF helps receiving mail systems check whether a server is allowed to send email for a domain.',
-    category: 'Email authentication', tone: 'neutral', statusLabel: 'Detected', sourceCategories: ['Email authentication'],
+    category: 'Email authentication', tone: 'unknown', statusLabel: 'Status unavailable', sourceCategories: ['Email authentication'],
   });
   assert.equal(presentIndicator('unusual_custom_feature').label, 'Unusual Custom Feature');
   assert.equal(presentIndicator('unusual_custom_feature').tone, 'neutral');
@@ -122,12 +122,25 @@ test('deduplicates repeated indicators while retaining source provenance', () =>
 });
 
 test('authentication status is only shown when explicitly present', () => {
-  assert.equal(presentIndicator('spf').statusLabel, 'Detected');
+  assert.equal(presentIndicator('spf').statusLabel, 'Status unavailable');
   assert.equal(presentIndicator('spf_failed', 'authentication').statusLabel, 'Failed');
   assert.equal(presentIndicator('dkim_passed', 'authentication').statusLabel, 'Passed');
   assert.equal(presentIndicator('dmarc_unavailable', 'authentication').statusLabel, 'Status unavailable');
   assert.equal(presentIndicator('spf_failed', 'authentication').tone, 'risk');
   assert.equal(presentIndicator('dkim_passed', 'authentication').tone, 'protective');
+});
+
+test('structured rule findings preserve high severity and tracking-pixel semantics', () => {
+  const findings = uniqueIndicatorPresentations({
+    detected_indicators: [], phishing_signals: [], authentication_signals: [], url_indicators: [], urgency_indicators: [],
+  }, [
+    { code: 'mailto_destination_mismatch', category: 'action', severity: 'high', title: 'Technical title', description: 'Technical description', score: 0, evidence: null, tone: 'high_concern', evidence_type: 'decision_safety_finding', source_engine: 'decision_safety', contributes_to_score: false },
+    { code: 'url_tracking_pixel', category: 'infrastructure', severity: 'low', title: 'Tracking', description: 'Tracking', score: 0, evidence: null, tone: 'informational', evidence_type: 'parser_evidence', source_engine: 'rules', contributes_to_score: false },
+  ]);
+  assert.equal(findings[0].statusLabel, 'High concern');
+  assert.equal(findings[0].tone, 'risk');
+  assert.equal(findings[1].statusLabel, 'Informational');
+  assert.equal(findings[1].tone, 'neutral');
 });
 
 test('summary is limited and has a graceful empty state', () => {

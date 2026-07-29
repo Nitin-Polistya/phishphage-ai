@@ -34,7 +34,10 @@ def test_body_only_safe_is_qualified_and_confidence_capped():
     assert result.decision.classification == ThreatClassification.safe
     assert result.decision.confidence <= 0.65
     assert result.analysis_completeness.state == 'body_text_only'
-    assert result.analysis_completeness.warning.startswith('Safe based on limited evidence:')
+    assert result.analysis_completeness.warning.startswith('Limited evidence:')
+    assert result.safe_verdict_allowed is False
+    assert result.decision_safety_status.value == 'rescan_required'
+    assert result.presentation_state.value == 'rescan_required'
 
 
 def test_facebook_eml_detects_hidden_destination_even_when_ml_says_legitimate():

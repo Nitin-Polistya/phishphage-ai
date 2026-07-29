@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     api_v1_prefix: str = Field(default='/api/v1', alias='API_V1_PREFIX')
     cors_origins: list[str] = Field(default_factory=lambda: ['http://localhost:3000'], alias='CORS_ORIGINS')
     log_level: str = Field(default='INFO', alias='LOG_LEVEL')
+    # Uvicorn's access logger is useful during development. In production the
+    # structured application request event is the source of truth, so the
+    # duplicate Uvicorn stream can be disabled explicitly (or by environment
+    # default when this value is omitted).
+    uvicorn_access_log: bool | None = Field(default=None, alias='UVICORN_ACCESS_LOG')
     max_request_bytes: int = Field(default=2_200_000, ge=1024, le=10_000_000, alias='MAX_REQUEST_BYTES')
     rate_limit_enabled: bool = Field(default=True, alias='RATE_LIMIT_ENABLED')
     rate_limit_window_seconds: int = Field(default=60, ge=1, le=3600, alias='RATE_LIMIT_WINDOW_SECONDS')
@@ -62,6 +67,13 @@ class Settings(BaseSettings):
         ):
             raise ValueError('localhost origins are development-only')
         return normalized
+
+    @property
+    def uvicorn_access_log_enabled(self) -> bool:
+        """Return the effective Uvicorn access-log policy for this environment."""
+        if self.uvicorn_access_log is not None:
+            return self.uvicorn_access_log
+        return self.environment.lower() != 'production'
 
 
 @lru_cache(maxsize=1)

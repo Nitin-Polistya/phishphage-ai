@@ -3,7 +3,6 @@
 import { useEffect, useMemo } from 'react';
 import { Clock, Download, FileText, Info, Link as LinkIcon, Mail, Paperclip, Printer, X } from 'lucide-react';
 
-import { ClassificationBadge } from '@/components/scans/classification-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -69,8 +68,10 @@ export function ReportPreview({ scan, onClose, onJson, onCsv, onPrint }: ReportP
               <div className="text-sm text-foreground0"><p>Scan ID</p><p className="mt-1 break-all font-mono text-xs text-muted-foreground">{report.scan_id}</p></div>
             </div>
 
+            {(!report.safe_verdict_allowed || report.analysis_freshness === 'stale') && <div role="alert" className="rounded-lg border border-warning/35 bg-warning/10 p-4 text-sm leading-6 text-warning"><p className="font-semibold">{report.presentation_state === 'rescan_required' ? 'Re-scan required' : 'Needs review'}</p><p className="mt-1">{report.stale_reason || report.missing_evidence.join(', ') || 'The stored evidence does not support a confident safe presentation.'}</p><p className="mt-2 font-medium">Do not click links or provide credentials. Verify the claimed service independently and re-scan the original email.</p></div>}
+
             <div className="grid gap-px overflow-hidden rounded-lg border border-border bg-surface-muted sm:grid-cols-3">
-              <div className="bg-surface p-5"><p className="text-xs uppercase tracking-wide text-foreground0">Final verdict</p><ClassificationBadge classification={report.final_classification} className="mt-3" /></div>
+              <div className="bg-surface p-5"><p className="text-xs uppercase tracking-wide text-foreground0">Presentation state</p><p className="mt-3 text-lg font-semibold capitalize text-foreground">{report.presentation_state.replaceAll('_', ' ')}</p></div>
               <div className="bg-surface p-5"><p className="text-xs uppercase tracking-wide text-foreground0">Risk score</p><p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{report.risk_score}<span className="text-sm font-normal text-foreground0">/100</span></p><Progress value={report.risk_score} className={cn('mt-3 h-2 bg-surface-muted', report.risk_score >= 70 ? '[&>div]:bg-danger' : report.risk_score >= 30 ? '[&>div]:bg-warning' : '[&>div]:bg-success')} /></div>
               <div className="bg-surface p-5"><p className="text-xs uppercase tracking-wide text-foreground0">Confidence</p><p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{Math.round(report.confidence * 100)}%</p><p className="mt-1 text-xs text-foreground0">Decision certainty</p></div>
             </div>
@@ -95,6 +96,8 @@ export function ReportPreview({ scan, onClose, onJson, onCsv, onPrint }: ReportP
                   <div><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-foreground">Rule engine</p><Badge variant="outline" className="border-success/30 bg-success/10 capitalize text-success">{report.rule_engine.status}</Badge></div><p className="mt-1 text-xs text-foreground0">Version: {report.rule_engine.version || 'Not recorded'}</p></div>
                   <Separator className="bg-surface-muted" />
                   <div><div className="flex items-center justify-between gap-3"><p className="text-sm font-medium text-foreground">ML engine</p><Badge variant="outline" className="border-input bg-background capitalize text-muted-foreground">{report.ml_engine.status}</Badge></div><p className="mt-1 text-xs text-foreground0">Version: {report.ml_engine.version || 'Not recorded'}</p></div>
+                  <Separator className="bg-surface-muted" />
+                  <div className="grid gap-2 text-xs text-muted-foreground"><p>Fusion policy: <span className="font-medium text-foreground">{report.fusion_policy_version}</span></p><p>Pre-floor / post-floor: <span className="font-medium text-foreground">{report.pre_floor_score ?? '—'} / {report.post_floor_score ?? report.risk_score}</span></p><p>Floor rule: <span className="font-medium text-foreground">{report.safety_floor_rule_id || 'None'}</span></p><p>Evidence families: <span className="font-medium text-foreground">{report.evidence_families.join(', ') || 'None recorded'}</span></p><p>Actionable URLs: <span className="font-medium text-foreground">{report.actionable_url_count}</span> · Tracking pixels: <span className="font-medium text-foreground">{report.external_tracking_pixel_count}</span> · Mailto actions: <span className="font-medium text-foreground">{report.actionable_mailto_count}</span></p></div>
                 </CardContent>
               </Card>
             </div>

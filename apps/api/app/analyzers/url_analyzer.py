@@ -102,6 +102,33 @@ def analyze_urls(
         item.url for item in evidence_items if item.user_actionable
     } if evidence_items else set(urls or [])
 
+    tracking_items = [
+        item for item in evidence_items
+        if getattr(getattr(item, 'source_type', None), 'value', getattr(item, 'source_type', None)) == 'tracking_pixel'
+    ]
+    if tracking_items:
+        tracking_domains = sorted({
+            getattr(item, 'url', '')[:200]
+            for item in tracking_items
+            if getattr(item, 'external_domain', None) is True
+        })
+        signals['url_tracking_pixel'] = ThreatSignal(
+            code='url_tracking_pixel',
+            category='infrastructure',
+            severity=ThreatSeverity.low,
+            title='External tracking pixel detected',
+            description='An external 1x1 or hidden image used for open tracking was detected; it is supporting evidence, not a user-actionable link.',
+            score=0,
+            evidence=', '.join(tracking_domains)[:300] if tracking_domains else 'tracking pixel',
+            recommendation='Avoid interacting with message links or buttons until the sender and request are independently verified.',
+            source_engine='rules',
+            evidence_type='parser_evidence',
+            user_impact='The sender may receive a signal that the message was opened.',
+            tone='informational',
+            contributes_to_score=False,
+            provenance='local HTML image semantics',
+        )
+
     for raw in actionable_urls:
         normalized = normalize_defanged_indicator(raw)
         try:

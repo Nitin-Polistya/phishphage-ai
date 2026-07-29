@@ -28,6 +28,7 @@ class UrlSourceType(str, Enum):
     tracking_pixel = 'tracking_pixel'
     document_metadata = 'document_metadata'
     namespace_or_dtd = 'namespace_or_dtd'
+    mailto = 'mailto'
 
 
 class EmailAddress(BaseModel):
@@ -74,6 +75,19 @@ class EmailUrlEvidence(BaseModel):
     url: str
     source_type: UrlSourceType
     user_actionable: bool = False
+    external_domain: bool | None = None
+    security_relevance: str = 'primary'
+
+
+class EmailMailtoEvidence(BaseModel):
+    """Privacy-safe mailto action evidence; full recipient addresses are not retained."""
+
+    destination_domains: list[str] = Field(default_factory=list)
+    recipient_count: int = Field(default=0, ge=0)
+    visible_text: str = ''
+    action_type: str = 'unknown'
+    user_actionable: bool = True
+    malformed: bool = False
 
 
 class ParsedEmail(BaseModel):
@@ -93,6 +107,23 @@ class ParsedEmail(BaseModel):
     extracted_urls: list[str] = Field(default_factory=list, description='URLs found in email')
     url_evidence: list[EmailUrlEvidence] = Field(default_factory=list, description='URLs with source semantics')
     html_links: list[EmailHtmlLink] = Field(default_factory=list, description='Locally parsed HTML anchors')
+    link_language_present: bool = Field(default=False, description='Message language suggests link interaction')
+    actual_url_count: int = Field(default=0, ge=0, description='Number of locally extracted URLs')
+    html_anchor_count: int = Field(default=0, ge=0, description='Number of locally parsed HTML anchors')
+    url_extraction_status: str = Field(default='unavailable', description='Local URL evidence extraction state')
+    url_extraction_reason: str | None = None
+    actionable_url_count: int = Field(default=0, ge=0)
+    tracking_pixel_count: int = Field(default=0, ge=0)
+    external_tracking_pixel_count: int = Field(default=0, ge=0)
+    mailto_evidence: list[EmailMailtoEvidence] = Field(default_factory=list)
+    mailto_count: int = Field(default=0, ge=0)
+    actionable_mailto_count: int = Field(default=0, ge=0)
+    mailto_destinations_redacted_or_normalized: list[str] = Field(default_factory=list)
+    mailto_domain_count: int = Field(default=0, ge=0)
+    mailto_external_domain_mismatch: bool = False
+    mailto_personal_provider: bool = False
+    mailto_action_types: list[str] = Field(default_factory=list)
+    mailto_action_type: str = 'unknown'
     attachments: list[EmailAttachmentMetadata] = Field(
         default_factory=list, description='Attachment metadata'
     )

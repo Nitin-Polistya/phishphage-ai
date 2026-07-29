@@ -129,4 +129,14 @@ Changes to model ID, version, calibration, threshold, feature manifest, or activ
 
 ## Safe-use disclaimer
 
-Use the model as one input to human review. Independently verify requests for credentials, payments, downloads, or account changes through an official channel. A “safe” result can reflect incomplete evidence and does not guarantee that the message is safe.
+### Decision-safety boundary
+
+Phase I.4D keeps the approved artifact, calibration, probability, threshold, feature set, and registry metadata unchanged. The current score formula is preserved as the pre-floor diagnostic:
+
+`pre_floor_score = int((adjusted_rule_score + phishing_probability * 100) / 2)`
+
+The asymmetric safety layer evaluates independent identity, routing, authentication, action, and infrastructure families. Corroborated high-confidence evidence may apply a deterministic 80–82 floor and raise the presentation classification; moderate corroboration may apply a 60-point suspicious floor. A lower ML probability remains visible and unchanged. Protective evidence is limited to an official claimed domain with aligned explicit authentication, and never overrides a corroborated mismatch or sensitive external action. Tracking pixels are supporting infrastructure evidence, not actionable destinations; `mailto:` evidence is normalized to domains and action metadata without exposing full addresses.
+
+Stale, incomplete, unavailable, or high-confidence claimed-brand mismatches cannot be presented as safe or low risk; they are shown as needs review or re-scan required. Brand findings are explainability context and do not add arbitrary model points.
+
+Use the model as one input to human review. Independently verify requests for credentials, payments, downloads, or account changes through an official channel. A low-risk result is not a guarantee that the message is safe, and incomplete evidence requires review or re-scan.

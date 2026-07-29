@@ -27,13 +27,13 @@ function subjectSlug(subject: string) {
   return slug || 'untitled-scan';
 }
 
-function csvValue(value: string | number) {
+function csvValue(value: string | number | boolean) {
   let text = String(value);
   if (/^[=+\-@]/.test(text)) text = `'${text}`;
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-function escapeHtml(value: string | number | null) {
+function escapeHtml(value: string | number | boolean | null) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;',
     '<': '&lt;',
@@ -54,8 +54,9 @@ export function createScanReport(scan: ScanRecord, generatedAt = new Date().toIS
   const staleReason = analysisFreshness === 'current'
     ? null
     : details?.staleReason || 'Engine-version metadata was not recorded; re-scan the original email.';
+  const safeAllowed = details?.safeVerdictAllowed === true && details?.fusionPolicyVersion === 'asymmetric-safety-v1' && analysisFreshness === 'current';
   return {
-    report_schema_version: '1.1',
+    report_schema_version: '1.3',
     product: 'PhishShield AI',
     report_generated_at: generatedAt,
     scan_id: scan.id,
@@ -76,20 +77,79 @@ export function createScanReport(scan: ScanRecord, generatedAt = new Date().toIS
     rule_ml_agreement: details?.ruleMlAgreement ?? null,
     fusion_reason: details?.fusionReason ?? null,
     analysis_completeness: details?.analysisCompleteness ?? 'not_recorded',
+    analysis_completeness_status: (details?.analysisCompletenessStatus ?? 'not_recorded') as ScanReportData['analysis_completeness_status'],
+    missing_evidence: details?.missingEvidence ?? [],
+    incomplete_reason_codes: details?.incompleteReasonCodes ?? [],
+    decision_safety_status: details?.decisionSafetyStatus ?? 'unable_to_verify',
+    presentation_state: details?.presentationState ?? 'needs_review',
+    requires_rescan: details?.requiresRescan ?? analysisFreshness === 'stale',
+    safe_verdict_allowed: safeAllowed,
+    engines_requested: details?.enginesRequested ?? ['rules', 'ml'],
+    engines_completed: details?.enginesCompleted ?? [],
+    engines_failed: details?.enginesFailed ?? [],
+    decision_source: details?.decisionSource ?? 'unknown',
+    fusion_performed: details?.fusionPerformed ?? false,
+    fallback_used: details?.fallbackUsed ?? false,
+    fallback_reason: details?.fallbackReason ?? null,
+    fusion_policy_version: details?.fusionPolicyVersion ?? 'unknown',
+    fusion_inputs: details?.fusionInputs ?? {},
+    fusion_components: details?.fusionComponents ?? [],
+    rule_weight: details?.ruleWeight ?? 0.5,
+    ml_weight: details?.mlWeight ?? 0.5,
+    safety_floor_applied: details?.safetyFloorApplied ?? false,
+    safety_floor_rule_id: details?.safetyFloorRuleId ?? null,
+    applied_floor_reason: details?.appliedFloorReason ?? null,
+    disagreement_resolution: details?.disagreementResolution ?? null,
+    pre_floor_score: details?.preFloorScore ?? null,
+    post_floor_score: details?.postFloorScore ?? null,
+    dominant_evidence_source: details?.dominantEvidenceSource ?? 'unknown',
+    evidence_families: details?.evidenceFamilies ?? [],
+    high_confidence_rule_evidence: details?.highConfidenceRuleEvidence ?? false,
+    protective_evidence: details?.protectiveEvidence ?? [],
     positive_authentication_evidence: (details?.positiveAuthenticationEvidence ?? []).map((item) => ({
       mechanism: item.mechanism,
       state: item.state,
       domain: item.domain,
       aligned_with_from: item.alignedWithFrom,
+      result: item.result,
+      display_label: item.displayLabel,
+      detail: item.detail,
     })),
-    authentication_evidence_status: details?.authenticationEvidenceStatus ?? 'unavailable',
+    authentication_evidence: (details?.authenticationEvidence ?? []).map((item) => ({
+      mechanism: item.mechanism,
+      state: item.state,
+      domain: item.domain,
+      aligned_with_from: item.alignedWithFrom,
+      result: item.result,
+      display_label: item.displayLabel,
+      detail: item.detail,
+    })),
+    authentication_evidence_status: (details?.authenticationEvidenceStatus ?? 'unavailable') as ScanReportData['authentication_evidence_status'],
     url_evidence: (details?.urlEvidence ?? []).map((item) => ({
       url: item.url,
       source_type: item.sourceType,
       user_actionable: item.userActionable,
+      external_domain: item.externalDomain,
+      security_relevance: item.securityRelevance,
     })),
     analysis_freshness: analysisFreshness,
     stale_reason: staleReason,
+    link_language_present: details?.linkLanguagePresent ?? false,
+    actual_url_count: details?.actualUrlCount ?? details?.urls?.length ?? 0,
+    html_anchor_count: details?.htmlAnchorCount ?? 0,
+    url_extraction_status: details?.urlExtractionStatus ?? 'unavailable',
+    url_extraction_reason: details?.urlExtractionReason ?? null,
+    actionable_url_count: details?.actionableUrlCount ?? 0,
+    tracking_pixel_count: details?.trackingPixelCount ?? 0,
+    external_tracking_pixel_count: details?.externalTrackingPixelCount ?? 0,
+    mailto_count: details?.mailtoCount ?? 0,
+    actionable_mailto_count: details?.actionableMailtoCount ?? 0,
+    mailto_destinations_redacted_or_normalized: details?.mailtoDestinationsRedactedOrNormalized ?? [],
+    mailto_domain_count: details?.mailtoDomainCount ?? 0,
+    mailto_external_domain_mismatch: details?.mailtoExternalDomainMismatch ?? false,
+    mailto_personal_provider: details?.mailtoPersonalProvider ?? false,
+    mailto_action_types: details?.mailtoActionTypes ?? [],
+    mailto_action_type: details?.mailtoActionType ?? 'unknown',
     rule_engine: {
       status: details?.ruleEngine?.status ?? 'unknown',
       version: details?.ruleEngine?.version ?? null,
@@ -106,6 +166,11 @@ export function createScanReport(scan: ScanRecord, generatedAt = new Date().toIS
       score: indicator.score,
       description: indicator.description ?? null,
       evidence: indicator.evidence ?? null,
+      source_engine: indicator.sourceEngine,
+      evidence_type: indicator.evidenceType,
+      tone: indicator.tone,
+      contributes_to_score: indicator.contributesToScore,
+      provenance: indicator.provenance,
     })),
     recommendations: details?.recommendations ?? [],
     extracted_urls: details?.urls ?? [],
@@ -125,8 +190,8 @@ export function serializeReportsToJson(scans: ScanRecord[], generatedAt = new Da
 export function serializeReportsToCsv(scans: ScanRecord[], generatedAt = new Date().toISOString()) {
   const columns = [
     'report_generated_at', 'scan_timestamp', 'scan_id', 'subject', 'sender', 'recipients', 'input_mode', 'final_classification',
-    'risk_score', 'confidence_percent', 'rule_engine_status', 'rule_engine_version', 'ml_engine_status', 'ml_engine_version',
-    'indicator_count', 'detected_indicators', 'evidence', 'recommendations', 'extracted_urls', 'attachment_count', 'attachment_metadata', 'privacy_disclaimer',
+    'risk_score', 'confidence_percent', 'presentation_state', 'safe_verdict_allowed', 'analysis_freshness', 'stale_reason', 'analysis_completeness_status', 'missing_evidence', 'decision_safety_status', 'fusion_policy_version', 'pre_floor_score', 'post_floor_score', 'safety_floor_rule_id', 'dominant_evidence_source', 'evidence_families', 'rule_engine_status', 'rule_engine_version', 'ml_engine_status', 'ml_engine_version',
+    'indicator_count', 'detected_indicators', 'evidence', 'recommendations', 'extracted_urls', 'actionable_url_count', 'tracking_pixel_count', 'mailto_count', 'actionable_mailto_count', 'mailto_domains', 'attachment_count', 'attachment_metadata', 'privacy_disclaimer',
   ];
   const rows = scans.map((scan) => {
     const report = createScanReport(scan, generatedAt);
@@ -142,6 +207,19 @@ export function serializeReportsToCsv(scans: ScanRecord[], generatedAt = new Dat
       report.final_classification,
       report.risk_score,
       Math.round(report.confidence * 100),
+      report.presentation_state,
+      report.safe_verdict_allowed,
+      report.analysis_freshness,
+      report.stale_reason ?? '',
+      report.analysis_completeness_status,
+      report.missing_evidence.join(' | '),
+      report.decision_safety_status,
+      report.fusion_policy_version,
+      report.pre_floor_score ?? '',
+      report.post_floor_score ?? '',
+      report.safety_floor_rule_id ?? '',
+      report.dominant_evidence_source,
+      report.evidence_families.join(' | '),
       report.rule_engine.status,
       report.rule_engine.version ?? '',
       report.ml_engine.status,
@@ -151,6 +229,11 @@ export function serializeReportsToCsv(scans: ScanRecord[], generatedAt = new Dat
       report.detected_indicators.map((indicator) => indicator.evidence ?? '').filter(Boolean).join(' | '),
       report.recommendations.join(' | '),
       report.extracted_urls.join(' | '),
+      report.actionable_url_count,
+      report.tracking_pixel_count,
+      report.mailto_count,
+      report.actionable_mailto_count,
+      report.mailto_destinations_redacted_or_normalized.join(' | '),
       report.attachments.length,
       attachments,
       report.privacy_disclaimer,
@@ -209,13 +292,15 @@ export function createPrintableReportHtml(scan: ScanRecord, generatedAt = new Da
     @media print { body { color: #000; background: #fff; } a { color: #000; text-decoration: none; } .section.allow-break { break-inside: auto; } }
   </style></head><body>
     <header><div><div class="brand">PhishShield AI</div><h1>Email Analysis Report</h1></div><div><p><strong>Report generated</strong></p><p>${escapeHtml(formatReportDate(report.report_generated_at))}</p></div></header>
-    <section class="verdict"><div class="metric"><span class="muted">Final classification</span><strong>${escapeHtml(report.final_classification)}</strong></div><div class="metric"><span class="muted">Risk score</span><strong>${escapeHtml(report.risk_score)}/100</strong></div><div class="metric"><span class="muted">Confidence</span><strong>${escapeHtml(Math.round(report.confidence * 100))}%</strong></div></section>
+    <section class="verdict"><div class="metric"><span class="muted">Presentation state</span><strong>${escapeHtml(report.presentation_state)}</strong></div><div class="metric"><span class="muted">Risk score</span><strong>${escapeHtml(report.risk_score)}/100</strong></div><div class="metric"><span class="muted">Confidence</span><strong>${escapeHtml(Math.round(report.confidence * 100))}%</strong></div></section>
+    ${report.analysis_freshness === 'stale' || !report.safe_verdict_allowed ? `<section class="section"><div class="privacy"><strong>${escapeHtml(report.presentation_state === 'rescan_required' ? 'Re-scan required' : 'Needs review')}</strong><p>${escapeHtml(report.stale_reason || report.missing_evidence.join(', ') || 'The evidence does not support a confident safe presentation.')}</p></div></section>` : ''}
     <section class="section"><h2>Email and scan metadata</h2><dl class="metadata"><dt>Scan timestamp</dt><dd>${escapeHtml(formatReportDate(report.scan_timestamp))}</dd><dt>Subject</dt><dd>${escapeHtml(report.subject)}</dd><dt>Sender</dt><dd>${escapeHtml(report.sender)}</dd><dt>Recipients</dt><dd>${escapeHtml(report.recipients.join(', ') || 'Not recorded')}</dd><dt>Input mode</dt><dd>${escapeHtml(formatReportInputMode(report.input_mode))}</dd></dl></section>
     <section class="section allow-break"><h2>Detected indicators</h2>${indicators}</section>
-    <section class="section"><h2>Extracted URLs</h2>${printableList(report.extracted_urls, 'No URLs recorded.')}</section>
+    <section class="section"><h2>Destinations and tracking</h2>${printableList(report.extracted_urls, 'No user-visible HTTP URLs recorded.')}<p class="muted">Actionable HTTP URLs: ${escapeHtml(report.actionable_url_count)} · External tracking pixels: ${escapeHtml(report.external_tracking_pixel_count)} · Mailto actions: ${escapeHtml(report.actionable_mailto_count)}</p><p class="muted">Mailto destination domains: ${escapeHtml(report.mailto_destinations_redacted_or_normalized.join(', ') || 'None recorded')}</p></section>
     <section class="section allow-break"><h2>Attachment metadata</h2>${attachments}</section>
     <section class="section"><h2>Recommendations</h2>${printableList(report.recommendations, 'No recommendations recorded.')}</section>
-    <section class="section"><h2>Engine metadata</h2><dl class="metadata"><dt>Rule engine</dt><dd>${escapeHtml(report.rule_engine.status)} · ${escapeHtml(report.rule_engine.version || 'Version not recorded')}</dd><dt>ML engine</dt><dd>${escapeHtml(report.ml_engine.status)} · ${escapeHtml(report.ml_engine.version || 'Version not recorded')}</dd><dt>Report schema</dt><dd>${escapeHtml(report.report_schema_version)}</dd><dt>Scan ID</dt><dd>${escapeHtml(report.scan_id)}</dd></dl></section>
+    <section class="section"><h2>Decision fusion details</h2><dl class="metadata"><dt>Fusion policy</dt><dd>${escapeHtml(report.fusion_policy_version)}</dd><dt>Raw rule score</dt><dd>${escapeHtml(report.rule_raw_score ?? 'Not recorded')} / adjusted ${escapeHtml(report.rule_adjusted_score ?? 'Not recorded')}</dd><dt>Raw ML probability</dt><dd>${escapeHtml(report.ml_phishing_probability ?? 'Not recorded')} / threshold ${escapeHtml(report.ml_threshold ?? 'Not recorded')}</dd><dt>Pre-floor / post-floor</dt><dd>${escapeHtml(report.pre_floor_score ?? 'Not recorded')} / ${escapeHtml(report.post_floor_score ?? report.risk_score)}</dd><dt>Safety floor</dt><dd>${escapeHtml(report.safety_floor_rule_id || 'None applied')} / ${escapeHtml(report.applied_floor_reason || 'No floor reason recorded')}</dd><dt>Evidence families</dt><dd>${escapeHtml(report.evidence_families.join(', ') || 'None recorded')}</dd><dt>Authentication</dt><dd>${escapeHtml(report.authentication_evidence.map((item) => `${item.mechanism}: ${item.display_label || item.state}`).join('; ') || report.authentication_evidence_status)}</dd></dl></section>
+    <section class="section"><h2>Engine metadata</h2><dl class="metadata"><dt>Rule engine</dt><dd>${escapeHtml(report.rule_engine.status)} · ${escapeHtml(report.rule_engine.version || 'Version not recorded')}</dd><dt>ML engine</dt><dd>${escapeHtml(report.ml_engine.status)} · ${escapeHtml(report.ml_engine.version || 'Version not recorded')}</dd><dt>Decision safety</dt><dd>${escapeHtml(report.decision_safety_status)} · safe verdict allowed: ${escapeHtml(report.safe_verdict_allowed)}</dd><dt>Report schema</dt><dd>${escapeHtml(report.report_schema_version)}</dd><dt>Scan ID</dt><dd>${escapeHtml(report.scan_id)}</dd></dl></section>
     <footer class="privacy"><strong>Privacy notice:</strong> ${escapeHtml(report.privacy_disclaimer)}</footer>
   </body></html>`;
 }

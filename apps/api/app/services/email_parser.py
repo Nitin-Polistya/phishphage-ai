@@ -8,7 +8,7 @@ from email import message_from_string
 from email.header import decode_header
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, unquote_plus, urlparse, urlsplit
 
 from app.schemas.email import (
     EmailAddress,
@@ -16,6 +16,7 @@ from app.schemas.email import (
     EmailHtmlLink,
     EmailUrlEvidence,
     ParsedEmail,
+    EmailMailtoEvidence,
     UrlSourceType,
 )
 from app.core.logging import log_event
@@ -35,6 +36,19 @@ STANDARD_SOURCE_HEADERS = {'from', 'to', 'subject', 'date', 'message-id', 'mime-
 URL_PATTERN = re.compile(
     r'h(?:tt|xx)ps?://[^\s<>"\'\)]+',
     re.IGNORECASE,
+)
+LINK_LANGUAGE_PATTERN = re.compile(
+    r'\b(?:click|tap|open|follow|use|visit|review|verify|sign\s*in|log\s*in)\b[^\n]{0,80}\b(?:link|button|below|here|page|portal|account|security)\b',
+    re.IGNORECASE,
+)
+PERSONAL_MAILBOX_DOMAINS = frozenset({'gmail.com', 'googlemail.com', 'outlook.com', 'hotmail.com', 'live.com', 'yahoo.com', 'icloud.com', 'aol.com'})
+MAILTO_ACTION_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ('report', ('report', 'abuse', 'phishing', 'spam', 'user')),
+    ('security', ('security', 'alert', 'verify', 'account', 'suspicious')),
+    ('payment', ('payment', 'invoice', 'billing', 'refund', 'transaction')),
+    ('support', ('support', 'help', 'contact', 'customer service')),
+    ('unsubscribe', ('unsubscribe', 'remove me', 'opt out')),
+    ('reply', ('reply', 'respond', 'answer')),
 )
 
 
@@ -57,11 +71,54 @@ def _domain_from_indicator(value: str) -> str | None:
         return None
 
 
+def _mailto_action_type(visible_text: str, subject: str = '') -> str:
+    context = f'{visible_text} {subject}'.casefold()
+    for action_type, phrases in MAILTO_ACTION_PATTERNS:
+        if any(phrase in context for phrase in phrases):
+            return action_type
+    return 'unknown'
+
+
+def parse_mailto_evidence(value: str | None, visible_text: str = '') -> EmailMailtoEvidence:
+    """Parse mailto recipients without retaining full mailbox addresses."""
+    raw = (value or '').strip()
+    if not raw.casefold().startswith('mailto:'):
+        return EmailMailtoEvidence(visible_text=visible_text[:300], malformed=True, user_actionable=False)
+    parsed = urlsplit(raw)
+    recipient_text = unquote(parsed.path or '').strip()
+    recipients = [part.strip() for part in recipient_text.split(',') if part.strip()]
+    domains: list[str] = []
+    valid_recipient_count = 0
+    for recipient in recipients:
+        mailbox = recipient.rsplit('<', 1)[-1].strip().strip('>')
+        if '@' not in mailbox:
+            continue
+        local, domain = mailbox.rsplit('@', 1)
+        domain = domain.casefold().strip().strip('.')
+        if not local.strip() or not re.fullmatch(r'[a-z0-9.-]+', domain):
+            continue
+        valid_recipient_count += 1
+        if domain not in domains:
+            domains.append(domain)
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    subject = unquote_plus(query.get('subject', [''])[0]) if query else ''
+    action_type = _mailto_action_type(visible_text, subject)
+    return EmailMailtoEvidence(
+        destination_domains=domains,
+        recipient_count=valid_recipient_count,
+        visible_text=visible_text[:300],
+        action_type=action_type,
+        user_actionable=valid_recipient_count > 0,
+        malformed=valid_recipient_count == 0,
+    )
+
+
 class _AnchorParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.links: list[EmailHtmlLink] = []
         self.url_evidence: list[EmailUrlEvidence] = []
+        self.mailto_evidence: list[EmailMailtoEvidence] = []
         self.visible_text_parts: list[str] = []
         self._href: str | None = None
         self._text: list[str] = []
@@ -86,7 +143,8 @@ class _AnchorParser(HTMLParser):
         if tag == 'a':
             self._href = attributes.get('href')
             self._text = []
-            self._add_url(self._href, UrlSourceType.anchor_href, user_actionable=True)
+            if not (self._href or '').casefold().startswith('mailto:'):
+                self._add_url(self._href, UrlSourceType.anchor_href, user_actionable=True)
         elif tag == 'form':
             self._add_url(attributes.get('action'), UrlSourceType.form_action, user_actionable=True)
         elif tag == 'img':
@@ -128,6 +186,8 @@ class _AnchorParser(HTMLParser):
         if tag != 'a' or self._href is None:
             return
         visible = re.sub(r'\s+', ' ', ''.join(self._text)).strip()
+        if self._href.casefold().startswith('mailto:'):
+            self.mailto_evidence.append(parse_mailto_evidence(self._href, visible))
         visible_domain = _domain_from_indicator(visible) if visible else None
         href_domain = _domain_from_indicator(self._href)
         self.links.append(EmailHtmlLink(
@@ -152,16 +212,16 @@ def extract_html_links(html: str | None) -> list[EmailHtmlLink]:
     return parser.links
 
 
-def extract_html_semantics(html: str | None) -> tuple[list[EmailHtmlLink], list[EmailUrlEvidence], str]:
+def extract_html_semantics(html: str | None) -> tuple[list[EmailHtmlLink], list[EmailUrlEvidence], str, list[EmailMailtoEvidence]]:
     if not html:
-        return [], [], ''
+        return [], [], '', []
     parser = _AnchorParser()
     try:
         parser.feed(html)
     except Exception:
         log_event(logger, logging.DEBUG, 'parser.component_failed', component='html_semantics')
     visible_text = re.sub(r'\s+', ' ', ' '.join(parser.visible_text_parts)).strip()
-    return parser.links, parser.url_evidence, visible_text
+    return parser.links, parser.url_evidence, visible_text, parser.mailto_evidence
 
 
 def validate_email_input(raw_email: str) -> None:
@@ -286,6 +346,32 @@ def extract_urls(text: str) -> list[str]:
     return list(dict.fromkeys(urls))[:MAX_EXTRACTED_URLS]
 
 
+def classify_url_extraction(
+    *,
+    subject: str | None,
+    body_text: str,
+    body_html: str | None,
+    urls: list[str],
+    html_links: list[EmailHtmlLink],
+    actionable_url_count: int | None = None,
+) -> tuple[bool, int, int, str, str]:
+    """Describe local URL evidence without guessing hidden destinations."""
+    visible_text = ' '.join(filter(None, (subject or '', body_text)))
+    link_language_present = bool(LINK_LANGUAGE_PATTERN.search(visible_text))
+    html_anchor_count = len(html_links)
+    actual_url_count = len(urls)
+    actionable_count = actual_url_count if actionable_url_count is None else actionable_url_count
+    if actual_url_count and actionable_count:
+        return link_language_present, actual_url_count, html_anchor_count, 'extracted', 'url_evidence_extracted'
+    if actual_url_count and not actionable_count:
+        return link_language_present, actual_url_count, html_anchor_count, 'tracking_only', 'tracking_pixel_only_no_actionable_destination'
+    if body_html and re.search(r'<\s*a\b', body_html, re.IGNORECASE):
+        return link_language_present, 0, max(1, html_anchor_count), 'partial', 'html_anchor_destination_unavailable'
+    if link_language_present:
+        return True, 0, html_anchor_count, 'partial', 'link_language_without_url'
+    return False, 0, html_anchor_count, 'not_present', 'no_link_evidence'
+
+
 def get_header_value(message: Any, header_name: str) -> str | None:
     """Safely extract and decode a header value.
     
@@ -373,7 +459,7 @@ def extract_body_and_urls(message: Any) -> tuple[str, str | None, list[str]]:
 
     all_urls.extend(extract_urls(body_text))
     if body_html:
-        _, html_evidence, _ = extract_html_semantics(body_html)
+        _, html_evidence, _, _ = extract_html_semantics(body_html)
         all_urls.extend(evidence.url for evidence in html_evidence)
 
     return body_text, body_html, list(dict.fromkeys(all_urls))
@@ -466,15 +552,37 @@ def parse_email(raw_email: str) -> ParsedEmail:
     message_id = get_header_value(message, 'Message-ID')
 
     body_text, body_html, urls = extract_body_and_urls(message)
-    html_links, html_url_evidence, body_visible_text = extract_html_semantics(body_html)
+    html_links, html_url_evidence, body_visible_text, mailto_evidence = extract_html_semantics(body_html)
     plain_url_evidence = [
         EmailUrlEvidence(url=url, source_type=UrlSourceType.plain_text, user_actionable=True)
         for url in extract_urls(body_text)
     ]
-    url_evidence = list(dict.fromkeys(
+    sender_domain = str(sender.address).rsplit('@', 1)[-1] if sender else None
+    url_evidence = []
+    for item in list(dict.fromkeys(
         (item.url, item.source_type, item.user_actionable) for item in plain_url_evidence + html_url_evidence
-    ))
+    )):
+        evidence = EmailUrlEvidence(url=item[0], source_type=item[1], user_actionable=item[2])
+        hostname = _domain_from_indicator(evidence.url)
+        evidence = evidence.model_copy(update={
+            'external_domain': bool(hostname and sender_domain and not domains_align(sender_domain, hostname)),
+            'security_relevance': 'supporting' if evidence.source_type == UrlSourceType.tracking_pixel else 'primary',
+        })
+        url_evidence.append(evidence)
+    actionable_url_count = sum(1 for item in url_evidence if item.user_actionable and item.source_type != UrlSourceType.tracking_pixel)
+    tracking_pixel_count = sum(1 for item in url_evidence if item.source_type == UrlSourceType.tracking_pixel)
+    external_tracking_pixel_count = sum(1 for item in url_evidence if item.source_type == UrlSourceType.tracking_pixel and item.external_domain is True)
     attachments = extract_attachment_metadata(message)
+    link_language_present, actual_url_count, html_anchor_count, url_status, url_reason = classify_url_extraction(
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+        urls=urls,
+        html_links=html_links,
+        actionable_url_count=actionable_url_count,
+    )
+    mailto_domains = sorted({domain for item in mailto_evidence for domain in item.destination_domains})
+    mailto_action_types = list(dict.fromkeys(item.action_type for item in mailto_evidence))
 
     headers = {
         key: str(value)
@@ -495,10 +603,23 @@ def parse_email(raw_email: str) -> ParsedEmail:
         body_visible_text=body_visible_text,
         headers=headers,
         extracted_urls=urls,
-        url_evidence=[
-            EmailUrlEvidence(url=url, source_type=source_type, user_actionable=user_actionable)
-            for url, source_type, user_actionable in url_evidence
-        ],
+        url_evidence=url_evidence,
         html_links=html_links,
+        link_language_present=link_language_present,
+        actual_url_count=actual_url_count,
+        html_anchor_count=html_anchor_count,
+        url_extraction_status=url_status,
+        url_extraction_reason=url_reason,
+        actionable_url_count=actionable_url_count,
+        tracking_pixel_count=tracking_pixel_count,
+        external_tracking_pixel_count=external_tracking_pixel_count,
+        mailto_evidence=mailto_evidence,
+        mailto_count=len(mailto_evidence),
+        actionable_mailto_count=sum(1 for item in mailto_evidence if item.user_actionable),
+        mailto_destinations_redacted_or_normalized=mailto_domains,
+        mailto_domain_count=len(mailto_domains),
+        mailto_personal_provider=any(domain in PERSONAL_MAILBOX_DOMAINS for domain in mailto_domains),
+        mailto_action_types=mailto_action_types,
+        mailto_action_type=mailto_action_types[0] if mailto_action_types else 'unknown',
         attachments=attachments,
     )

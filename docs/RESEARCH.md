@@ -53,6 +53,10 @@ The current audit reports 298 development-pool rows, 271 campaign groups, and a 
 
 ## Evidence index
 
+### Decision-safety research boundary
+
+Phase I.4D is a deterministic safety-fusion and explainability change, not a model experiment. It records the preserved pre-floor arithmetic, policy version, independent evidence families, applied floors, protective evidence, actionable `mailto:` destinations, tracking-pixel classification, and explicit authentication states. It does not retrain, recalibrate, alter the 0.50 decision threshold, change datasets, change model artifacts or hashes, or promote an experimental artifact.
+
 - [Inference integrity report](../reports/inference_audit/inference_integrity_report.md)
 - [Candidate qualification](../reports/candidate_qualification/final_qualification_recommendation.md)
 - [Hybrid feature recommendation](../reports/hybrid_features/recommendation.md)

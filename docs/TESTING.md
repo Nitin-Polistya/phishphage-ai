@@ -80,6 +80,10 @@ git diff --check
 
 ## What is excluded from normal tests
 
+### Decision-safety regression matrix
+
+Synthetic tests cover the preserved score formula; high-confidence multi-family floors; duplicate-family suppression; moderate floors; weak-rule/high-ML disagreement; aligned-domain/authentication protection; `mailto:` parsing, decoding, malformed input, action classification, and privacy-safe export; tracking-pixel versus actionable URL classification; explicit authentication states; UI severity labels; recommendation deduplication and caps; report/history migration; and raw/pre-floor/post-floor preservation. The observed Microsoft-style disagreement fixture is verified to remain phishing/high concern after the rule floor while retaining its lower ML probability.
+
 - Public/cloud deployment and automatic commits.
 - Real artifact downloads and private provider URLs.
 - Raw dataset acquisition, training, threshold changes, and model activation.

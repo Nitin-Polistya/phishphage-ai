@@ -388,13 +388,14 @@ Representative response using synthetic data:
   },
   "decision": {
     "classification": "safe", "risk_score": 21, "confidence": 0.79,
+    "presentation_state": "needs_review", "safe_verdict_allowed": false,
     "fusion_reason": "Rule and ML evidence are aligned.",
     "limited_authentication_evidence": false
   },
   "recommendations": ["Remain cautious with links, attachments, and requests for sensitive information."],
   "analysis_completeness": {
     "state": "structured_fields", "limited_evidence": true,
-    "warning": "Safe based on limited evidence: some structured fields were available, but complete raw headers and HTML destinations were not.",
+    "warning": "Limited evidence: some structured fields were available, but complete raw headers and HTML destinations were not.",
     "has_from_header": false, "has_reply_to": false, "has_return_path": false,
     "has_authentication_results": false, "has_spf_result": false,
     "has_dkim_result": false, "has_dmarc_result": false,
@@ -427,7 +428,15 @@ Rate-limit behavior: 120 requests per client per default 60-second window.
 
 Request ID and cache behavior: `X-Request-ID` and `Cache-Control: no-store` are returned.
 
-Security notes: the pipeline never renders HTML, contacts URL destinations, executes attachments, or treats missing authentication as failure. Safe results from incomplete evidence are explicitly qualified and their confidence is capped by the pipeline. The response can contain parsed header/address metadata; callers must protect it as sensitive data.
+Security notes: the pipeline never renders HTML, contacts URL destinations, executes attachments, or treats missing authentication as failure. Incomplete evidence is presented as needs review and cannot be exported as a current safe verdict. The response can contain parsed header/address metadata; callers must protect it as sensitive data.
+
+## Decision-safety response metadata
+
+`/api/v1/analyze` preserves the raw rule score, adjusted rule score, ML probability, ML threshold, and pre-floor score. It also returns `fusion_policy_version` (`asymmetric-safety-v1`), `post_floor_score`, `applied_floor`, `applied_floor_reason`, `evidence_families`, `high_confidence_rule_evidence`, `protective_evidence`, and `disagreement_resolution`. The decision remains explainable: the floor can raise the final presentation score and classification when independent rule families corroborate a high-confidence threat, but never changes the ML probability, threshold, calibration, model artifact, or registry metadata.
+
+Parsed HTML metadata includes actionable HTTP URL counts, tracking-pixel counts, source types, and privacy-safe normalized domains. `mailto:` anchors are represented as destination domains, recipient counts, action type, and whether the destination is user-actionable; full mailbox addresses are not returned. Authentication is explicit (`passed`, `failed`, `inconclusive`, `missing`, `unavailable`, `malformed`, or `conflicting`) and is not inferred from a bare authentication token.
+
+Legacy records with no fusion policy are migrated with `fusionPolicyVersion: "unknown"`; their original classification and raw fields are preserved, while safe eligibility is blocked until a fresh current-policy rescan. These fields never include raw bodies or full headers.
 
 ## Error shape
 

@@ -21,14 +21,21 @@ def test_prediction_endpoint_returns_privacy_safe_contract():
     response = client.post('/api/v1/analyze', json={'raw_email': RAW})
     assert response.status_code == 200
     payload = response.json()
-    assert set(payload) == {
+    assert {
         'model_id', 'model_version', 'prediction', 'probability', 'risk_score', 'confidence',
         'threshold_used', 'feature_families', 'signals', 'recommendations', 'processing_time_ms',
-    }
+    } <= set(payload)
     assert payload['model_id'] == 'phase-c-logistic-regression-v1'
     assert payload['model_version'] == '1.0.0'
     assert payload['threshold_used'] == 0.5
     assert payload['prediction'] in {'phishing', 'legitimate'}
+    assert payload['engines_requested'] == ['rules', 'ml']
+    assert 'rules' in payload['engines_completed']
+    assert 'ml' in payload['engines_completed']
+    assert payload['fusion_performed'] is True
+    assert payload['safe_verdict_allowed'] is False
+    assert payload['analysis_freshness'] in {'current', 'stale'}
+    assert 'rule_findings' in payload
     assert 'coefficients' not in json.dumps(payload).lower()
 
 

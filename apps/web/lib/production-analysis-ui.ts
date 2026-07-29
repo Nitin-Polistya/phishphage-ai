@@ -1,4 +1,5 @@
 import type { EmailAttachmentMetadata } from '@/types/analysis';
+import type { ThreatSignal } from '@/types/analysis';
 import type { InferenceSignals, PredictionResponse } from '@/types/inference';
 
 export type QuickPasteFields = {
@@ -78,7 +79,12 @@ export function displayRisk(score: number): 'Low' | 'Moderate' | 'High' | 'Criti
   return 'Low';
 }
 
-export function displayPrediction(result: Pick<PredictionResponse, 'prediction' | 'probability'>): string {
+export function displayPrediction(result: Pick<PredictionResponse, 'prediction' | 'probability'> & Partial<Pick<PredictionResponse, 'presentation_state' | 'final_classification' | 'safe_verdict_allowed' | 'analysis_freshness'>>): string {
+  if (result.analysis_freshness === 'stale' || result.presentation_state === 'rescan_required') return 'Re-scan required';
+  if (result.presentation_state === 'incomplete' || result.presentation_state === 'unable_to_verify') return 'Unable to verify';
+  if (result.presentation_state === 'needs_review') return 'Needs review';
+  if (result.presentation_state === 'safe' && result.safe_verdict_allowed !== false) return 'Low risk';
+  if (result.presentation_state === 'suspicious') return 'Needs review';
   if (result.prediction === 'phishing') return 'Phishing';
   return result.probability >= 0.35 ? 'Suspicious' : 'Low risk';
 }
@@ -108,6 +114,10 @@ export type IndicatorPresentation = {
   tone: IndicatorTone;
   statusLabel: string;
   sourceCategories: string[];
+  severity?: 'low' | 'medium' | 'high';
+  evidenceType?: string;
+  sourceEngine?: string;
+  contributesToScore?: boolean;
 };
 
 type SignalSource = 'detected' | 'phishing' | 'urgency' | 'url' | 'authentication';
@@ -128,6 +138,58 @@ const knownIndicators: Record<string, Pick<IndicatorPresentation, 'label' | 'des
   actionable_url: {
     label: 'Link asks the recipient to take action',
     description: 'The message encourages the recipient to open or use a web link.',
+  },
+  click: {
+    label: 'Message asks you to click',
+    description: 'The message uses click-oriented language; inspect any destination independently before interacting.',
+  },
+  url_destination_unverified: {
+    label: 'Destination could not be verified',
+    description: 'The message appears to request link interaction, but the destination could not be verified.',
+  },
+  identity_claim_sender_domain_mismatch: {
+    label: 'Claimed organization does not match sender domain',
+    description: 'The message claims to represent an organization, but the sender domain is not a recognized domain family for that organization.',
+  },
+  sensitive_brand_claim_requires_review: {
+    label: 'Sensitive claimed-brand request requires review',
+    description: 'A sensitive action was requested by a claimed organization whose sender identity could not be verified.',
+  },
+  content_suspicious_cta: {
+    label: 'Suspicious call-to-action',
+    description: 'The message directs the recipient to click, download, reply, or disclose sensitive information.',
+  },
+  header_replyto_mismatch: {
+    label: 'Reply-To domain mismatch',
+    description: 'Replies are redirected to a domain different from the visible sender.',
+  },
+  header_displayname_impersonation: {
+    label: 'Display-name impersonation',
+    description: 'The display name claims a trusted organization while the sender uses another domain.',
+  },
+  header_dmarc_inconclusive: {
+    label: 'DMARC authentication inconclusive',
+    description: 'DMARC returned an error or non-pass result and cannot reliably confirm the sender identity.',
+  },
+  header_returnpath_mismatch: {
+    label: 'Return-Path domain mismatch',
+    description: 'Delivery failures are routed to a domain different from the visible sender.',
+  },
+  header_spf_none: {
+    label: 'SPF authorization result is none',
+    description: 'No SPF authorization result was provided; this is not an authentication pass.',
+  },
+  header_dkim_none: {
+    label: 'No DKIM signature',
+    description: 'The message reports no DKIM signature for the sender identity.',
+  },
+  mailto_destination_mismatch: {
+    label: 'Security action redirects to an unrelated email address',
+    description: 'The message claims a trusted organization but directs the action to an unrelated mailbox domain.',
+  },
+  url_tracking_pixel: {
+    label: 'External tracking pixel detected',
+    description: 'An external hidden image may notify the sender that the message was opened; it is not a clickable destination.',
   },
   urgent_language: {
     label: 'Urgent or time-pressure language',
@@ -173,10 +235,15 @@ export function normalizeIndicatorKey(value: string): string {
 }
 
 function authenticationStatus(raw: string, key: string): { key: string; label: string; tone: IndicatorTone } {
-  const status = raw.toLowerCase().match(/(?:pass(?:ed)?|fail(?:ed)?|missing|unavailable|unknown)/)?.[0];
-  if (!['spf', 'dkim', 'dmarc'].includes(key) || !status) return { key, label: 'Detected', tone: 'neutral' };
+  const status = raw.toLowerCase().match(/(?:pass(?:ed)?|fail(?:ed)?|missing|unavailable|unknown|inconclusive|conflicting|malformed|none)/)?.[0];
+  if (!['spf', 'dkim', 'dmarc'].includes(key)) return { key, label: 'Detected', tone: 'neutral' };
+  if (!status) return { key, label: 'Status unavailable', tone: 'unknown' };
   if (status.startsWith('pass')) return { key, label: 'Passed', tone: 'protective' };
   if (status.startsWith('fail')) return { key, label: 'Failed', tone: 'risk' };
+  if (status === 'inconclusive') return { key, label: 'Inconclusive', tone: 'risk' };
+  if (status === 'conflicting') return { key, label: 'Conflicting results', tone: 'risk' };
+  if (status === 'malformed') return { key, label: 'Malformed result', tone: 'risk' };
+  if (status === 'none') return { key, label: 'Not authenticated', tone: 'risk' };
   if (status === 'missing') return { key, label: 'Not found', tone: 'neutral' };
   return { key, label: 'Status unavailable', tone: 'unknown' };
 }
@@ -204,6 +271,45 @@ export function presentIndicator(raw: string, source: SignalSource = 'detected')
   };
 }
 
+function signalCategory(signal: ThreatSignal): IndicatorPresentation['category'] {
+  if (signal.category === 'url' || signal.category === 'infrastructure' || signal.code.startsWith('url_')) return 'Links and destinations';
+  if (signal.category === 'header' || signal.code.startsWith('header_')) return 'Email authentication';
+  if (signal.category === 'content' || signal.category === 'action') return 'Message content';
+  if (signal.category === 'identity' || signal.category === 'routing') return 'Other technical indicators';
+  return 'Other technical indicators';
+}
+
+function presentThreatSignal(signal: ThreatSignal): IndicatorPresentation {
+  const key = normalizeIndicatorKey(signal.code);
+  const known = knownIndicators[key];
+  const severity = signal.severity;
+  const tone: IndicatorTone = signal.tone === 'protective'
+    ? 'protective'
+    : signal.tone === 'high_concern' || severity === 'high' || signal.tone === 'review' || severity === 'medium'
+      ? 'risk'
+      : signal.tone === 'unknown'
+        ? 'unknown'
+        : 'neutral';
+  return {
+    key,
+    raw: signal.code,
+    label: signal.mapped_title ?? known?.label ?? signal.title,
+    description: signal.mapped_description ?? known?.description ?? signal.description,
+    category: signalCategory(signal),
+    tone,
+    statusLabel: severity === 'high' || signal.tone === 'high_concern'
+      ? 'High concern'
+      : severity === 'medium' || signal.tone === 'review'
+        ? 'Potential concern'
+        : 'Informational',
+    sourceCategories: [signalCategory(signal)],
+    severity,
+    evidenceType: signal.evidence_type,
+    sourceEngine: signal.source_engine,
+    contributesToScore: signal.contributes_to_score,
+  };
+}
+
 const sourceValues: Array<[SignalSource, keyof InferenceSignals]> = [
   ['phishing', 'phishing_signals'],
   ['urgency', 'urgency_indicators'],
@@ -212,8 +318,12 @@ const sourceValues: Array<[SignalSource, keyof InferenceSignals]> = [
   ['detected', 'detected_indicators'],
 ];
 
-export function uniqueIndicatorPresentations(signals: InferenceSignals): IndicatorPresentation[] {
+export function uniqueIndicatorPresentations(signals: InferenceSignals, ruleFindings: ThreatSignal[] = []): IndicatorPresentation[] {
   const findings = new Map<string, IndicatorPresentation>();
+  for (const signal of ruleFindings) {
+    if (!signal?.code?.trim()) continue;
+    findings.set(normalizeIndicatorKey(signal.code), presentThreatSignal(signal));
+  }
   for (const [source, field] of sourceValues) {
     for (const raw of signals[field]) {
       if (!raw?.trim()) continue;

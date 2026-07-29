@@ -14,6 +14,9 @@ export function displayRisk(score) {
 }
 
 export function displayPrediction(result) {
+  if (result.analysis_freshness === 'stale' || result.presentation_state === 'rescan_required') return 'Re-scan required';
+  if (result.presentation_state === 'needs_review' || result.presentation_state === 'unable_to_verify') return 'Needs review';
+  if (result.presentation_state === 'safe' && result.safe_verdict_allowed === false) return 'Needs review';
   if (result.prediction === 'phishing') return 'Phishing';
   return result.probability >= 0.35 ? 'Suspicious' : 'Low risk';
 }

@@ -8,6 +8,11 @@ export interface ScanIndicator {
   score: number;
   description?: string;
   evidence?: string | null;
+  sourceEngine?: string;
+  evidenceType?: string;
+  tone?: string;
+  contributesToScore?: boolean;
+  provenance?: string | null;
 }
 
 export interface ScanDetails {
@@ -22,6 +27,16 @@ export interface ScanDetails {
     url: string;
     sourceType: string;
     userActionable: boolean;
+    externalDomain?: boolean | null;
+    securityRelevance?: string;
+  }>;
+  mailtoEvidence?: Array<{
+    destinationDomains: string[];
+    recipientCount: number;
+    visibleText: string;
+    actionType: string;
+    userActionable: boolean;
+    malformed: boolean;
   }>;
   attachments: EmailAttachmentMetadata[];
   inputMode?: AnalysisInputMode;
@@ -42,15 +57,74 @@ export interface ScanDetails {
   ruleMlAgreement?: string | null;
   fusionReason?: string | null;
   analysisCompleteness?: AnalysisCompletenessState;
+  analysisCompletenessStatus?: 'complete' | 'partial' | 'incomplete' | 'stale' | 'unavailable' | string;
+  missingEvidence?: string[];
+  incompleteReasonCodes?: string[];
+  decisionSafetyStatus?: 'eligible' | 'needs_review' | 'unable_to_verify' | 'rescan_required' | string;
+  presentationState?: string;
+  requiresRescan?: boolean;
+  safeVerdictAllowed?: boolean;
+  enginesRequested?: string[];
+  enginesCompleted?: string[];
+  enginesFailed?: string[];
+  decisionSource?: string;
+  fusionPerformed?: boolean;
+  fallbackUsed?: boolean;
+  fallbackReason?: string | null;
+  fusionPolicyVersion?: string;
+  fusionInputs?: Record<string, unknown>;
+  fusionComponents?: string[];
+  ruleWeight?: number;
+  mlWeight?: number;
+  safetyFloorApplied?: boolean;
+  safetyFloorRuleId?: string | null;
+  appliedFloorReason?: string | null;
+  disagreementResolution?: string | null;
+  preFloorScore?: number | null;
+  postFloorScore?: number | null;
+  dominantEvidenceSource?: string;
+  evidenceFamilies?: string[];
+  highConfidenceRuleEvidence?: boolean;
+  protectiveEvidence?: string[];
   positiveAuthenticationEvidence?: Array<{
     mechanism: string;
     state: string;
     domain: string | null;
     alignedWithFrom: boolean | null;
+    result?: string | null;
+    displayLabel?: string;
+    detail?: string | null;
   }>;
-  authenticationEvidenceStatus?: 'available' | 'unavailable' | 'failed' | 'inconclusive';
+  authenticationEvidence?: Array<{
+    mechanism: string;
+    state: string;
+    domain?: string | null;
+    alignedWithFrom?: boolean | null;
+    result?: string | null;
+    displayLabel?: string;
+    detail?: string | null;
+  }>;
+  authenticationEvidenceStatus?: 'available' | 'passed' | 'unavailable' | 'failed' | 'inconclusive' | 'conflicting' | string;
   analysisFreshness?: 'current' | 'stale';
   staleReason?: string | null;
+  linkLanguagePresent?: boolean;
+  actualUrlCount?: number;
+  htmlAnchorCount?: number;
+  urlExtractionStatus?: string;
+  urlExtractionReason?: string | null;
+  actionableUrlCount?: number;
+  trackingPixelCount?: number;
+  externalTrackingPixelCount?: number;
+  mailtoCount?: number;
+  actionableMailtoCount?: number;
+  mailtoDestinationsRedactedOrNormalized?: string[];
+  mailtoDomainCount?: number;
+  mailtoExternalDomainMismatch?: boolean;
+  mailtoPersonalProvider?: boolean;
+  mailtoActionTypes?: string[];
+  mailtoActionType?: string;
+  currentRuleVersion?: string | null;
+  storedRuleVersion?: string | null;
 }
 
 export interface ScanRecord {

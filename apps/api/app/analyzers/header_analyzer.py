@@ -34,12 +34,18 @@ def _signal(code: str, severity: ThreatSeverity, title: str, description: str, s
             evidence: str | None, recommendation: str) -> ThreatSignal:
     return ThreatSignal(code=code, category='header', severity=severity, title=title,
                         description=description, score=score, evidence=evidence,
-                        recommendation=recommendation)
+                        recommendation=recommendation,
+                        tone='high_concern' if severity == ThreatSeverity.high else 'review' if severity == ThreatSeverity.medium else 'informational',
+                        contributes_to_score=score > 0, provenance='deterministic header analyzer')
+
+
+def _auth_results(auth: str, mechanism: str) -> list[str]:
+    return [match.group(1).lower() for match in re.finditer(rf'\b{mechanism}\s*[=:]\s*([a-z]+)', auth, re.IGNORECASE)]
 
 
 def _auth_result(auth: str, mechanism: str) -> str | None:
-    match = re.search(rf'\b{mechanism}\s*[=:]\s*([a-z]+)', auth, re.IGNORECASE)
-    return match.group(1).lower() if match else None
+    results = _auth_results(auth, mechanism)
+    return results[0] if results else None
 
 
 def _auth_domain(auth: str, mechanism: str) -> str | None:
@@ -67,21 +73,52 @@ def evaluate_authentication(parsed_headers: Dict[str, str], sender_address: Opti
     sender_domain = _domain(sender_address)
     evidence: list[AuthenticationEvidence] = []
     for mechanism in ('spf', 'dkim', 'dmarc'):
-        result = _auth_result(auth, mechanism)
-        if result == 'pass':
+        observed = _auth_results(auth, mechanism)
+        unique_results = set(observed)
+        result = observed[0] if observed else None
+        if len(unique_results) > 1:
+            state = AuthenticationState.conflicting
+            display_label = 'Conflicting results'
+            detail = f'{mechanism.upper()} produced conflicting results: {", ".join(sorted(unique_results))}.'
+        elif result == 'pass':
             state = AuthenticationState.passed
+            display_label = 'Passed'
+            detail = f'{mechanism.upper()} passed for the reported domain.'
         elif result in {'fail', 'hardfail'}:
             state = AuthenticationState.failed
+            display_label = 'Failed'
+            detail = f'{mechanism.upper()} failed authorization.'
+        elif result == 'none':
+            state = AuthenticationState.missing
+            display_label = 'Not authenticated'
+            detail = f'No {mechanism.upper()} authorization result was provided.' if mechanism == 'spf' else f'No {mechanism.upper()} signature/result was provided.'
         elif result in {'softfail', 'neutral', 'temperror', 'permerror', 'none', 'policy'}:
             state = AuthenticationState.inconclusive
-        else:
+            display_label = 'Inconclusive'
+            detail = {
+                'softfail': 'The sender was not fully authorized by SPF.',
+                'neutral': f'{mechanism.upper()} returned a neutral result.',
+                'temperror': f'{mechanism.upper()} encountered a temporary evaluation error.',
+                'permerror': f'{mechanism.upper()} returned a permanent error and could not be evaluated reliably.',
+                'policy': f'{mechanism.upper()} returned a policy result without a clean pass.',
+            }.get(result, f'{mechanism.upper()} did not provide a clean pass.')
+        elif result is None:
             state = AuthenticationState.missing
+            display_label = 'Status unavailable'
+            detail = f'No {mechanism.upper()} result was present in Authentication-Results.'
+        else:
+            state = AuthenticationState.malformed
+            display_label = 'Malformed result'
+            detail = f'The {mechanism.upper()} result could not be parsed.'
         domain = _auth_domain(auth, mechanism)
         evidence.append(AuthenticationEvidence(
             mechanism=mechanism,
             state=state,
             domain=domain,
             aligned_with_from=domains_align(sender_domain, domain) if sender_domain and domain else None,
+            result=result,
+            display_label=display_label,
+            detail=detail,
         ))
     aligned_identity_pass = any(
         item.mechanism in {'dkim', 'dmarc'} and item.state == AuthenticationState.passed
@@ -159,8 +196,23 @@ def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optio
                 'Do not treat absence alone as malicious; check the original message in the receiving mailbox.')
     else:
         for mechanism, label in (('spf', 'SPF'), ('dkim', 'DKIM'), ('dmarc', 'DMARC')):
-            result = _auth_result(auth, mechanism)
-            if result in {'fail', 'hardfail'}:
+            observed = _auth_results(auth, mechanism)
+            result = observed[0] if observed else None
+            if len(set(observed)) > 1:
+                signals[f'header_{mechanism}_conflicting'] = _signal(
+                    f'header_{mechanism}_conflicting', ThreatSeverity.high, f'{label} results conflict',
+                    f'The message contains conflicting {label} results that cannot be treated as a clean authentication outcome.',
+                    0, f'{mechanism}={", ".join(sorted(set(observed)))}',
+                    'Verify the message through a trusted mail-security view before trusting its identity.')
+            elif result == 'pass':
+                continue
+            elif result == 'none':
+                signals[f'header_{mechanism}_none'] = _signal(
+                    f'header_{mechanism}_none', ThreatSeverity.medium, f'{label} authorization result is none',
+                    f'The message reports no {label} authorization result; this is not an authentication pass.',
+                    0, f'{mechanism}=none',
+                    'Treat this as supporting evidence and verify the sender independently.')
+            elif result in {'fail', 'hardfail'}:
                 signals[f'header_{mechanism}_fail'] = _signal(
                     f'header_{mechanism}_fail', ThreatSeverity.high, f'{label} authentication failed',
                     f'The receiving mail system reports that {label} validation failed.', 24,
@@ -170,6 +222,11 @@ def analyze_headers(parsed_headers: Dict[str, str], parsed_sender_address: Optio
                     f'header_{mechanism}_inconclusive', ThreatSeverity.medium, f'{label} authentication inconclusive',
                     f'The {label} result does not provide a clean authentication pass.', 10,
                     f'{mechanism}={result}', 'Use this as supporting evidence and verify the sender independently.')
+            elif re.search(rf'\b{mechanism}\s*[=:]', auth, re.IGNORECASE):
+                signals[f'header_{mechanism}_malformed'] = _signal(
+                    f'header_{mechanism}_malformed', ThreatSeverity.medium, f'Malformed {label} result',
+                    f'The {label} result is present but could not be parsed reliably.', 0,
+                    f'{mechanism}=unparsed', 'Verify the sender using a trusted mail-security view.')
 
     actual_return_path = return_path or headers.get('return-path')
     return_domain = _domain(actual_return_path)

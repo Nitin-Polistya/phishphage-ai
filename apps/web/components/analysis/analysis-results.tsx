@@ -76,14 +76,23 @@ export function AnalysisResults({ result, isLoading = false }: { result: Unified
   if (isLoading) return <LoadingResults />;
   if (!result) return <EmptyResults />;
 
-  const style = verdictStyles[result.decision.classification];
+  const presentation = result.analysis_freshness === 'stale' || result.presentation_state === 'rescan_required'
+    ? 'Re-scan required'
+    : result.presentation_state === 'unable_to_verify'
+      ? 'Unable to verify'
+      : result.presentation_state === 'needs_review'
+        ? 'Needs review'
+        : result.presentation_state ?? result.decision.classification;
+  const blockedSafe = result.decision.classification === 'safe' && result.safe_verdict_allowed !== true;
+  const style = presentation === 'Re-scan required' || presentation === 'Unable to verify' || presentation === 'Needs review' || blockedSafe
+    ? verdictStyles.suspicious
+    : verdictStyles[result.decision.classification];
   const VerdictIcon = style.icon;
   const materialSignals = result.rule_analysis.signals.filter((signal) => signal.score > 0).sort((a, b) => b.score - a.score);
   const topSignals = materialSignals.slice(0, 3);
   const remainingSignals = result.rule_analysis.signals.filter((signal) => !topSignals.includes(signal));
   const headerSignals = result.rule_analysis.signals.filter((signal) => signal.category === 'header');
   const completeness = result.analysis_completeness;
-  const qualifiedSafe = result.decision.classification === 'safe' && completeness?.limited_evidence;
   const completenessLabel = completeness?.state.replaceAll('_', ' ') ?? 'not reported';
   const timeline = [
     { label: 'Input received', detail: 'Analysis request accepted' },
@@ -100,10 +109,10 @@ export function AnalysisResults({ result, isLoading = false }: { result: Unified
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-6 sm:p-8">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-4"><span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-background/60', style.text)}><VerdictIcon aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground0">Final verdict</p><h2 className={cn('mt-1 text-3xl font-semibold capitalize tracking-tight sm:text-4xl', style.text)}>{qualifiedSafe ? 'Safe based on limited evidence' : result.decision.classification}</h2></div></div>
+                <div className="flex items-center gap-4"><span className={cn('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-background/60', style.text)}><VerdictIcon aria-hidden="true" /></span><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-foreground0">Final verdict</p><h2 className={cn('mt-1 text-3xl font-semibold capitalize tracking-tight sm:text-4xl', style.text)}>{presentation}</h2></div></div>
                 <Badge variant="outline" className={cn('w-fit', style.badge)}>{result.decision.risk_score >= 70 ? 'Immediate action' : result.decision.risk_score >= 30 ? 'Review advised' : 'Low concern'}</Badge>
               </div>
-              {completeness?.warning && <div className="mt-5 flex gap-3 rounded-lg border border-warning/25 bg-warning/10 p-4 text-sm leading-6 text-warning"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" /><p>{completeness.warning}</p></div>}
+              {(completeness?.warning || presentation !== result.decision.classification) && <div role="alert" className="mt-5 flex gap-3 rounded-lg border border-warning/25 bg-warning/10 p-4 text-sm leading-6 text-warning"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" /><p>{result.stale_reason || result.missing_evidence?.length ? `${result.stale_reason || 'Evidence is incomplete.'} ${result.missing_evidence?.join(', ') || ''}` : completeness?.warning}</p></div>}
               <div className="mt-7 rounded-lg border border-border bg-background/45 p-4"><p className="text-xs font-medium uppercase tracking-wide text-foreground0">Recommended action</p><p className="mt-2 text-base font-medium leading-7 text-foreground">{result.recommendations[0] ?? 'Review with your security team.'}</p></div>
               <div className="mt-6"><p className="text-xs font-medium uppercase tracking-wide text-foreground0">Top reasons</p>{topSignals.length ? <ul className="mt-3 grid gap-2 sm:grid-cols-3">{topSignals.map((signal) => <li key={signal.code} className="flex gap-2 text-sm leading-5 text-muted-foreground"><CircleDot className={cn('mt-0.5 h-4 w-4 shrink-0', signal.severity === 'high' ? 'text-danger' : signal.severity === 'medium' ? 'text-warning' : 'text-primary')} aria-hidden="true" /><span>{signal.title}</span></li>)}</ul> : <p className="mt-2 text-sm text-muted-foreground">No material threat signals detected.</p>}</div>
             </div>

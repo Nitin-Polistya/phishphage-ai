@@ -49,4 +49,8 @@ Health checks should be sampled or filtered to avoid noisy logs. A multi-instanc
 
 ## Startup and privacy
 
+### Decision-safety telemetry
+
+Analysis responses and browser reports retain `fusion_policy_version`, raw/adjusted rule scores, ML probability, pre/post-floor scores, applied floor and reason, evidence families, disagreement resolution, protective evidence, authentication state, actionable URL counts, tracking-pixel counts, and privacy-safe `mailto:` domains. Structured logs continue to exclude raw bodies, full headers, complete mailbox addresses, credentials, and filesystem paths. Stale reasons are preserved when history records are migrated.
+
 Startup emits safe diagnostic fields for environment, API version, selected model ID, registry version, artifact hash, model state, timings, ML-required/fallback state, Firebase-enabled state, limiter state, CORS origin count, access-log policy, and request-size configuration. It does not emit credentials, source URLs, raw input, or filesystem paths.
