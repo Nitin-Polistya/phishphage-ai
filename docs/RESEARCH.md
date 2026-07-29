@@ -62,3 +62,13 @@ Phase I.4D is a deterministic safety-fusion and explainability change, not a mod
 - [Hybrid feature recommendation](../reports/hybrid_features/recommendation.md)
 - [Dataset evolution summary](../reports/dataset_evolution/executive_summary.md)
 - [Model card](MODEL.md)
+
+## Gold-standard evaluation boundary
+
+Phase II adds a provenance-complete curation framework without changing a
+model, artifact, threshold, calibration, rule score, or production inference
+path. Research/training datasets, diagnostic fixtures, prior challenge
+material, and external-validation files remain separate from the future
+independent benchmark. Labels enter only through independent manual review and
+adjudication. Until that process reaches the minimum target, benchmark metrics
+are withheld and the portfolio summary says that curation is still in progress.

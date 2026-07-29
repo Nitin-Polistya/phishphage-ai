@@ -60,3 +60,16 @@ Binary quality metrics treat `phishing` as positive and both `safe` and
 `suspicious` as non-phishing. Three-class confusion and per-class metrics are
 reported separately. Calibration is measured only; no calibration operation is
 performed.
+
+## Phase II gold-standard curation
+
+The production harness is read-only, but a trustworthy benchmark also requires
+provenance, privacy, overlap, and manual adjudication controls. The Phase II
+curator is documented in [GOLD_STANDARD_DATASET.md](GOLD_STANDARD_DATASET.md),
+with its schema at
+[`services/ml/evaluation/schema/gold_standard_schema.json`](../services/ml/evaluation/schema/gold_standard_schema.json).
+It never infers labels from source annotations or model predictions. Existing
+repository datasets remain separate as training-only, diagnostic-only, or
+external-validation-only material unless a future review explicitly qualifies
+them. With insufficient adjudicated samples, the pilot command writes readiness
+and shortfall reports and deliberately withholds headline metrics.

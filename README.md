@@ -45,6 +45,8 @@ Email risk evidence is distributed across wording, headers, authentication resul
 - Local parsing of headers, plain text, visible HTML text, URL evidence, and attachment metadata.
 - Rule-based indicators with signal severity, evidence, and recommendations.
 - Optional calibrated text-model inference through a versioned registry.
+- A label-blind, privacy-safe gold-standard curation workflow with manual
+  review, adjudication, overlap control, and evidence-gated benchmark export.
 - Explicit model/rule agreement, limited-evidence warnings, and safe fallback behavior.
 - Optional browser-local scan history and browser-generated reports. History is disabled unless the user enables it; raw bodies and complete raw headers are excluded from saved records.
 - Request IDs, bounded payloads, process-local rate limits, safe errors, security headers, CSP, privacy-safe logs, health, readiness, and metrics endpoints.
@@ -125,6 +127,7 @@ Read [docs/SECURITY.md](docs/SECURITY.md) for scope and residual risks. Read [do
 apps/api/       FastAPI application, parser, rules, inference, and tests
 apps/web/       Next.js application, browser-local history, reports, and tests
 services/ml/    Dataset controls, model development, registry, artifacts, and research reports
+services/ml/evaluation/ Versioned evaluation schema, review queue, and private local curation boundary
 docs/           Public architecture, API, model, security, deployment, and contributor guides
 reports/        Generated audit, performance, security, deployment, and research evidence
 ```
@@ -228,6 +231,7 @@ Current status: local integration and deployment preparation only. The included 
 
 - Reconcile registry/runtime version metadata before a release decision.
 - Add provenance-complete, privacy-reviewed, campaign-grouped legitimate hard negatives and modern phishing families.
+- Complete the manually reviewed Phase II benchmark before making headline metric claims.
 - Re-run independent qualification with explicit precision, FPR, calibration, and false-negative gates.
 - Decide whether authentication/authorization and a shared rate limiter are required for the deployment context.
 - Restore browser automation and complete provider-like HTTPS, capacity, and container validation.
@@ -239,6 +243,9 @@ Current status: local integration and deployment preparation only. The included 
 - [API](docs/API.md)
 - [Model](docs/MODEL.md)
 - [Datasets](docs/DATASETS.md)
+- [Gold-standard evaluation dataset](docs/GOLD_STANDARD_DATASET.md)
+- [Labeling guide](docs/LABELING_GUIDE.md)
+- [Evaluation privacy](docs/EVALUATION_PRIVACY.md)
 - [Security](docs/SECURITY.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Development](docs/DEVELOPMENT.md)

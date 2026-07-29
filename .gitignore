@@ -58,3 +58,9 @@ Thumbs.db
 /reports/*
 !/reports/release_candidate/
 !/reports/release_candidate/**
+!/reports/gold_standard/
+!/reports/gold_standard/**
+
+# Gold-standard curation keeps raw content and absolute local paths private.
+/services/ml/evaluation/private/*
+!/services/ml/evaluation/private/.gitkeep

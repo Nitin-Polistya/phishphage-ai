@@ -62,6 +62,13 @@ Model tests cover the verified registry path, hash checks, threshold/metadata al
 
 Research/evaluation commands must use the documented data boundary and review gate. They are excluded from normal tests when they require ignored datasets, private artifacts, network access, or explicit approval. No evaluation command in this documentation phase retrains or promotes a model.
 
+The gold-standard curation tests in `apps/api/tests/test_gold_standard_dataset.py`
+use synthetic fixtures only. They cover schema and label vocabulary validation,
+duplicate IDs, missing campaign/date handling, privacy redaction, stable hashes,
+exact overlap detection, provisional versus adjudicated state, final
+eligibility, deterministic ordering, public-manifest safety, label-blind
+ingestion, empty-benchmark behavior, and minimum-size warnings.
+
 ## Synthetic data policy
 
 Use `example.com`, fabricated names, fabricated IDs, and non-routable or clearly synthetic content. Tests may assert URL parsing and security behavior without opening destinations. Fixtures under the repository are sanitized and must not be expanded with copied mailbox content. Reports should use aggregates, hashes, or redacted examples.

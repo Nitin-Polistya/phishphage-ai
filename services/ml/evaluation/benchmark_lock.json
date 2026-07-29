@@ -1,0 +1,8 @@
+{
+  "headline_metrics_allowed": false,
+  "locked_record_ids": [],
+  "rejected_records": [],
+  "schema_version": "gold-standard-1.0",
+  "status": "not_ready",
+  "subset": "independent_validation"
+}
