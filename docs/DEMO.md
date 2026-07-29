@@ -30,7 +30,7 @@ Open the model detail. Say: “The ML model can disagree with deterministic evid
 
 ### 7. Decision-safety floor (25 seconds)
 
-Open the decision-safety panel. Say: “Because independent evidence families corroborate a sensitive action and unsafe identity/routing, asymmetric fusion can apply a bounded safety floor. In the documented synthetic scenario the final presentation is 82/100 while the raw ML probability remains 22.9%. This is a scenario result, not an accuracy claim.”
+Open the decision-safety panel. Say: “Because independent evidence families corroborate a sensitive action and unsafe identity/routing, asymmetric fusion applies a bounded safety floor. In the current local run this fixture returned phishing/100 with raw ML probability 1.0 and the `brand_impersonation_with_routing_mismatch` floor. This is a scenario result, not an accuracy claim.”
 
 ### 8. Indicators and recommendations (20 seconds)
 

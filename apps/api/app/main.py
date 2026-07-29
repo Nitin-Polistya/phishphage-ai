@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
 	title=settings.app_name,
-	description='PhishPhage AI API for email parsing and phishing-risk analysis.',
+    description='PhishShield AI API for email parsing and phishing-risk analysis.',
 	version=settings.app_version,
 )
 
@@ -79,7 +79,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.get('/')
 def root() -> dict[str, str]:
-	return {'message': 'PhishPhage AI API is running'}
+    return {'message': 'PhishShield AI API is running'}
 
 
 def _round_ms(value: float | None) -> float:

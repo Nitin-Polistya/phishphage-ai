@@ -19,10 +19,11 @@ function syntheticScan(value) {
   };
 }
 
-const browser = await chromium.launch({
-  headless: true,
-  executablePath: 'C:\\Users\\DELL\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe',
-});
+const launchOptions = { headless: true };
+if (process.env.CHROME_EXECUTABLE_PATH) {
+  launchOptions.executablePath = process.env.CHROME_EXECUTABLE_PATH;
+}
+const browser = await chromium.launch(launchOptions);
 try {
   for (const viewport of viewports) {
     for (const theme of ['light', 'dark']) {

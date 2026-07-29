@@ -6,13 +6,13 @@ Values below are configuration placeholders, not secrets. The backend reads `app
 
 | Variable | Default/requiredness | Purpose |
 | --- | --- | --- |
-| `APP_NAME` | `PhishPhage AI API`; optional | Internal API service label. Public product name is PhishShield AI. |
-| `APP_VERSION` | `0.1.0`; optional | API/application version returned by health metadata. |
+| `APP_NAME` | `PhishShield AI API`; optional | API service label. The public product name is PhishShield AI. |
+| `APP_VERSION` | `1.0.0-rc1`; optional | Application release-candidate version returned by health metadata. |
 | `ENVIRONMENT` | `development`; set `production` for deployment | Enables production validation/HSTS behavior. |
 | `API_V1_PREFIX` | `/api/v1`; optional | Intended API namespace setting. Current router registration is explicitly `/api/v1`; changing this variable alone does not remount routes. |
 | `HOST` | command-specific; use `0.0.0.0` in a container | Bind address. |
 | `PORT` | `8000`; provider may override | Listening port. |
-| `CORS_ORIGINS` | localhost development default; required in production | Comma-separated exact browser origins. Wildcard/localhost production values are rejected. |
+| `CORS_ORIGINS` | JSON array containing localhost and 127.0.0.1 in the example; required in production | Exact browser-origin JSON array. Wildcard/localhost production values are rejected. |
 | `LOG_LEVEL` | `INFO`; optional | Structured log level. |
 | `MAX_REQUEST_BYTES` | `2200000`; optional | HTTP body ceiling; accepted range is 1 KiB to 10 MB. |
 | `RATE_LIMIT_ENABLED` | `true`; optional | Enables process-local fixed-window limits. |

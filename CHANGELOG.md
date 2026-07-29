@@ -2,6 +2,38 @@
 
 All notable repository changes are documented here. The project has no historical release tags or released versions to summarize.
 
+## [1.0.0-rc1] - 2026-07-29
+
+This is a release candidate, not a final release. It has not been tagged, published, or deployed.
+
+### Added
+
+- Release-candidate validation reports, release notes, and a gated checklist.
+- Synthetic portfolio fixtures, Mermaid diagrams, social-preview source, and privacy-reviewed presentation guidance.
+
+### Changed
+
+- Reconciled application and frontend package metadata to `1.0.0-rc1`.
+- Reconciled the public API label to PhishShield AI while preserving internal compatibility/storage identifiers.
+- Updated public API examples and environment guidance for the release-candidate version and JSON CORS origin lists.
+
+### Fixed
+
+- Removed stale `0.1.0` application examples from release-facing health/API metadata.
+- Corrected portfolio documentation so the current synthetic fixture is reported as phishing/100 with raw ML probability 1.0; the unreproduced 82/100 and 22.9% pair is no longer treated as a current claim.
+
+### Security
+
+- Revalidated backend security/model-integrity coverage, artifact hashes, privacy-safe logging, and npm audit status.
+- No model artifact, threshold, calibration, dataset, or registry activation state changed.
+
+### Known limitations
+
+- The root tracked `LICENSE` path is currently deleted locally while an untracked `LICENSE.md` exists; the license gate remains blocked until the user resolves that rename and confirms the license.
+- `npm ci` timed out in both sandboxed and escalated environments; local frontend tests, type checking, lint, build, and audit passed using the available dependency tree.
+- Browser automation, Docker/provider execution, cloud capacity, and public deployment remain unverified.
+- The approved model remains a deployment candidate with `activated=false`.
+
 ## [Unreleased]
 
 ### Added

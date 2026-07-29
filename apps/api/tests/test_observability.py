@@ -36,7 +36,7 @@ def test_request_id_is_correlated_and_request_log_is_structured(caplog):
 
 def test_health_contains_safe_runtime_and_model_metadata():
     payload = client.get('/api/v1/health').json()
-    assert payload['application_version'] == '0.1.0'
+    assert payload['application_version'] == '1.0.0-rc1'
     assert payload['environment']
     assert payload['uptime_seconds'] >= 0
     assert payload['request_counts']['total'] >= 0

@@ -19,7 +19,7 @@ flowchart LR
   registry[Versioned model registry] --> model
 ```
 
-The public product name is PhishShield AI. Some internal keys, API defaults, and historical reports still contain `PhishPhage`; this is an internal naming inconsistency, not a separate product.
+The public product name is PhishShield AI. Historical reports and browser-storage compatibility keys may still contain `PhishPhage`; these are migration identifiers, not a separate product or release name.
 
 ## Frontend architecture
 

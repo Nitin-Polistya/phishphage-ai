@@ -35,7 +35,7 @@ Response body, HTTP 200:
 
 ```json
 {
-  "message": "PhishPhage AI API is running"
+  "message": "PhishShield AI API is running"
 }
 ```
 
@@ -177,7 +177,7 @@ Response body, HTTP 200 example:
   "model_available": true,
   "inference_ready": true,
   "reason_code": null,
-  "application_version": "0.1.0",
+  "application_version": "1.0.0-rc1",
   "environment": "development",
   "uptime_seconds": 42.1,
   "startup_time": "2026-01-01T00:00:00+00:00",

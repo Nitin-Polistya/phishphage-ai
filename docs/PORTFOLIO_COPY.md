@@ -20,7 +20,7 @@ All copy below is scoped to the repository evidence and the synthetic demonstrat
 - Repaired a calibrated-model adapter mismatch by aligning API inference with the verified artifact's transform, class ordering, probability shape, calibration metadata, and registry threshold.
 - Implemented evidence-family fusion that retains raw ML probability and uses deterministic identity, routing, authentication, action, and infrastructure corroboration to prevent unjustified safe presentations.
 - Secured model loading with registry selection, approved-directory containment, SHA-256 validation for pipeline/vectorizer/manifest assets, compatibility checks, and fail-closed behavior for unavailable or inconsistent artifacts.
-- Documented and verified the latest checked-in validation snapshot of 218 backend pytest tests and 28 frontend Node tests, while recording browser-launch, deployment, provider, and model-artifact release limitations.
+- Documented and verified the 2026-07-29 release-candidate validation of 245 backend pytest tests and 33 frontend Node tests, while recording browser-launch, deployment, provider, and model-artifact release limitations.
 
 ## Short LinkedIn project description
 
@@ -36,7 +36,7 @@ The most important design decision was to keep the raw calibrated ML probability
 
 The project also includes artifact hash validation, registry-controlled model loading, privacy-safe logs, bounded requests, security headers, readiness and metrics endpoints, and opt-in browser-local sanitized history. Firebase remains optional, attachment contents are not scanned, and the repository has not been publicly deployed.
 
-The latest checked-in evidence records 218 backend tests and 28 frontend tests. The remaining work is deliberately visible: better provenance-complete data, independent qualification, browser verification, deployment validation, and a reviewed decision on authentication and shared rate limiting.
+The 2026-07-29 release-candidate evidence records 245 backend tests and 33 frontend tests. The remaining work is deliberately visible: better provenance-complete data, independent qualification, browser verification, deployment validation, and a reviewed decision on authentication and shared rate limiting.
 
 ## GitHub repository description
 
@@ -56,7 +56,7 @@ This project investigates how a defensive email-analysis system can combine a te
 
 ## Claim hygiene
 
-- Use “latest checked-in evidence: 218 backend and 28 frontend tests” unless a new run produces a reviewed result.
-- Do not publish “245 backend and 33 frontend tests” from this phase; that milestone is not supported by the current repository evidence.
-- Use the 82/100 and 22.9% pair only as the labeled synthetic decision-safety scenario described in [CASE_STUDY.md](CASE_STUDY.md), after reproducing it locally for a screenshot or talk.
+- Use “2026-07-29 release-candidate validation: 245 backend and 33 frontend tests,” with the local-validation and no-CI qualification.
+- Do not imply that the test count is a passing CI badge or a production-certification result.
+- Do not publish the 82/100 and 22.9% pair from the earlier portfolio narrative: it was not reproduced by the current synthetic fixture. Use the current verified fixture result (phishing/100, raw ML 1.0) or reproduce a separate scenario with fresh evidence.
 - Never use “production-ready,” “deployed,” “enterprise,” “commercial,” “100% accurate,” or “detects all phishing.”

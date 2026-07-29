@@ -11,8 +11,8 @@
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white" alt="FastAPI" /></a>
   <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white" alt="Next.js 15" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-React-3178C6?logo=typescript&logoColor=white" alt="TypeScript and React" /></a>
-  <img src="https://img.shields.io/badge/backend_tests-218_verified-15803D" alt="218 backend tests verified in the latest checked-in milestone" />
-  <img src="https://img.shields.io/badge/frontend_tests-28_verified-15803D" alt="28 frontend tests verified in the latest checked-in milestone" />
+  <img src="https://img.shields.io/badge/backend_tests-245_verified-15803D" alt="245 backend tests verified on 2026-07-29" />
+  <img src="https://img.shields.io/badge/frontend_tests-33_verified-15803D" alt="33 frontend tests verified on 2026-07-29" />
   <img src="https://img.shields.io/badge/security-privacy--reviewed-2563EB" alt="Privacy and security documentation reviewed" />
   <img src="https://img.shields.io/badge/model-candidate_inactive-B45309" alt="Registry model candidate inactive" />
 </p>
@@ -214,7 +214,7 @@ The analysis workflow processes input in memory. The API does not persist raw em
 
 The current candidate is a text-oriented calibrated Logistic Regression artifact. It does not establish sender reputation, verify live SPF/DKIM/DMARC, follow redirects, inspect attachment content, consult external threat intelligence, or guarantee detection of multilingual, image-only, compromised-account, novel, or template-shift phishing. External qualification of the rejected SVM candidate failed its precision/FPR gates, and hybrid structured-feature experiments also failed their declared gates. Those experiments were research-only and are not activated models. No model should be described as universally accurate.
 
-The latest checked-in validation snapshot records 218 backend pytest tests and 28 frontend Node tests. These are repository evidence, not a CI status badge. The browser security suite remains inconclusive because the host blocked browser child-process launch; provider deployment, HTTPS smoke tests, Docker execution, capacity, and public release remain unverified.
+The latest release-candidate validation records 245 backend pytest tests and 33 frontend Node tests on 2026-07-29. These are local repository evidence, not a CI status badge. The browser security suite remains inconclusive because the host blocked browser child-process launch; provider deployment, HTTPS smoke tests, Docker execution, capacity, and public release remain unverified.
 
 ## Known environment limitations
 

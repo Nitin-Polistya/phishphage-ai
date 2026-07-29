@@ -1,6 +1,6 @@
 # API Service
 
-FastAPI backend infrastructure for the PhishPhage AI MVP.
+FastAPI backend infrastructure for PhishShield AI.
 
 ## Included endpoints
 

@@ -44,9 +44,9 @@ The system now distinguishes `eligible`, `needs_review`, `unable_to_verify`, and
 
 ## Sanitized disagreement scenario
 
-The portfolio walkthrough uses a synthetic Microsoft-style impersonation email with an inert `example.org` destination. The model can assign a low raw phishing probability even though the message contains independent identity, routing, authentication, and sensitive-action evidence. In the documented scenario, the final displayed result is 82/100 while the raw ML probability remains 22.9%.
+The portfolio walkthrough uses a synthetic Microsoft-style impersonation email with an inert `example.org` destination. The current local run returned phishing/100 with raw ML probability 1.0 and applied the `brand_impersonation_with_routing_mismatch` safety floor. This is a scenario-specific demonstration of asymmetric safety fusion, not an accuracy statistic or inbox prevalence estimate.
 
-That pair is a scenario-specific demonstration of asymmetric safety fusion. It is not an accuracy statistic, not an inbox prevalence estimate, and not permission to edit a result image. Reproduce the fixture locally and capture the actual state before publishing the number.
+An earlier portfolio narrative described a separate 82/100 result with raw ML probability 22.9%. That pair was not reproduced by the current fixture and is now treated as an unsupported claim until a distinct, documented synthetic input reproduces it. Do not edit a result image to force the pair.
 
 ## Security hardening
 
@@ -60,7 +60,7 @@ Health, readiness, and metrics expose startup, model, request, analysis, inferen
 
 ## Testing
 
-The latest checked-in validation snapshot records 218 backend pytest tests, 28 frontend Node tests, TypeScript, lint, production build, pip check, and npm audit results. The browser security suite remains inconclusive because the host blocked child-process launch with `spawn EPERM`. Provider deployment, Docker execution, HTTPS smoke testing, and private artifact release validation were not performed.
+The 2026-07-29 release-candidate validation records 245 backend pytest tests, 33 frontend Node tests, TypeScript, lint, production build, pip check, and npm audit results. The browser security suite remains inconclusive because the host blocked child-process launch with `spawn EPERM`. Provider deployment, Docker execution, HTTPS smoke testing, and private artifact release validation were not performed.
 
 ## Final architecture
 
