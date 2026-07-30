@@ -1,6 +1,6 @@
 # Portfolio asset library
 
-This directory contains privacy-reviewed source material for the PhishShield AI portfolio presentation. It is intentionally organized so that generated assets and manual captures remain separate from application code.
+This directory contains privacy-reviewed source material for the PhishPhage AI portfolio presentation. It is intentionally organized so that generated assets and manual captures remain separate from application code.
 
 | Directory | Purpose |
 | --- | --- |

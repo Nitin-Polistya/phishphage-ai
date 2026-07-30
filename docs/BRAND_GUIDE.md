@@ -1,17 +1,17 @@
-# PhishShield AI brand guide
+# PhishPhage AI brand guide
 
 ## Identity
 
-- Canonical public name: **PhishShield AI**
+- Canonical public name: **PhishPhage AI**
 - Suggested tagline: **Explainable phishing detection with evidence-aware decision safety.**
 - Short descriptor: Defensive email analysis for human review.
 - Tone: calm, precise, evidence-led, privacy-conscious, and candid about uncertainty.
 
-Historical/internal `PhishPhage` identifiers may remain in compatibility metadata or old reports, but they are not the public product name and should not appear in new portfolio copy.
+Compatibility-sensitive identifiers may remain in metadata or old reports, but they do not change the public product name and should not appear as alternate branding in new portfolio copy.
 
 ## Logo and icon usage
 
-The current frontend mark is a blue shield with a light check. Keep the icon paired with the wordmark when space permits. At small sizes, use the shield alone only when the surrounding context already names PhishShield AI.
+The current frontend mark is a blue shield with a light check. Keep the icon paired with the wordmark when space permits. At small sizes, use the shield alone only when the surrounding context already names PhishPhage AI.
 
 Text/SVG-safe specification:
 

@@ -2,7 +2,7 @@
 
 This guide defines ground truth for the three-class evaluation schema. Labels
 must be based on available message evidence and source context, never on a
-PhishShield prediction, threshold, rule score, filename, or dataset shortcut.
+PhishPhage prediction, threshold, rule score, filename, or dataset shortcut.
 
 ## Safe
 

@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = Field(default='PhishShield AI API', alias='APP_NAME')
+    app_name: str = Field(default='PhishPhage AI API', alias='APP_NAME')
     app_version: str = Field(default='1.0.0-rc1', alias='APP_VERSION')
     environment: str = Field(default='development', alias='ENVIRONMENT')
     api_v1_prefix: str = Field(default='/api/v1', alias='API_V1_PREFIX')

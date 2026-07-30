@@ -1,6 +1,6 @@
 # Gold-standard evaluation dataset
 
-PhishShield AI separates production evaluation from dataset curation. The
+PhishPhage AI separates production evaluation from dataset curation. The
 versioned schema is [`services/ml/evaluation/schema/gold_standard_schema.json`](../services/ml/evaluation/schema/gold_standard_schema.json), and the standard-library curator is [`apps/api/scripts/build_gold_standard_dataset.py`](../apps/api/scripts/build_gold_standard_dataset.py).
 
 The current status is: **curation framework complete; more manual review

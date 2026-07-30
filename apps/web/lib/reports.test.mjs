@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-import { createScanReport } from './reports.ts';
+import { createPrintableReportHtml, createScanReport, serializeReportsToJson } from './reports.ts';
 
 function scanWithFreshness(status, reason) {
   return {
@@ -26,4 +27,30 @@ test('stale report freshness preserves the exact stale reason', () => {
   const report = createScanReport(scanWithFreshness('stale', reason));
   assert.equal(report.analysis_freshness, 'stale');
   assert.equal(report.stale_reason, reason);
+});
+
+test('reports use the current PhishPhage AI brand in data and printable output', () => {
+  const scan = scanWithFreshness('current', null);
+  const report = createScanReport(scan, '2026-07-17T00:00:00.000Z');
+  assert.equal(report.product, 'PhishPhage AI');
+  assert.match(serializeReportsToJson([scan]), /"product": "PhishPhage AI"/);
+  assert.match(createPrintableReportHtml(scan), /PhishPhage AI Report/);
+});
+
+test('current user-facing source files do not retain the previous display name', async () => {
+  const previousDisplayName = new RegExp(['Phish', 'Shield'].join(''), 'i');
+  const files = [
+    '../app/layout.tsx',
+    '../app/page.tsx',
+    '../app/icon.svg',
+    '../components/layout/sidebar.tsx',
+    '../components/dashboard/dashboard-overview.tsx',
+    '../components/reports/report-preview.tsx',
+    './reports.ts',
+    '../types/reports.ts',
+  ];
+  for (const file of files) {
+    const source = await readFile(new URL(file, import.meta.url), 'utf8');
+    assert.doesNotMatch(source, previousDisplayName, file);
+  }
 });

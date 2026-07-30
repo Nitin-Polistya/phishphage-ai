@@ -27,7 +27,7 @@ import { LandingSectionNavigation } from '@/components/landing/section-navigatio
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'PhishShield AI — Explainable phishing detection',
+    absolute: 'PhishPhage AI — Explainable phishing detection',
   },
   description: 'Analyze email content, headers, URLs, and attachment metadata with explainable phishing-risk scoring.',
 };
@@ -90,7 +90,7 @@ export default function LandingPage() {
             <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <ShieldAlert size={19} aria-hidden="true" />
             </span>
-            <span className="font-semibold tracking-tight text-foreground">PhishShield AI</span>
+            <span className="font-semibold tracking-tight text-foreground">PhishPhage AI</span>
           </Link>
 
           <LandingSectionNavigation />
@@ -117,7 +117,7 @@ export default function LandingPage() {
                 Stop phishing before it becomes an incident.
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-                PhishShield AI turns suspicious emails into clear, evidence-backed risk assessments—so you can understand the threat and act with confidence.
+                PhishPhage AI turns suspicious emails into clear, evidence-backed risk assessments—so you can understand the threat and act with confidence.
               </p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Button asChild size="lg" className="bg-primary px-6 text-primary-foreground hover:bg-primary">
@@ -301,7 +301,7 @@ export default function LandingPage() {
                 <ShieldAlert size={18} aria-hidden="true" />
               </span>
               <div>
-              <p className="text-sm font-semibold text-foreground">PhishShield AI</p>
+              <p className="text-sm font-semibold text-foreground">PhishPhage AI</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">Explainable phishing detection</p>
               </div>
             </div>
@@ -314,7 +314,7 @@ export default function LandingPage() {
           <Separator className="my-8 bg-surface-muted" />
           <div className="flex flex-col justify-between gap-2 text-xs text-muted-foreground sm:flex-row">
             <p>Built for transparent, evidence-led email security analysis.</p>
-            <p>PhishShield AI · Project information</p>
+            <p>PhishPhage AI · Project information</p>
           </div>
         </div>
       </footer>

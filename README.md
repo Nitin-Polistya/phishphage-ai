@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="apps/web/app/icon.svg" alt="PhishShield AI shield" width="72" />
+  <img src="apps/web/app/icon.svg" alt="PhishPhage AI shield" width="72" />
 </p>
 
-<h1 align="center">PhishShield AI</h1>
+<h1 align="center">PhishPhage AI</h1>
 
 <p align="center"><strong>Explainable phishing detection with evidence-aware decision safety.</strong></p>
 
@@ -23,7 +23,7 @@
 
 ## Why it exists
 
-PhishShield AI combines a Next.js interface, a FastAPI service, local RFC822/MIME parsing, deterministic security indicators, and a hash-checked local machine-learning candidate. It is intended to support human review during triage; it does not guarantee safety, identify every phishing message, or replace mail security controls.
+PhishPhage AI combines a Next.js interface, a FastAPI service, local RFC822/MIME parsing, deterministic security indicators, and a hash-checked local machine-learning candidate. It is intended to support human review during triage; it does not guarantee safety, identify every phishing message, or replace mail security controls.
 
 ## Key capabilities
 
@@ -37,7 +37,7 @@ PhishShield AI combines a Next.js interface, a FastAPI service, local RFC822/MIM
 
 ## Problem statement
 
-Email risk evidence is distributed across wording, headers, authentication results, links, HTML, and attachment metadata. PhishShield AI makes those signals easier to inspect without rendering email HTML, following URLs, executing attachments, or requiring the user to send raw email to a third-party analysis API.
+Email risk evidence is distributed across wording, headers, authentication results, links, HTML, and attachment metadata. PhishPhage AI makes those signals easier to inspect without rendering email HTML, following URLs, executing attachments, or requiring the user to send raw email to a third-party analysis API.
 
 ## Core capabilities
 
@@ -284,4 +284,4 @@ No root project license file is present. A license decision is required before t
 
 ## Disclaimer
 
-PhishShield AI is a defensive research and decision-support project. A result is not a verdict, legal advice, incident-response instruction, or guarantee that an email is safe or malicious. Verify sensitive requests through an independently opened trusted channel and follow your organization’s security process.
+PhishPhage AI is a defensive research and decision-support project. A result is not a verdict, legal advice, incident-response instruction, or guarantee that an email is safe or malicious. Verify sensitive requests through an independently opened trusted channel and follow your organization’s security process.

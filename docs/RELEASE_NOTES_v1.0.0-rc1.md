@@ -1,10 +1,10 @@
-# PhishShield AI v1.0.0-rc1 release notes
+# PhishPhage AI v1.0.0-rc1 release notes
 
 Status: release-candidate preparation only. The tag `v1.0.0-rc1` has not been created, no release has been published, and no deployment has occurred.
 
 ## Release summary
 
-This candidate packages the existing PhishShield AI defensive email-analysis workflow with reconciled application metadata, validated model integrity, expanded documentation, and a release-gate record. It is intended for review, not production certification.
+This candidate packages the existing PhishPhage AI defensive email-analysis workflow with reconciled application metadata, validated model integrity, expanded documentation, and a release-gate record. It is intended for review, not production certification.
 
 ## Major capabilities
 

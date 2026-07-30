@@ -6,7 +6,7 @@ All copy below is scoped to the repository evidence and the synthetic demonstrat
 
 ### A. Concise
 
-- Built PhishShield AI, a Next.js/FastAPI phishing-analysis platform that combines local email parsing, deterministic evidence, calibrated ML inference, and decision-safety explanations for human review.
+- Built PhishPhage AI, a Next.js/FastAPI phishing-analysis platform that combines local email parsing, deterministic evidence, calibrated ML inference, and decision-safety explanations for human review.
 
 ### B. Standard
 
@@ -24,11 +24,11 @@ All copy below is scoped to the repository evidence and the synthetic demonstrat
 
 ## Short LinkedIn project description
 
-PhishShield AI is an explainable phishing-analysis platform built with Next.js and FastAPI. It parses email locally, surfaces deterministic evidence, optionally uses a registry-controlled calibrated text model, and applies decision-safety checks so reviewers can see uncertainty instead of receiving a misleadingly confident safe verdict.
+PhishPhage AI is an explainable phishing-analysis platform built with Next.js and FastAPI. It parses email locally, surfaces deterministic evidence, optionally uses a registry-controlled calibrated text model, and applies decision-safety checks so reviewers can see uncertainty instead of receiving a misleadingly confident safe verdict.
 
 ## Long LinkedIn project post
 
-I built PhishShield AI to explore a practical question in email security: what should a tool do when a statistical model and strong deterministic evidence disagree?
+I built PhishPhage AI to explore a practical question in email security: what should a tool do when a statistical model and strong deterministic evidence disagree?
 
 The project combines a Next.js interface with a FastAPI analysis service. It accepts Quick Paste, raw RFC822, and `.eml` inputs; parses headers, body text, links, authentication results, and attachment metadata; and returns structured evidence with recommendations.
 
@@ -44,11 +44,11 @@ Explainable phishing analysis with local email parsing, deterministic evidence, 
 
 ## Portfolio-card description
 
-PhishShield AI turns suspicious email into an evidence-backed review workflow. The project demonstrates privacy-conscious RFC822/MIME parsing, rule/ML fusion, model artifact integrity checks, safety floors, browser-local history, and operational safeguards without claiming universal detection or public deployment.
+PhishPhage AI turns suspicious email into an evidence-backed review workflow. The project demonstrates privacy-conscious RFC822/MIME parsing, rule/ML fusion, model artifact integrity checks, safety floors, browser-local history, and operational safeguards without claiming universal detection or public deployment.
 
 ## Interview elevator pitch
 
-“PhishShield AI is a Next.js/FastAPI email-analysis workspace. It parses email locally, extracts explainable signals, optionally runs a calibrated text classifier, and then keeps model and rule evidence separate so a safety layer can prevent a false reassurance when independent evidence is concerning. I treated model integrity, privacy, and uncertainty as first-class product behavior, and documented the limits rather than hiding failed experiments.”
+“PhishPhage AI is a Next.js/FastAPI email-analysis workspace. It parses email locally, extracts explainable signals, optionally runs a calibrated text classifier, and then keeps model and rule evidence separate so a safety layer can prevent a false reassurance when independent evidence is concerning. I treated model integrity, privacy, and uncertainty as first-class product behavior, and documented the limits rather than hiding failed experiments.”
 
 ## Professor or project-review summary
 

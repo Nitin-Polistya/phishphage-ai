@@ -4,7 +4,7 @@ import type { ScanReportData } from '@/types/reports';
 export type ReportExportFormat = 'json' | 'csv';
 
 export const LARGE_BATCH_EXPORT_THRESHOLD = 10;
-export const REPORT_PRIVACY_DISCLAIMER = 'This report contains analysis metadata and findings only. Raw email bodies and full raw headers are excluded. Reports are generated in browser memory and are not stored by PhishShield AI.';
+export const REPORT_PRIVACY_DISCLAIMER = 'This report contains analysis metadata and findings only. Raw email bodies and full raw headers are excluded. Reports are generated in browser memory and are not stored by PhishPhage AI.';
 
 export function formatReportInputMode(inputMode: ScanReportData['input_mode']) {
   if (inputMode === 'quick_paste') return 'Quick Paste';
@@ -57,7 +57,7 @@ export function createScanReport(scan: ScanRecord, generatedAt = new Date().toIS
   const safeAllowed = details?.safeVerdictAllowed === true && details?.fusionPolicyVersion === 'asymmetric-safety-v1' && analysisFreshness === 'current';
   return {
     report_schema_version: '1.3',
-    product: 'PhishShield AI',
+    product: 'PhishPhage AI',
     report_generated_at: generatedAt,
     scan_id: scan.id,
     scan_timestamp: scan.timestamp,
@@ -183,7 +183,7 @@ export function serializeReportsToJson(scans: ScanRecord[], generatedAt = new Da
   const reports = scans.map((scan) => createScanReport(scan, generatedAt));
   const payload = reports.length === 1
     ? reports[0]
-    : { product: 'PhishShield AI', report_generated_at: generatedAt, report_count: reports.length, reports };
+    : { product: 'PhishPhage AI', report_generated_at: generatedAt, report_count: reports.length, reports };
   return JSON.stringify(payload, null, 2);
 }
 
@@ -274,7 +274,7 @@ export function createPrintableReportHtml(scan: ScanRecord, generatedAt = new Da
     ? `<table><thead><tr><th>Filename</th><th>Content type</th><th>Size</th><th>Disposition</th></tr></thead><tbody>${report.attachments.map((attachment) => `<tr><td>${escapeHtml(attachment.filename || 'Unnamed')}</td><td>${escapeHtml(attachment.content_type || 'Unknown')}</td><td>${escapeHtml(attachment.size_bytes)} bytes</td><td>${escapeHtml(attachment.disposition || 'Not recorded')}</td></tr>`).join('')}</tbody></table>`
     : '<p class="muted">No attachment metadata recorded.</p>';
 
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PhishShield AI Report - ${escapeHtml(report.subject)}</title><style>
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PhishPhage AI Report - ${escapeHtml(report.subject)}</title><style>
     @page { size: auto; margin: 16mm; }
     * { box-sizing: border-box; }
     body { margin: 0; color: #0f172a; background: #fff; font: 13px/1.5 Arial, Helvetica, sans-serif; }
@@ -291,7 +291,7 @@ export function createPrintableReportHtml(scan: ScanRecord, generatedAt = new Da
     ul { margin: 6px 0; padding-left: 20px; } li { break-inside: avoid; } .privacy { border: 1px solid #94a3b8; background: #f8fafc; padding: 12px; font-size: 11px; break-inside: avoid; }
     @media print { body { color: #000; background: #fff; } a { color: #000; text-decoration: none; } .section.allow-break { break-inside: auto; } }
   </style></head><body>
-    <header><div><div class="brand">PhishShield AI</div><h1>Email Analysis Report</h1></div><div><p><strong>Report generated</strong></p><p>${escapeHtml(formatReportDate(report.report_generated_at))}</p></div></header>
+    <header><div><div class="brand">PhishPhage AI</div><h1>Email Analysis Report</h1></div><div><p><strong>Report generated</strong></p><p>${escapeHtml(formatReportDate(report.report_generated_at))}</p></div></header>
     <section class="verdict"><div class="metric"><span class="muted">Presentation state</span><strong>${escapeHtml(report.presentation_state)}</strong></div><div class="metric"><span class="muted">Risk score</span><strong>${escapeHtml(report.risk_score)}/100</strong></div><div class="metric"><span class="muted">Confidence</span><strong>${escapeHtml(Math.round(report.confidence * 100))}%</strong></div></section>
     ${report.analysis_freshness === 'stale' || !report.safe_verdict_allowed ? `<section class="section"><div class="privacy"><strong>${escapeHtml(report.presentation_state === 'rescan_required' ? 'Re-scan required' : 'Needs review')}</strong><p>${escapeHtml(report.stale_reason || report.missing_evidence.join(', ') || 'The evidence does not support a confident safe presentation.')}</p></div></section>` : ''}
     <section class="section"><h2>Email and scan metadata</h2><dl class="metadata"><dt>Scan timestamp</dt><dd>${escapeHtml(formatReportDate(report.scan_timestamp))}</dd><dt>Subject</dt><dd>${escapeHtml(report.subject)}</dd><dt>Sender</dt><dd>${escapeHtml(report.sender)}</dd><dt>Recipients</dt><dd>${escapeHtml(report.recipients.join(', ') || 'Not recorded')}</dd><dt>Input mode</dt><dd>${escapeHtml(formatReportInputMode(report.input_mode))}</dd></dl></section>

@@ -62,7 +62,7 @@ def health_check() -> HealthResponse:
         )
     return HealthResponse(
         status='ok' if health['inference_ready'] else 'degraded',
-        service='phishshield-api',
+        service=get_settings().app_name,
         firebase=firebase_status,
         firebase_enabled=firebase_status == 'configured',
         application_version=get_settings().app_version,

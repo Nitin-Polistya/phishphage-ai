@@ -34,7 +34,7 @@ export function DashboardOverview() {
             <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
             {isLoaded ? 'Local data - stored in this browser' : 'Loading local scan data...'}
           </Badge>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">PhishShield AI Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">PhishPhage AI Dashboard</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
             Monitor recent phishing-detection activity, risk distribution, and the signals driving email classifications.
           </p>

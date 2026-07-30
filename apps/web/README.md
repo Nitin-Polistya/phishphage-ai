@@ -1,4 +1,4 @@
-# PhishShield AI web application
+# PhishPhage AI web application
 
 The frontend is a Next.js App Router application. It provides an in-memory raw-email analysis workspace at `/analyze` and reads the production FastAPI inference service.
 

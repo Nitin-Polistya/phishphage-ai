@@ -7,7 +7,7 @@
 - [ ] No personal history, bookmarks, autofill, or notifications.
 - [ ] Synthetic subject and sender.
 - [ ] Synthetic fixture from `docs/assets/demo/`.
-- [ ] Correct project name: PhishShield AI.
+- [ ] Correct project name: PhishPhage AI.
 - [ ] Correct light/dark theme for the capture plan.
 
 ## Privacy and truthfulness
@@ -37,8 +37,8 @@
 
 | Asset | Alt text |
 | --- | --- |
-| `landing-light.png` | PhishShield AI landing page showing explainable email analysis, three input modes, and an in-memory privacy boundary. |
-| `dashboard-light.png` | PhishShield AI dashboard showing sanitized synthetic scan summaries and security insights. |
+| `landing-light.png` | PhishPhage AI landing page showing explainable email analysis, three input modes, and an in-memory privacy boundary. |
+| `dashboard-light.png` | PhishPhage AI dashboard showing sanitized synthetic scan summaries and security insights. |
 | `analyzer-input.png` | Analyze Email workspace showing Quick Paste, raw source, and `.eml` input choices with privacy guidance. |
 | `phishing-result.png` | Synthetic phishing analysis result showing a high-concern classification, evidence-backed score, and human-review recommendation. |
 | `decision-safety.png` | Decision-safety panel showing rule and ML disagreement, preserved raw probability, and a bounded safety floor explanation. |
@@ -47,5 +47,5 @@
 | `reports.png` | Reports workspace showing a privacy-safe report preview generated from sanitized synthetic scan history. |
 | `settings.png` | Settings workspace showing local history preference, theme controls, and service status without secrets. |
 | `api-swagger.png` | Local FastAPI Swagger page showing documented health and analysis endpoints without credentials. |
-| `health-readiness.png` | Local PhishShield AI health and readiness output showing actual service and model state without paths or secrets. |
-| `architecture.svg` | PhishShield AI architecture diagram connecting browser, FastAPI, parser, rules, approved ML, safety fusion, local history, registry, and observability. |
+| `health-readiness.png` | Local PhishPhage AI health and readiness output showing actual service and model state without paths or secrets. |
+| `architecture.svg` | PhishPhage AI architecture diagram connecting browser, FastAPI, parser, rules, approved ML, safety fusion, local history, registry, and observability. |

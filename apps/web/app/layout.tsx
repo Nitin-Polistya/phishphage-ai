@@ -7,19 +7,19 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'PhishShield AI',
-    template: '%s | PhishShield AI',
+    default: 'PhishPhage AI',
+    template: '%s | PhishPhage AI',
   },
-  description: 'PhishShield AI provides explainable, privacy-conscious phishing risk analysis for suspicious emails.',
+  description: 'PhishPhage AI provides explainable, privacy-conscious phishing risk analysis for suspicious emails.',
   keywords: ['phishing detection', 'email security', 'explainable ML', 'FastAPI', 'Next.js'],
-  authors: [{ name: 'PhishShield AI contributors' }],
-  creator: 'PhishShield AI',
+  authors: [{ name: 'PhishPhage AI contributors' }],
+  creator: 'PhishPhage AI',
   openGraph: {
-    title: 'PhishShield AI — Explainable email risk analysis',
+    title: 'PhishPhage AI — Explainable email risk analysis',
     description: 'Understand suspicious email signals with calibrated, privacy-conscious analysis.',
     type: 'website',
   },
-  twitter: { card: 'summary', title: 'PhishShield AI', description: 'Explainable phishing risk analysis for suspicious emails.' },
+  twitter: { card: 'summary', title: 'PhishPhage AI', description: 'Explainable phishing risk analysis for suspicious emails.' },
   robots: { index: false, follow: false },
 };
 

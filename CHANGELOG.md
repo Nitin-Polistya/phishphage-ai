@@ -2,6 +2,10 @@
 
 All notable repository changes are documented here. The project has no historical release tags or released versions to summarize.
 
+### Brand rename
+
+- The project was renamed from PhishShield AI to PhishPhage AI. Historical entries retain the former name where they record the prior release state.
+
 ## [1.0.0-rc1] - 2026-07-29
 
 This is a release candidate, not a final release. It has not been tagged, published, or deployed.

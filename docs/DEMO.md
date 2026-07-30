@@ -1,4 +1,4 @@
-# PhishShield AI portfolio demo
+# PhishPhage AI portfolio demo
 
 Target length: 3-5 minutes. Use only the synthetic fixtures in [`assets/demo/`](assets/demo/) and keep the backend/model state truthful. This is a decision-support demonstration, not a claim of production certification or universal detection.
 
@@ -6,7 +6,7 @@ Target length: 3-5 minutes. Use only the synthetic fixtures in [`assets/demo/`](
 
 ### 1. Problem introduction (20 seconds)
 
-“Suspicious email risk is spread across wording, identity, routing, authentication, links, and attachment metadata. PhishShield AI brings those signals into one explainable review surface. The goal is to help a human make a safer next decision, not to replace mail controls or judgment.”
+“Suspicious email risk is spread across wording, identity, routing, authentication, links, and attachment metadata. PhishPhage AI brings those signals into one explainable review surface. The goal is to help a human make a safer next decision, not to replace mail controls or judgment.”
 
 ### 2. Landing page (15 seconds)
 
@@ -54,4 +54,4 @@ Show `system-architecture.mmd` or its reviewed export. Say: “The browser calls
 
 ## Closing line
 
-“PhishShield AI makes uncertainty and evidence visible so a reviewer can slow down a risky action.”
+“PhishPhage AI makes uncertainty and evidence visible so a reviewer can slow down a risky action.”

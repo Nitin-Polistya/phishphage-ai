@@ -35,7 +35,7 @@ Response body, HTTP 200:
 
 ```json
 {
-  "message": "PhishShield AI API is running"
+  "message": "PhishPhage AI API is running"
 }
 ```
 
@@ -60,7 +60,7 @@ Response body, HTTP 200:
 ```json
 {
   "status": "ok",
-  "service": "phishshield-api"
+  "service": "PhishPhage AI API"
 }
 ```
 
@@ -85,7 +85,7 @@ Response body, HTTP 200:
 ```json
 {
   "status": "ready",
-  "service": "PhishShield AI API",
+  "service": "PhishPhage AI API",
   "startup_complete": true,
   "registry_valid": true,
   "model_available": true
@@ -159,7 +159,7 @@ Response body, HTTP 200 example:
 ```json
 {
   "status": "ok",
-  "service": "phishshield-api",
+  "service": "PhishPhage AI API",
   "firebase": "not_configured",
   "firebase_enabled": false,
   "loaded_model": "phase-c-logistic-regression-v1",

@@ -1,4 +1,4 @@
-"""Production evaluation and benchmarking harness for PhishShield AI v1.
+"""Production evaluation and benchmarking harness for PhishPhage AI v1.
 
 This script is deliberately evaluation-only.  It loads the registry-selected
 production pipeline, never fits or mutates a model, and refuses to turn binary
@@ -940,7 +940,7 @@ def write_reports(output_dir: Path, load: DatasetLoad, rows: list[dict[str, Any]
     (output_dir / "NEXT_IMPROVEMENTS.md").write_text(next_improvements, encoding="utf-8")
     binary = metrics["binary_phishing_vs_non_phishing"]
     summary_lines = [
-        "# PhishShield AI v1.0.0 Evaluation Summary", "", f"Evaluator version: `{EVALUATOR_VERSION}`", f"Generated: `{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}`", "", "## Ground-truth gate", "", f"- Discovered records: **{len(load.candidates)}**", f"- Eligible records: **{len(load.samples)}**", f"- Rejected records: **{len(load.rejected)}**", f"- Supported labels: `{', '.join(VALID_LABELS)}`", "", "The runner does not infer labels, dates, campaigns, or categories. Rejected records remain outside every metric.", ""]
+        "# PhishPhage AI v1.0.0 Evaluation Summary", "", f"Evaluator version: `{EVALUATOR_VERSION}`", f"Generated: `{time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}`", "", "## Ground-truth gate", "", f"- Discovered records: **{len(load.candidates)}**", f"- Eligible records: **{len(load.samples)}**", f"- Rejected records: **{len(load.rejected)}**", f"- Supported labels: `{', '.join(VALID_LABELS)}`", "", "The runner does not infer labels, dates, campaigns, or categories. Rejected records remain outside every metric.", ""]
     if load.rejected:
         summary_lines += ["### Missing or invalid data", ""]
         for field_name, count in sorted(dataset_status["missing_fields"].items()): summary_lines.append(f"- Missing `{field_name}`: {count} record(s)")

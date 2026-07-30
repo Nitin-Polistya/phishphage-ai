@@ -680,7 +680,7 @@ def write_repository_audit(report_root: Path) -> dict[str, Any]:
     eligibility = [
         "# Gold-standard source eligibility",
         "",
-        "This audit inspects local dataset artifacts and prior provenance reports. It does not convert source labels into PhishShield ground truth.",
+        "This audit inspects local dataset artifacts and prior provenance reports. It does not convert source labels into PhishPhage ground truth.",
         "",
         "## Classification counts",
         "",

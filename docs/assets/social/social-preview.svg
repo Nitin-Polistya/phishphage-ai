@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
-  <title id="title">PhishShield AI social preview</title>
-  <desc id="desc">A dark portfolio preview for PhishShield AI with a shield logo, explainable phishing detection tagline, and a synthetic analysis result card.</desc>
+  <title id="title">PhishPhage AI social preview</title>
+  <desc id="desc">A dark portfolio preview for PhishPhage AI with a shield logo, explainable phishing detection tagline, and a synthetic analysis result card.</desc>
   <defs>
     <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
       <stop offset="0" stop-color="#0F172A"/>
@@ -13,7 +13,7 @@
     <rect width="62" height="62" rx="14" fill="#2563EB"/>
     <path d="M31 10 48 17v13c0 11-6.7 19.6-17 24C20.7 49.6 14 41 14 30V17l17-7Z" fill="#EFF6FF"/>
     <path d="m22 31 6 6 13-14" fill="none" stroke="#2563EB" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
-    <text x="82" y="41" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="31" font-weight="700">PhishShield AI</text>
+    <text x="82" y="41" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="31" font-weight="700">PhishPhage AI</text>
   </g>
   <text x="72" y="220" fill="#F8FAFC" font-family="Arial, sans-serif" font-size="43" font-weight="700">Explainable phishing detection</text>
   <text x="72" y="274" fill="#BFDBFE" font-family="Arial, sans-serif" font-size="27">with evidence-aware decision safety.</text>

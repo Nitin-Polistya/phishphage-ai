@@ -19,4 +19,4 @@ Audit date: 2026-07-29. The application release candidate is `1.0.0-rc1`; the Gi
 
 The prior documentation version report described the pre-RC `0.1.0` state and is historical evidence. This report supersedes its application-version rows. The runtime API/frontend model freshness constants already match the registry model version `1.0.0`; no model-version, threshold, calibration, artifact, or registry edit was made.
 
-The public API label is now `PhishShield AI API`. Browser storage keys, research source IDs, and historical reports containing `PhishPhage` remain compatibility/history identifiers and were not renamed because doing so would change migration behavior or research provenance.
+The current public API label is now `PhishPhage AI API`; the project was renamed from `PhishShield AI`. Browser storage keys, research source IDs, and historical reports are compatibility/history data and were not renamed because doing so would change migration behavior or research provenance.

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "phishshield://evaluation/gold-standard-schema/1.0",
-  "title": "PhishShield AI Gold-Standard Evaluation Sample",
+  "title": "PhishPhage AI Gold-Standard Evaluation Sample",
   "description": "Privacy-safe metadata for a manually reviewed evaluation sample. Raw content is never embedded in this record.",
   "type": "object",
   "additionalProperties": false,

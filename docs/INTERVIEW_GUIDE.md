@@ -1,4 +1,4 @@
-# PhishShield AI interview guide
+# PhishPhage AI interview guide
 
 Answers are intentionally candid about the current scope and failed experiments.
 

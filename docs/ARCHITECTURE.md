@@ -2,7 +2,7 @@
 
 ## System overview
 
-PhishShield AI is a browser-to-API analysis system with a local privacy boundary. The frontend collects one input at a time. The API parses and analyzes the input in memory, then returns structured evidence. The browser may optionally save a sanitized summary of a completed scan for the dashboard, history, and report views.
+PhishPhage AI is a browser-to-API analysis system with a local privacy boundary. The frontend collects one input at a time. The API parses and analyzes the input in memory, then returns structured evidence. The browser may optionally save a sanitized summary of a completed scan for the dashboard, history, and report views.
 
 ```mermaid
 flowchart LR
@@ -19,7 +19,7 @@ flowchart LR
   registry[Versioned model registry] --> model
 ```
 
-The public product name is PhishShield AI. Historical reports and browser-storage compatibility keys may still contain `PhishPhage`; these are migration identifiers, not a separate product or release name.
+The public product name is PhishPhage AI. Historical reports, browser-storage keys, and research source IDs may retain compatibility identifiers; these are migration or provenance identifiers, not separate product or release names.
 
 ## Frontend architecture
 

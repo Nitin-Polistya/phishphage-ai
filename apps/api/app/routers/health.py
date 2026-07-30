@@ -20,7 +20,7 @@ router = APIRouter()
 
 @router.get('/health', response_model=HealthResponse)
 def health_check() -> HealthResponse:
-    return HealthResponse(status='ok', service='phishshield-api')
+    return HealthResponse(status='ok', service=get_settings().app_name)
 
 
 @router.get('/ready')

@@ -6,7 +6,7 @@ All captures use synthetic input from [`assets/demo/`](assets/demo/) or the app'
 
 | # | Screenshot | Route | Viewport / theme | Test data | Must be visible | Must be hidden | Filename | README placement |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Landing page | `/` | 1440x900, light | No email data | PhishShield AI name, tagline, input modes, privacy boundary, primary CTA | Browser tabs, local paths, fabricated metrics | `landing-light.png` | Hero gallery, first image after the introduction |
+| 1 | Landing page | `/` | 1440x900, light | No email data | PhishPhage AI name, tagline, input modes, privacy boundary, primary CTA | Browser tabs, local paths, fabricated metrics | `landing-light.png` | Hero gallery, first image after the introduction |
 | 2 | Dashboard | `/dashboard` | 1440x900, light | Synthetic scan summaries only | Overview cards, recent scans, safety/privacy language | Real history, personal names, stale backend errors | `dashboard-light.png` | Capabilities gallery |
 | 3 | Analyzer input modes | `/analyze` | 1440x900, light | Quick Paste fields plus synthetic raw/EML options | Quick Paste, Raw Email, `.eml Upload`, limits, privacy notice | Real mailbox content, secrets, active destinations | `analyzer-input.png` | Demo flow |
 | 4 | High-risk phishing result | `/analyze` after `phishing_brand_impersonation.eml` | 1440x900, light | Synthetic Microsoft-style fixture | Final classification, score, raw ML probability, result freshness | Any edited number, live link, raw full headers | `phishing-result.png` | Results gallery |

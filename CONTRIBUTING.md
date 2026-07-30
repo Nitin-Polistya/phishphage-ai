@@ -1,6 +1,6 @@
-# Contributing to PhishShield AI
+# Contributing to PhishPhage AI
 
-PhishShield AI is a defensive cybersecurity project. Contributions should improve analysis, explainability, safety, privacy, or documentation without turning the system into an automated guarantee.
+PhishPhage AI is a defensive cybersecurity project. Contributions should improve analysis, explainability, safety, privacy, or documentation without turning the system into an automated guarantee.
 
 ## Community expectations
 
@@ -52,5 +52,4 @@ Do not commit model binaries, private artifact URLs, secrets, unverified registr
 
 ## Documentation expectations
 
-Document what the repository proves, distinguish local validation from deployment, disclose known limitations, and avoid accuracy or safety guarantees. Use the canonical public name PhishShield AI in new public documentation; preserve internal names when changing them would be an unrelated compatibility change.
-
+Document what the repository proves, distinguish local validation from deployment, disclose known limitations, and avoid accuracy or safety guarantees. Use the canonical public name PhishPhage AI in new public documentation; preserve internal names when changing them would be an unrelated compatibility change.

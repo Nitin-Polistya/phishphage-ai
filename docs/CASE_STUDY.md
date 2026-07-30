@@ -1,4 +1,4 @@
-# PhishShield AI technical case study
+# PhishPhage AI technical case study
 
 This case study describes the engineering progression using sanitized and synthetic examples. It is a portfolio narrative, not a production certification or a model benchmark.
 

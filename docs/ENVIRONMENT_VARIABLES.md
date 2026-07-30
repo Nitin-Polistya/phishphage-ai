@@ -6,7 +6,7 @@ Values below are configuration placeholders, not secrets. The backend reads `app
 
 | Variable | Default/requiredness | Purpose |
 | --- | --- | --- |
-| `APP_NAME` | `PhishShield AI API`; optional | API service label. The public product name is PhishShield AI. |
+| `APP_NAME` | `PhishPhage AI API`; optional | API service label. The public product name is PhishPhage AI. |
 | `APP_VERSION` | `1.0.0-rc1`; optional | Application release-candidate version returned by health metadata. |
 | `ENVIRONMENT` | `development`; set `production` for deployment | Enables production validation/HSTS behavior. |
 | `API_V1_PREFIX` | `/api/v1`; optional | Intended API namespace setting. Current router registration is explicitly `/api/v1`; changing this variable alone does not remount routes. |

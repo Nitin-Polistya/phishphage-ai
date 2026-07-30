@@ -17,7 +17,7 @@ export interface ReportIndicator {
 
 export interface ScanReportData {
   report_schema_version: '1.3';
-  product: 'PhishShield AI';
+  product: 'PhishPhage AI';
   report_generated_at: string;
   scan_id: string;
   scan_timestamp: string;
