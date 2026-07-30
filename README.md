@@ -50,6 +50,9 @@ Email risk evidence is distributed across wording, headers, authentication resul
 - An optional local dataset-review workspace with a consented, sanitized,
   advisory-only Gemini assistant; it is disabled by default and never affects
   production `/analyze`.
+- A Phase III gold-dataset manager with human-only approval, reviewer agreement,
+  duplicate detection, immutable audit history, quality metrics, and
+  privacy-safe approved-only exports.
 - Explicit model/rule agreement, limited-evidence warnings, and safe fallback behavior.
 - Optional browser-local scan history and browser-generated reports. History is disabled unless the user enables it; raw bodies and complete raw headers are excluded from saved records.
 - Request IDs, bounded payloads, process-local rate limits, safe errors, security headers, CSP, privacy-safe logs, health, readiness, and metrics endpoints.
@@ -252,6 +255,7 @@ Current status: local integration and deployment preparation only. The included 
 - [Datasets](docs/DATASETS.md)
 - [Gold-standard evaluation dataset](docs/GOLD_STANDARD_DATASET.md)
 - [Gemini review assistant](docs/GEMINI_REVIEW_ASSISTANT.md)
+- [Gold dataset management](docs/GOLD_DATASET_MANAGEMENT.md)
 - [Labeling guide](docs/LABELING_GUIDE.md)
 - [Evaluation privacy](docs/EVALUATION_PRIVACY.md)
 - [Security](docs/SECURITY.md)

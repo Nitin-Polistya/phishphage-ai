@@ -5,6 +5,7 @@ from app.api.v1.health import router as v1_health_router
 from app.api.v1.analysis import router as v1_analysis_router
 from app.api.v1.analyze import router as v1_analyze_router
 from app.api.v1.dataset_review import router as v1_dataset_review_router
+from app.api.v1.gold_dataset import router as v1_gold_dataset_router
 
 api_router = APIRouter()
 
@@ -13,3 +14,4 @@ api_router.include_router(v1_email_parser_router, prefix='/api/v1', tags=['v1'])
 api_router.include_router(v1_analysis_router, prefix='/api/v1', tags=['v1'])
 api_router.include_router(v1_analyze_router, prefix='/api/v1', tags=['v1'])
 api_router.include_router(v1_dataset_review_router, prefix='/api/v1', tags=['dataset-review'])
+api_router.include_router(v1_gold_dataset_router, prefix='/api/v1', tags=['dataset-review'])

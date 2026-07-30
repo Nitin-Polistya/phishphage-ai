@@ -12,6 +12,11 @@ The optional local Gemini assistant is documented in
 [`GEMINI_REVIEW_ASSISTANT.md`](GEMINI_REVIEW_ASSISTANT.md). It produces an
 advisory suggestion only; it cannot replace a human label or reviewer two.
 
+Long-term reviewed-sample storage, state transitions, reviewer agreement,
+duplicate controls, immutable audit history, dashboard metrics, and approved
+privacy-safe exports are documented in
+[`GOLD_DATASET_MANAGEMENT.md`](GOLD_DATASET_MANAGEMENT.md).
+
 ## Record contract
 
 Every public record contains a deterministic `sample_id`, stable SHA-256

@@ -60,6 +60,9 @@ Thumbs.db
 !/reports/release_candidate/**
 !/reports/gold_standard/
 !/reports/gold_standard/**
+# Phase III writes review statistics locally; generated reports are not source.
+/reports/gold_standard/phase_iii/*
+!/reports/gold_standard/phase_iii/.gitkeep
 
 # Gold-standard curation keeps raw content and absolute local paths private.
 /services/ml/evaluation/private/*

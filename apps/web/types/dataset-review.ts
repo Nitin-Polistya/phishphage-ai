@@ -77,3 +77,24 @@ export interface GeminiSuggestion {
   generated_at: string;
   provider_usage: { input_tokens: number | null; output_tokens: number | null; total_tokens: number | null };
 }
+
+export interface GoldDatasetDashboard {
+  total_samples: number;
+  review_completion: number;
+  approved_samples: number;
+  review_queue: Record<string, number>;
+  reviewer_agreement: {
+    reviewer_a: string;
+    reviewer_b: string;
+    sample_count: number;
+    agreement_count: number;
+    disagreement_count: number;
+    agreement_rate: number;
+    cohen_kappa: number;
+  } | null;
+  label_distribution: Record<string, number>;
+  language_distribution: Record<string, number>;
+  confidence_distribution: Record<string, number>;
+  source_distribution: Record<string, number>;
+  second_review_count: number;
+}

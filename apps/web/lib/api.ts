@@ -1,6 +1,6 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { HealthResponse, PredictionResponse } from '@/types/inference';
-import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, ReviewLabel, ReviewMode, SanitizedReviewPayload } from '@/types/dataset-review';
+import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, ReviewLabel, ReviewMode, SanitizedReviewPayload } from '@/types/dataset-review';
 export type { HealthResponse } from '@/types/inference';
 
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'timeout' | 'cancelled' | 'unexpected';
@@ -113,6 +113,52 @@ export function saveDatasetHumanReview(
   token: string,
 ) {
   return datasetReviewRequest('/reviews', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function createGoldDatasetReview(
+  payload: {
+    sample_hash: string;
+    normalized_content_hash: string;
+    source_dataset: string;
+    source_sample_id: string;
+    source_identifier: string;
+    campaign_identifier: string;
+    reviewer_name: string;
+    language: string;
+    phishing_label: ReviewLabel;
+    label_quality: 'high' | 'medium' | 'low' | 'unresolved';
+    reviewer_confidence: number;
+    review_notes: string;
+    gemini_recommendation?: ReviewLabel | null;
+    gemini_reasoning_summary?: string | null;
+    accepted_gemini_recommendation?: boolean | null;
+    requires_second_review: boolean;
+    state: 'pending';
+  },
+  token: string,
+): Promise<{ review_id: string; state: string }> {
+  return datasetReviewRequest<{ review_id: string; state: string }>('/gold-dataset/reviews', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function transitionGoldDatasetReview(
+  reviewId: string,
+  token: string,
+  newState: 'reviewed' | 'approved' | 'needs_second_review' | 'rejected' | 'archived',
+  reviewerName: string,
+  reason: string,
+): Promise<{ review_id: string; state: string }> {
+  return datasetReviewRequest<{ review_id: string; state: string }>(`/gold-dataset/reviews/${encodeURIComponent(reviewId)}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ new_state: newState, reviewer_name: reviewerName, reason }),
+  }, token);
+}
+
+export function fetchGoldDatasetDashboard(token: string): Promise<GoldDatasetDashboard> {
+  return datasetReviewRequest<GoldDatasetDashboard>('/gold-dataset/dashboard', {}, token);
+}
+
+export function exportGoldDataset(token: string): Promise<{ exported_samples: number; files: string[]; privacy_contract: string }> {
+  return datasetReviewRequest<{ exported_samples: number; files: string[]; privacy_contract: string }>('/gold-dataset/export', { method: 'POST', body: JSON.stringify({}) }, token);
 }
 
 export async function analyzeProductionEmail(rawEmail: string, signal?: AbortSignal): Promise<PredictionResponse> {

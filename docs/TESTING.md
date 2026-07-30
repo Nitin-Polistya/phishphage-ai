@@ -105,3 +105,9 @@ cover disabled flags, local-only access, token authorization, sanitization and
 limits, hash-bound consent, strict structured output, provider failures,
 human-only labels, deterministic reviewer packages, and session/daily limits.
 Do not configure a live provider request in automated tests.
+
+Phase III tests in `apps/api/tests/test_gold_dataset_manager.py` cover state
+transitions, duplicate detection, reviewer agreement and Cohen's kappa,
+approval gates, immutable audit triggers, privacy-safe exports, reports, and
+dashboard metrics. They use temporary SQLite databases and deterministic
+synthetic reviewer records.
