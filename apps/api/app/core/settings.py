@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -42,6 +42,42 @@ class Settings(BaseSettings):
     firebase_project_id: str | None = Field(default=None, alias='FIREBASE_PROJECT_ID')
     firebase_client_email: str | None = Field(default=None, alias='FIREBASE_CLIENT_EMAIL')
     firebase_private_key: str | None = Field(default=None, alias='FIREBASE_PRIVATE_KEY')
+
+    # Dataset curation is deliberately disabled by default and is kept out of
+    # the production inference configuration. Secret fields are never exposed
+    # through a response model or diagnostic payload.
+    dataset_review_enabled: bool = Field(default=False, alias='DATASET_REVIEW_ENABLED')
+    dataset_review_local_only: bool = Field(default=True, alias='DATASET_REVIEW_LOCAL_ONLY')
+    dataset_review_admin_token: str | None = Field(default=None, alias='DATASET_REVIEW_ADMIN_TOKEN', repr=False)
+    gemini_review_enabled: bool = Field(default=False, alias='GEMINI_REVIEW_ENABLED')
+    gemini_api_key: str | None = Field(default=None, alias='GEMINI_API_KEY', repr=False)
+    google_api_key: str | None = Field(default=None, alias='GOOGLE_API_KEY', repr=False)
+    gemini_model: str | None = Field(default=None, alias='GEMINI_MODEL')
+    gemini_request_timeout_seconds: int = Field(default=45, ge=1, le=120, alias='GEMINI_REQUEST_TIMEOUT_SECONDS')
+    gemini_max_retries: int = Field(default=1, ge=0, le=3, alias='GEMINI_MAX_RETRIES')
+    gemini_max_concurrent_requests: int = Field(default=1, ge=1, le=4, alias='GEMINI_MAX_CONCURRENT_REQUESTS')
+    gemini_session_review_limit: int = Field(default=5, ge=1, le=25, alias='GEMINI_SESSION_REVIEW_LIMIT')
+    gemini_daily_review_limit: int = Field(default=10, ge=1, le=100, alias='GEMINI_DAILY_REVIEW_LIMIT')
+    gemini_batch_enabled: bool = Field(default=False, alias='GEMINI_BATCH_ENABLED')
+    gemini_cache_enabled: bool = Field(default=False, alias='GEMINI_CACHE_ENABLED')
+    gemini_sanitized_subject_max_chars: int = Field(default=300, ge=1, le=300, alias='GEMINI_SANITIZED_SUBJECT_MAX_CHARS')
+    gemini_sanitized_body_max_chars: int = Field(default=8000, ge=1, le=8000, alias='GEMINI_SANITIZED_BODY_MAX_CHARS')
+    gemini_sanitized_payload_max_bytes: int = Field(default=16384, ge=1024, le=16384, alias='GEMINI_SANITIZED_PAYLOAD_MAX_BYTES')
+    gemini_prompt_version: str = Field(default='gemini-review-v1', alias='GEMINI_PROMPT_VERSION')
+    dataset_review_storage_path: str = Field(
+        default='services/ml/evaluation/private/review_workspace.sqlite3',
+        alias='DATASET_REVIEW_STORAGE_PATH',
+    )
+
+    @model_validator(mode='after')
+    def validate_review_secret_contract(self) -> 'Settings':
+        if self.gemini_api_key and self.google_api_key:
+            raise ValueError('Conflicting provider API key configuration.')
+        if self.dataset_review_admin_token and self.gemini_api_key and self.dataset_review_admin_token == self.gemini_api_key:
+            raise ValueError('Dataset review admin token must be separate from the provider API key.')
+        if self.gemini_batch_enabled:
+            raise ValueError('Gemini batch review is disabled for this phase.')
+        return self
 
     model_config = SettingsConfigDict(
         env_file='.env',

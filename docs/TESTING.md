@@ -97,3 +97,11 @@ Synthetic tests cover the preserved score formula; high-confidence multi-family 
 - Interactive browser checks when host process policy blocks browser launch.
 - Live URL/DNS reputation and attachment execution.
 - Claims about production accuracy, universal detection, or certification.
+
+## Dataset-review validation
+
+Gemini tests use a fake `google-genai` client and never access the network. They
+cover disabled flags, local-only access, token authorization, sanitization and
+limits, hash-bound consent, strict structured output, provider failures,
+human-only labels, deterministic reviewer packages, and session/daily limits.
+Do not configure a live provider request in automated tests.

@@ -56,3 +56,9 @@ reviewer identity, and date. One available reviewer creates a **provisional**
 record only and cannot support headline metrics. Notes must not contain raw
 bodies, full addresses, phone numbers, tokens, private headers, attachments,
 or live URLs.
+
+When using the optional Gemini assistant, use independent mode by default:
+record the preliminary human label and notes before viewing the suggestion.
+Record any changed label and reason. Gemini's `unable_to_determine` suggestion
+is not a final benchmark label, and Gemini never counts as the second human
+reviewer.

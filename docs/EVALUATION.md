@@ -73,3 +73,8 @@ repository datasets remain separate as training-only, diagnostic-only, or
 external-validation-only material unless a future review explicitly qualifies
 them. With insufficient adjudicated samples, the pilot command writes readiness
 and shortfall reports and deliberately withholds headline metrics.
+
+Gemini assistance is audited separately under
+`reports/gold_standard/gemini_assistance/`. Agreement with a suggestion is not
+phishing accuracy, benchmark accuracy, model accuracy, or ground-truth
+correctness.

@@ -8,6 +8,10 @@ required**. Existing repository data did not qualify automatically. Source
 labels, filenames, weak labels, challenge annotations, and model predictions
 are never converted into ground truth.
 
+The optional local Gemini assistant is documented in
+[`GEMINI_REVIEW_ASSISTANT.md`](GEMINI_REVIEW_ASSISTANT.md). It produces an
+advisory suggestion only; it cannot replace a human label or reviewer two.
+
 ## Record contract
 
 Every public record contains a deterministic `sample_id`, stable SHA-256

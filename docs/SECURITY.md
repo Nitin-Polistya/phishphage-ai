@@ -89,3 +89,9 @@ The supported security posture assumes synthetic or otherwise authorized email, 
 The UI and exports prioritize re-scan required, unable to verify, and needs review above phishing/suspicious/safe labels. The safety layer deduplicates evidence by identity, routing, authentication, action, and infrastructure families. High-confidence corroboration can apply a bounded 80–82 floor; moderate corroboration can apply a 60-point suspicious floor. An explicit aligned authentication result and official claimed domain are protective only when no stronger mismatch evidence exists. Authentication tokens are not passes: only parseable explicit results are labeled passed or failed. `mailto:` addresses are reduced to normalized destination domains and action metadata, and tracking pixels are classified as non-actionable supporting evidence. No network lookup, DNS/WHOIS, model retraining, threshold change, or numeric score fabrication is used.
 
 Do not put real email, credentials, personal data, active malicious URLs, attachment files, or exploit payloads in a public issue. Use a private repository security advisory when available. If no private channel exists, open a minimal public issue requesting a private reporting channel and provide only a sanitized description, affected component/route, reproducible synthetic input, expected behavior, observed behavior, and tool versions. Allow maintainers reasonable time to validate and remediate before public disclosure. Do not contact unrelated third parties using information found in a sample.
+
+The internal dataset-review route is disabled by default and local-only by
+default. Its admin token is backend-only and in-memory in the browser. Gemini
+receives only a consented, hashed sanitized preview, is never called by
+`/analyze`, and cannot write ground truth. Reverse-proxy deployments must not
+trust arbitrary forwarding headers for local-only access.

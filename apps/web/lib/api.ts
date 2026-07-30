@@ -1,5 +1,6 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { HealthResponse, PredictionResponse } from '@/types/inference';
+import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, ReviewLabel, ReviewMode, SanitizedReviewPayload } from '@/types/dataset-review';
 export type { HealthResponse } from '@/types/inference';
 
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'timeout' | 'cancelled' | 'unexpected';
@@ -50,6 +51,68 @@ function requestSignal(signal?: AbortSignal, timeoutMs = 10_000) {
   const abort = () => controller.abort(signal?.reason ?? 'cancelled');
   signal?.addEventListener('abort', abort, { once: true });
   return { signal: controller.signal, cleanup: () => { globalThis.clearTimeout(timeout); signal?.removeEventListener('abort', abort); } };
+}
+
+async function datasetReviewRequest<T>(path: string, init: RequestInit = {}, token?: string, sessionId?: string): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/v1/dataset-review${path}`, {
+      ...init,
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { 'X-Dataset-Review-Token': token } : {}),
+        ...(sessionId ? { 'X-Dataset-Review-Session': sessionId } : {}),
+        ...(init.headers || {}),
+      },
+    });
+  } catch {
+    throw new ApiError('backend_unavailable', 'Cannot connect to the local dataset-review service.');
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = safeDetail(payload);
+    if (response.status === 401 || response.status === 403) throw new ApiError('validation', 'Dataset review authorization failed.');
+    if (response.status === 429) throw new ApiError('service_unavailable', detail || 'The review limit has been reached.');
+    if (response.status === 503) throw new ApiError('service_unavailable', detail || 'Gemini review is not configured.');
+    throw new ApiError('validation', detail || 'Dataset review could not be completed.');
+  }
+  return payload as T;
+}
+
+export function fetchDatasetReviewStatus(): Promise<DatasetReviewStatus> {
+  return datasetReviewRequest<DatasetReviewStatus>('/status');
+}
+
+export function previewDatasetReview(evidence: Record<string, unknown>, token: string): Promise<DatasetReviewPreview> {
+  return datasetReviewRequest<DatasetReviewPreview>('/preview', { method: 'POST', body: JSON.stringify(evidence) }, token);
+}
+
+export function requestGeminiSuggestion(
+  payload: SanitizedReviewPayload,
+  token: string,
+  sessionId: string,
+  options: { consent: boolean; reviewMode: ReviewMode; reviewerAlias: string; preliminaryLabel?: ReviewLabel; preliminaryNotes?: string },
+): Promise<{ suggestion: GeminiSuggestion; advisory_only: boolean; ground_truth_changed: boolean }> {
+  return datasetReviewRequest('/suggest', {
+    method: 'POST',
+    body: JSON.stringify({
+      payload,
+      consent: options.consent,
+      review_mode: options.reviewMode,
+      reviewer_alias: options.reviewerAlias,
+      preliminary_label: options.preliminaryLabel,
+      preliminary_notes: options.preliminaryNotes,
+    }),
+  }, token, sessionId);
+}
+
+export function saveDatasetHumanReview(
+  payload: { sample_id: string; reviewer_id: string; reviewer_role: 'reviewer_1' | 'reviewer_2' | 'adjudicator'; review_mode: ReviewMode; label: ReviewLabel; confidence: number; notes: string; preliminary_label?: ReviewLabel; preliminary_notes?: string; change_reason?: string; content_hash: string },
+  token: string,
+) {
+  return datasetReviewRequest('/reviews', { method: 'POST', body: JSON.stringify(payload) }, token);
 }
 
 export async function analyzeProductionEmail(rawEmail: string, signal?: AbortSignal): Promise<PredictionResponse> {

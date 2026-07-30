@@ -35,3 +35,9 @@ provenance, unresolved personal data, unsafe notes, raw content fields, an
 absolute path, or an attachment that cannot be safely handled remains pending
 or is excluded. Existing local raw datasets are preserved in place and are not
 copied, relabeled, deleted, or deployed by this phase.
+
+The optional Gemini workflow adds a second external-provider boundary. Only the
+sanitized preview is sent after explicit per-request consent; the free-tier
+provider may process that submitted data under its applicable terms. Never send
+personal or confidential email, raw `.eml`, full headers, full URLs, or
+attachments. See [GEMINI_REVIEW_ASSISTANT.md](GEMINI_REVIEW_ASSISTANT.md).

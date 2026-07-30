@@ -8,6 +8,9 @@ This is a release candidate, not a final release. It has not been tagged, publis
 
 ### Added
 
+- Disabled-by-default, local-only dataset-review workspace with sanitized,
+  consent-bound advisory Gemini suggestions and human-only labels.
+
 - Release-candidate validation reports, release notes, and a gated checklist.
 - Synthetic portfolio fixtures, Mermaid diagrams, social-preview source, and privacy-reviewed presentation guidance.
 

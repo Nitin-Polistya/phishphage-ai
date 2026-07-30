@@ -35,6 +35,10 @@ Copy-Item apps\web\.env.example apps\web\.env.local
 
 Keep Firebase and provisioning secrets empty for ordinary local work. The default backend runs with optional ML fallback; do not paste real sensitive mail into a shared or public environment.
 
+Dataset review is disabled by default. If explicitly piloting it locally, set
+the Phase II variables from [`GEMINI_REVIEW_ASSISTANT.md`](GEMINI_REVIEW_ASSISTANT.md)
+in `apps/api/.env`; never put either review secret in frontend configuration.
+
 ## Backend startup
 
 ```powershell

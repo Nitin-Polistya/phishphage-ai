@@ -47,6 +47,9 @@ Email risk evidence is distributed across wording, headers, authentication resul
 - Optional calibrated text-model inference through a versioned registry.
 - A label-blind, privacy-safe gold-standard curation workflow with manual
   review, adjudication, overlap control, and evidence-gated benchmark export.
+- An optional local dataset-review workspace with a consented, sanitized,
+  advisory-only Gemini assistant; it is disabled by default and never affects
+  production `/analyze`.
 - Explicit model/rule agreement, limited-evidence warnings, and safe fallback behavior.
 - Optional browser-local scan history and browser-generated reports. History is disabled unless the user enables it; raw bodies and complete raw headers are excluded from saved records.
 - Request IDs, bounded payloads, process-local rate limits, safe errors, security headers, CSP, privacy-safe logs, health, readiness, and metrics endpoints.
@@ -120,6 +123,10 @@ The exact 3-5 minute script is in [docs/DEMO.md](docs/DEMO.md). The synthetic in
 - Firebase is optional and is not an authorization boundary in this repository.
 
 Read [docs/SECURITY.md](docs/SECURITY.md) for scope and residual risks. Read [docs/BRAND_GUIDE.md](docs/BRAND_GUIDE.md) before reusing the logo or making public claims.
+
+The optional internal Gemini review assistant, its free-tier privacy boundary,
+human-label workflow, and one-synthetic-request procedure are documented in
+[docs/GEMINI_REVIEW_ASSISTANT.md](docs/GEMINI_REVIEW_ASSISTANT.md).
 
 ## Repository structure
 
@@ -244,6 +251,7 @@ Current status: local integration and deployment preparation only. The included 
 - [Model](docs/MODEL.md)
 - [Datasets](docs/DATASETS.md)
 - [Gold-standard evaluation dataset](docs/GOLD_STANDARD_DATASET.md)
+- [Gemini review assistant](docs/GEMINI_REVIEW_ASSISTANT.md)
 - [Labeling guide](docs/LABELING_GUIDE.md)
 - [Evaluation privacy](docs/EVALUATION_PRIVACY.md)
 - [Security](docs/SECURITY.md)

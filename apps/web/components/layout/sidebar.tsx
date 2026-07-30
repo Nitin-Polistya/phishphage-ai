@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft, ChevronRight, FileText, History, LayoutDashboard, MailSearch, Settings, ShieldAlert, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, History, LayoutDashboard, MailSearch, Settings, ShieldAlert, ClipboardCheck, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -14,6 +14,7 @@ const navigation = [
   { name: 'Analyze Email', href: '/analyze', icon: MailSearch },
   { name: 'Scan History', href: '/history', icon: History },
   { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Dataset Review', href: '/dataset-review', icon: ClipboardCheck },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
