@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LockKeyhole, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 
 import { ApiError, createGoldDatasetReview, exportGoldDataset, fetchDatasetReviewStatus, fetchGoldDatasetDashboard, previewDatasetReview, requestGeminiSuggestion, saveDatasetHumanReview, transitionGoldDatasetReview } from '@/lib/api';
@@ -22,6 +22,7 @@ function errorMessage(error: unknown) {
 export function DatasetReviewWorkspace() {
   const [status, setStatus] = useState<DatasetReviewStatus | null>(null);
   const [statusError, setStatusError] = useState('');
+  const [statusState, setStatusState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [dashboard, setDashboard] = useState<GoldDatasetDashboard | null>(null);
   const [token, setToken] = useState('');
   const [reviewerName, setReviewerName] = useState('');
@@ -58,10 +59,23 @@ export function DatasetReviewWorkspace() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
+  const refreshStatus = useCallback(async () => {
+    setStatusState('loading');
+    setStatus(null);
+    setStatusError('');
+    try {
+      setStatus(await fetchDatasetReviewStatus());
+      setStatusState('ready');
+    } catch (error) {
+      setStatusState('unavailable');
+      setStatusError(errorMessage(error));
+    }
+  }, []);
+
   useEffect(() => {
     setSessionId(globalThis.crypto?.randomUUID?.() || `tab-${Date.now()}`);
-    void fetchDatasetReviewStatus().then(setStatus).catch((error: unknown) => setStatusError(errorMessage(error)));
-  }, []);
+    void refreshStatus();
+  }, [refreshStatus]);
 
   const evidence = useMemo(() => ({
     sample_id: sampleId,
@@ -178,17 +192,18 @@ export function DatasetReviewWorkspace() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Internal curation</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Dataset review workspace</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">A local, human-in-the-loop review surface for gold-standard evidence. Gemini can advise; only a human can create benchmark truth.</p></div>
-        <div className="flex items-center gap-2"><Badge variant="outline">{status?.enabled ? 'Enabled locally' : 'Disabled by default'}</Badge>{token && <Button variant="outline" onClick={lockWorkspace}><LockKeyhole className="mr-2 h-4 w-4" />Lock</Button>}</div>
+        <div className="flex items-center gap-2"><Badge variant="outline">{statusState === 'loading' ? 'Checking service' : statusState === 'unavailable' ? 'Service unavailable' : status?.enabled ? 'Enabled locally' : 'Disabled by backend'}</Badge>{token && <Button variant="outline" onClick={lockWorkspace}><LockKeyhole className="mr-2 h-4 w-4" />Lock</Button>}</div>
       </div>
 
-      {statusError && <Alert variant="destructive"><AlertTitle>Review service unavailable</AlertTitle><AlertDescription>{statusError}</AlertDescription></Alert>}
-      {!status?.enabled && !statusError && <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Dataset review is inactive</AlertTitle><AlertDescription>This route exposes no active review controls while DATASET_REVIEW_ENABLED=false. Enable it only on a local development API with a separate admin token.</AlertDescription></Alert>}
-      {status?.enabled && <>
+      {statusState === 'loading' && <Alert><RefreshCw className="h-4 w-4" /><AlertTitle>Checking dataset review service</AlertTitle><AlertDescription>Reading the backend status before showing review controls.</AlertDescription></Alert>}
+      {statusState === 'unavailable' && <Alert variant="destructive"><RefreshCw className="h-4 w-4" /><AlertTitle>Unable to reach dataset review service</AlertTitle><AlertDescription>{statusError || 'Check that the local API is running, then retry.'} <Button variant="outline" size="sm" onClick={() => void refreshStatus()}>Retry status</Button></AlertDescription></Alert>}
+      {statusState === 'ready' && status && !status.enabled && <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Dataset review is disabled</AlertTitle><AlertDescription>The backend reports DATASET_REVIEW_ENABLED=false. Enable it only on a local development API with a separate admin token. <Button variant="outline" size="sm" onClick={() => void refreshStatus()}>Refresh status</Button></AlertDescription></Alert>}
+      {statusState === 'ready' && status?.enabled && <>
         <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Privacy boundary</AlertTitle><AlertDescription>Only this sanitized preview can be sent to an external AI provider. Do not submit personal, confidential, credential-bearing, live malicious, or attachment content. Gemini is advisory, may process submitted data under free-tier terms, and never counts as reviewer two.</AlertDescription></Alert>
 
         <Card><CardHeader><CardTitle className="flex items-center justify-between">Gold dataset quality dashboard <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void loadDashboard()} disabled={busy || !token}><RefreshCw className="mr-2 h-4 w-4" />Load metrics</Button><Button variant="outline" size="sm" onClick={() => void exportGold()} disabled={busy || !token}>Export approved</Button></div></CardTitle></CardHeader><CardContent>{dashboard ? <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"><div><p className="text-xs text-muted-foreground">Samples</p><p className="text-2xl font-bold">{dashboard.total_samples}</p></div><div><p className="text-xs text-muted-foreground">Completion</p><p className="text-2xl font-bold">{Math.round(dashboard.review_completion * 100)}%</p></div><div><p className="text-xs text-muted-foreground">Approved</p><p className="text-2xl font-bold">{dashboard.approved_samples}</p></div><div><p className="text-xs text-muted-foreground">Queue</p><p className="text-2xl font-bold">{Object.values(dashboard.review_queue).reduce((sum, count) => sum + count, 0)}</p></div><div><p className="text-xs text-muted-foreground">Second reviews</p><p className="text-2xl font-bold">{dashboard.second_review_count}</p></div><div><p className="text-xs text-muted-foreground">Agreement</p><p className="text-2xl font-bold">{dashboard.reviewer_agreement ? `${Math.round(dashboard.reviewer_agreement.agreement_rate * 100)}%` : '—'}</p></div><div className="sm:col-span-3 lg:col-span-6 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>Labels: {Object.entries(dashboard.label_distribution).map(([label, count]) => `${label} ${count}`).join(' · ') || 'none'}</span><span>Languages: {Object.entries(dashboard.language_distribution).map(([language, count]) => `${language} ${count}`).join(' · ') || 'none'}</span><span>Sources: {Object.entries(dashboard.source_distribution).map(([source, count]) => `${source} ${count}`).join(' · ') || 'none'}</span></div></div> : <p className="text-sm text-muted-foreground">Metrics remain local and require an authorized reviewer session.</p>}</CardContent></Card>
 
-        <Card><CardHeader><CardTitle className="flex items-center justify-between">1. Prepare sanitized evidence <Button variant="outline" size="sm" onClick={() => void fetchDatasetReviewStatus().then(setStatus)}><RefreshCw className="mr-2 h-4 w-4" />Refresh status</Button></CardTitle></CardHeader><CardContent className="space-y-4">
+        <Card><CardHeader><CardTitle className="flex items-center justify-between">1. Prepare sanitized evidence <Button variant="outline" size="sm" onClick={() => void refreshStatus()}><RefreshCw className="mr-2 h-4 w-4" />Refresh status</Button></CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3"><div><Label htmlFor="review-token">Local admin token (memory only)</Label><Input id="review-token" type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} /></div><div><Label htmlFor="reviewer-name">Human reviewer name</Label><Input id="reviewer-name" autoComplete="off" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} placeholder="Enter your own reviewer identity" /></div><div><Label htmlFor="sample-id">Stable sample ID</Label><Input id="sample-id" value={sampleId} onChange={(event) => { setSampleId(event.target.value); setPreview(null); }} /></div></div>
           <div className="grid gap-4 sm:grid-cols-4"><div><Label htmlFor="source-dataset">Source dataset</Label><Input id="source-dataset" value={sourceDataset} onChange={(event) => setSourceDataset(event.target.value)} /></div><div><Label htmlFor="source-identifier">Source identifier</Label><Input id="source-identifier" value={sourceIdentifier} onChange={(event) => setSourceIdentifier(event.target.value)} /></div><div><Label htmlFor="campaign-identifier">Campaign identifier</Label><Input id="campaign-identifier" value={campaignIdentifier} onChange={(event) => setCampaignIdentifier(event.target.value)} /></div><div><Label htmlFor="language">Language</Label><Input id="language" value={language} onChange={(event) => setLanguage(event.target.value)} /></div></div>
           <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="subject">Sanitized subject</Label><Input id="subject" maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></div><div><Label htmlFor="display-name">Display name (optional)</Label><Input id="display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></div></div>

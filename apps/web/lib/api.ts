@@ -1,6 +1,7 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { HealthResponse, PredictionResponse } from '@/types/inference';
 import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, ReviewLabel, ReviewMode, SanitizedReviewPayload } from '@/types/dataset-review';
+import { DatasetReviewStatusError, requestDatasetReviewStatus, resolveDatasetReviewApiBaseUrl } from './dataset-review-status';
 export type { HealthResponse } from '@/types/inference';
 
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'timeout' | 'cancelled' | 'unexpected';
@@ -13,6 +14,7 @@ export class ApiError extends Error {
 }
 
 export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/$/, '');
+export const DATASET_REVIEW_API_BASE_URL = resolveDatasetReviewApiBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
 
 export function validateApiBaseUrl(url = API_BASE_URL): boolean {
   try {
@@ -56,7 +58,7 @@ function requestSignal(signal?: AbortSignal, timeoutMs = 10_000) {
 async function datasetReviewRequest<T>(path: string, init: RequestInit = {}, token?: string, sessionId?: string): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_BASE_URL}/api/v1/dataset-review${path}`, {
+    response = await fetch(`${DATASET_REVIEW_API_BASE_URL}/api/v1/dataset-review${path}`, {
       ...init,
       cache: 'no-store',
       headers: {
@@ -81,8 +83,15 @@ async function datasetReviewRequest<T>(path: string, init: RequestInit = {}, tok
   return payload as T;
 }
 
-export function fetchDatasetReviewStatus(): Promise<DatasetReviewStatus> {
-  return datasetReviewRequest<DatasetReviewStatus>('/status');
+export async function fetchDatasetReviewStatus(): Promise<DatasetReviewStatus> {
+  try {
+    return await requestDatasetReviewStatus(fetch, DATASET_REVIEW_API_BASE_URL) as DatasetReviewStatus;
+  } catch (error) {
+    if (error instanceof DatasetReviewStatusError) {
+      throw new ApiError(error.kind, error.message);
+    }
+    throw new ApiError('unexpected', 'Dataset review status could not be read.');
+  }
 }
 
 export function previewDatasetReview(evidence: Record<string, unknown>, token: string): Promise<DatasetReviewPreview> {
