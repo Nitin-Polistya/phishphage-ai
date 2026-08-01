@@ -139,12 +139,12 @@ class DatasetReviewPreviewResponse(StrictModel):
     notice: str
 
 
-class GeminiReviewSuggestion(StrictModel):
-    suggestion_id: str = Field(min_length=1, max_length=120)
-    sample_id: str = Field(min_length=1, max_length=160)
-    suggested_label: ReviewLabel
-    confidence: float = Field(ge=0.0, le=1.0)
-    summary: str = Field(min_length=1, max_length=1200)
+class GeminiProviderSuggestion(StrictModel):
+    """The provider-owned portion of a Gemini advisory response."""
+
+    suggested_label: ReviewLabel = Field(description='Advisory label for human review.')
+    confidence: float = Field(ge=0.0, le=1.0, description='Provider confidence from 0 through 1.')
+    summary: str = Field(min_length=1, max_length=1200, description='Concise advisory summary.')
     evidence: list[GeminiEvidenceItem] = Field(default_factory=list, max_length=12)
     contrary_evidence: list[GeminiEvidenceItem] = Field(default_factory=list, max_length=12)
     claimed_organization: str | None = Field(default=None, max_length=160)
@@ -156,6 +156,20 @@ class GeminiReviewSuggestion(StrictModel):
     ambiguity_notes: list[str] = Field(default_factory=list, max_length=12)
     reviewer_questions: list[str] = Field(default_factory=list, max_length=12)
     safety_notes: list[str] = Field(default_factory=list, max_length=12)
+
+    @model_validator(mode='after')
+    def reject_duplicate_evidence(self) -> 'GeminiProviderSuggestion':
+        titles = [item.title.casefold() for item in [*self.evidence, *self.contrary_evidence]]
+        if len(titles) != len(set(titles)):
+            raise ValueError('Evidence items must have unique titles.')
+        return self
+
+
+class GeminiReviewSuggestion(GeminiProviderSuggestion):
+    """Validated provider advice plus server-owned provenance metadata."""
+
+    suggestion_id: str = Field(min_length=1, max_length=120)
+    sample_id: str = Field(min_length=1, max_length=160)
     model_name: str = Field(min_length=1, max_length=160)
     prompt_version: str = Field(min_length=1, max_length=80)
     sanitized_payload_hash: str = Field(pattern=r'^[a-f0-9]{64}$')
@@ -168,14 +182,6 @@ class GeminiReviewSuggestion(StrictModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError('generated_at must include a timezone.')
         return value.astimezone(timezone.utc)
-
-    @model_validator(mode='after')
-    def reject_duplicate_evidence(self) -> 'GeminiReviewSuggestion':
-        titles = [item.title.casefold() for item in [*self.evidence, *self.contrary_evidence]]
-        if len(titles) != len(set(titles)):
-            raise ValueError('Evidence items must have unique titles.')
-        return self
-
 
 class GeminiReviewSuggestRequest(StrictModel):
     payload: SanitizedReviewPayload

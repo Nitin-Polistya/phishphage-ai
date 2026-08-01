@@ -30,6 +30,7 @@ from app.schemas.gold_dataset import (
     LabelQuality,
     ReviewerDecisionInput,
 )
+from app.services.private_storage import resolve_private_evaluation_path
 
 
 SCHEMA_VERSION = 'gold-dataset-manager-1'
@@ -59,15 +60,14 @@ class GoldDatasetManager:
     }
 
     def __init__(self, path: str | Path | None = None) -> None:
-        supplied_path = path is not None
-        configured = Path(path or get_settings().dataset_review_storage_path)
-        if not configured.is_absolute():
-            configured = Path.cwd() / configured
-        self.path = configured.resolve()
-        if not supplied_path:
-            private_root = (Path(__file__).resolve().parents[4] / 'services' / 'ml' / 'evaluation' / 'private').resolve()
-            if not self.path.is_relative_to(private_root):
-                raise GoldDatasetError('Gold dataset storage must remain under the ignored private evaluation directory.')
+        configured = path if path is not None else get_settings().dataset_review_storage_path
+        try:
+            self.path = resolve_private_evaluation_path(
+                configured,
+                error_message='Gold dataset storage must remain under the ignored private evaluation directory.',
+            )
+        except ValueError as error:
+            raise GoldDatasetError(str(error)) from None
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
         self._initialize()
@@ -404,7 +404,7 @@ class GoldDatasetManager:
         return {'directory': destination, 'files': [jsonl_path, summary_path, stats_path], 'exported_samples': len(records)}
 
     def generate_reports(self, output_dir: str | Path | None = None) -> dict[str, Path]:
-        destination = self._output_dir(output_dir, 'reports/gold_standard/phase_iii')
+        destination = self._output_dir(output_dir, 'services/ml/evaluation/private/gold_dataset_reports')
         destination.mkdir(parents=True, exist_ok=True)
         dashboard = self.dashboard()
         agreement = dashboard.reviewer_agreement
@@ -481,10 +481,11 @@ class GoldDatasetManager:
         )
 
     def _output_dir(self, output_dir: str | Path | None, default_relative: str) -> Path:
-        destination = Path(output_dir or default_relative)
-        if not destination.is_absolute():
-            destination = Path.cwd() / destination
-        return destination.resolve()
+        destination = output_dir if output_dir is not None else default_relative
+        return resolve_private_evaluation_path(
+            destination,
+            error_message='Gold dataset output must remain under the ignored private evaluation directory.',
+        )
 
     @staticmethod
     def _summary(records: list[dict[str, object]]) -> dict[str, object]:

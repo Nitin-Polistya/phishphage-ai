@@ -69,8 +69,11 @@ by default. If this tool is later placed behind a reverse proxy, configure a
 trusted proxy boundary and ensure the application receives a validated
 loopback identity; do not simply trust arbitrary `X-Forwarded-For` values.
 
-The ignored SQLite file is
-`services/ml/evaluation/private/review_workspace.sqlite3`. It stores sanitized
+The ignored SQLite file is configured by `DATASET_REVIEW_STORAGE_PATH` and
+defaults to `services/ml/evaluation/private/review_workspace.sqlite3`. Relative
+paths resolve from the repository root, independently of the API process
+working directory, and the path must remain under the ignored private
+evaluation directory. It stores sanitized
 payload metadata, hashes, consent/provenance, human reviews, advisory output,
 status, and timestamps. It never stores the API key, admin token, raw email,
 attachment bytes, arbitrary paths, or provider raw responses.

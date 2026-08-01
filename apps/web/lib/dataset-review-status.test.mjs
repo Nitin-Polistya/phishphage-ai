@@ -4,10 +4,12 @@ import test from 'node:test';
 
 import {
   DEFAULT_DATASET_REVIEW_API_BASE_URL,
+  DATASET_REVIEW_STATUS_TIMEOUT_MS,
   DatasetReviewStatusError,
   parseDatasetReviewStatus,
   requestDatasetReviewStatus,
   resolveDatasetReviewApiBaseUrl,
+  toDatasetReviewServiceState,
 } from './dataset-review-status.ts';
 
 const enabledStatus = {
@@ -31,6 +33,17 @@ test('maps an enabled backend status response without changing its fields', () =
 
 test('maps a disabled backend status response as disabled rather than unavailable', () => {
   assert.equal(parseDatasetReviewStatus({ ...enabledStatus, enabled: false }).enabled, false);
+});
+
+test('keeps Dataset Review enabled when Gemini is not configured', () => {
+  const state = toDatasetReviewServiceState({ ...enabledStatus, configured: false, provider_ready: false, model_name: '' });
+  assert.equal(state.kind, 'enabled');
+  assert.equal(state.status.configured, false);
+  assert.equal(state.status.gemini_enabled, false);
+});
+
+test('maps a valid disabled response to a terminal disabled state', () => {
+  assert.equal(toDatasetReviewServiceState({ ...enabledStatus, enabled: false }).kind, 'disabled');
 });
 
 test('uses the safe local API default and trims configured origins', () => {
@@ -61,6 +74,16 @@ test('reports a backend network failure separately from a disabled response', as
   );
 });
 
+test('times out a status request so loading cannot remain permanent', async () => {
+  const result = requestDatasetReviewStatus((_url, init) => new Promise((resolve, reject) => {
+    init.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+  }), 'http://127.0.0.1:8000', undefined, 5);
+  await assert.rejects(result, (error) => error instanceof DatasetReviewStatusError
+    && error.kind === 'backend_unavailable'
+    && error.message === 'Dataset review service did not respond in time.');
+  assert.equal(DATASET_REVIEW_STATUS_TIMEOUT_MS, 10_000);
+});
+
 test('rejects malformed status responses instead of treating them as disabled', () => {
   assert.throws(() => parseDatasetReviewStatus({ enabled: true }), (error) => error instanceof DatasetReviewStatusError && error.kind === 'unexpected');
 });
@@ -69,6 +92,9 @@ test('keeps admin tokens backend-only and renders an unavailable state on fetch 
   const apiSource = await readFile(new URL('./api.ts', import.meta.url), 'utf8');
   const workspaceSource = await readFile(new URL('../components/dataset-review/dataset-review-workspace.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(apiSource, /DATASET_REVIEW_ADMIN_TOKEN/);
-  assert.match(workspaceSource, /statusState === 'unavailable'/);
+  assert.match(workspaceSource, /serviceState\.kind === 'unavailable'/);
+  assert.match(workspaceSource, /requestId !== statusRequestId\.current/);
+  assert.doesNotMatch(workspaceSource, /<form\b/);
+  assert.doesNotMatch(apiSource, /datasetReviewRequest(?:<[^>]+>)?\(\s*['"]\/?['"]\s*[,)]/s);
   assert.doesNotMatch(workspaceSource, /Dataset review is inactive/);
 });

@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LockKeyhole, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 
 import { ApiError, createGoldDatasetReview, exportGoldDataset, fetchDatasetReviewStatus, fetchGoldDatasetDashboard, previewDatasetReview, requestGeminiSuggestion, saveDatasetHumanReview, transitionGoldDatasetReview } from '@/lib/api';
+import { toDatasetReviewServiceState, type DatasetReviewServiceState } from '@/lib/dataset-review-status';
 import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, ReviewLabel, ReviewMode } from '@/types/dataset-review';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -20,9 +21,8 @@ function errorMessage(error: unknown) {
 }
 
 export function DatasetReviewWorkspace() {
-  const [status, setStatus] = useState<DatasetReviewStatus | null>(null);
-  const [statusError, setStatusError] = useState('');
-  const [statusState, setStatusState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [serviceState, setServiceState] = useState<DatasetReviewServiceState>({ kind: 'loading' });
+  const statusRequestId = useRef(0);
   const [dashboard, setDashboard] = useState<GoldDatasetDashboard | null>(null);
   const [token, setToken] = useState('');
   const [reviewerName, setReviewerName] = useState('');
@@ -60,15 +60,15 @@ export function DatasetReviewWorkspace() {
   const [message, setMessage] = useState('');
 
   const refreshStatus = useCallback(async () => {
-    setStatusState('loading');
-    setStatus(null);
-    setStatusError('');
+    const requestId = ++statusRequestId.current;
+    setServiceState({ kind: 'loading' });
     try {
-      setStatus(await fetchDatasetReviewStatus());
-      setStatusState('ready');
+      const nextStatus = await fetchDatasetReviewStatus();
+      if (requestId !== statusRequestId.current) return;
+      setServiceState(toDatasetReviewServiceState(nextStatus));
     } catch (error) {
-      setStatusState('unavailable');
-      setStatusError(errorMessage(error));
+      if (requestId !== statusRequestId.current) return;
+      setServiceState({ kind: 'unavailable', message: errorMessage(error) });
     }
   }, []);
 
@@ -76,6 +76,8 @@ export function DatasetReviewWorkspace() {
     setSessionId(globalThis.crypto?.randomUUID?.() || `tab-${Date.now()}`);
     void refreshStatus();
   }, [refreshStatus]);
+
+  const status: DatasetReviewStatus | null = serviceState.kind === 'enabled' || serviceState.kind === 'disabled' ? serviceState.status : null;
 
   const evidence = useMemo(() => ({
     sample_id: sampleId,
@@ -192,25 +194,26 @@ export function DatasetReviewWorkspace() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Internal curation</p><h1 className="mt-2 text-3xl font-bold tracking-tight">Dataset review workspace</h1><p className="mt-2 max-w-3xl text-sm text-muted-foreground">A local, human-in-the-loop review surface for gold-standard evidence. Gemini can advise; only a human can create benchmark truth.</p></div>
-        <div className="flex items-center gap-2"><Badge variant="outline">{statusState === 'loading' ? 'Checking service' : statusState === 'unavailable' ? 'Service unavailable' : status?.enabled ? 'Enabled locally' : 'Disabled by backend'}</Badge>{token && <Button variant="outline" onClick={lockWorkspace}><LockKeyhole className="mr-2 h-4 w-4" />Lock</Button>}</div>
+        <div className="flex items-center gap-2"><Badge variant="outline">{serviceState.kind === 'loading' ? 'Checking service' : serviceState.kind === 'unavailable' ? 'Service unavailable' : serviceState.kind === 'enabled' ? 'Enabled locally' : 'Disabled by backend'}</Badge>{token && <Button type="button" variant="outline" onClick={lockWorkspace}><LockKeyhole className="mr-2 h-4 w-4" />Lock</Button>}</div>
       </div>
 
-      {statusState === 'loading' && <Alert><RefreshCw className="h-4 w-4" /><AlertTitle>Checking dataset review service</AlertTitle><AlertDescription>Reading the backend status before showing review controls.</AlertDescription></Alert>}
-      {statusState === 'unavailable' && <Alert variant="destructive"><RefreshCw className="h-4 w-4" /><AlertTitle>Unable to reach dataset review service</AlertTitle><AlertDescription>{statusError || 'Check that the local API is running, then retry.'} <Button variant="outline" size="sm" onClick={() => void refreshStatus()}>Retry status</Button></AlertDescription></Alert>}
-      {statusState === 'ready' && status && !status.enabled && <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Dataset review is disabled</AlertTitle><AlertDescription>The backend reports DATASET_REVIEW_ENABLED=false. Enable it only on a local development API with a separate admin token. <Button variant="outline" size="sm" onClick={() => void refreshStatus()}>Refresh status</Button></AlertDescription></Alert>}
-      {statusState === 'ready' && status?.enabled && <>
+      {serviceState.kind === 'loading' && <Alert><RefreshCw className="h-4 w-4" /><AlertTitle>Checking dataset review service</AlertTitle><AlertDescription>Reading the backend status before showing review controls.</AlertDescription></Alert>}
+      {serviceState.kind === 'unavailable' && <Alert variant="destructive"><RefreshCw className="h-4 w-4" /><AlertTitle>Unable to reach dataset review service</AlertTitle><AlertDescription>{serviceState.message || 'Check that the local API is running, then retry.'} <Button type="button" variant="outline" size="sm" onClick={() => void refreshStatus()}>Retry status</Button></AlertDescription></Alert>}
+      {serviceState.kind === 'disabled' && <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Dataset review is disabled</AlertTitle><AlertDescription>The backend reports DATASET_REVIEW_ENABLED=false. Enable it only on a local development API with a separate admin token. <Button type="button" variant="outline" size="sm" onClick={() => void refreshStatus()}>Refresh status</Button></AlertDescription></Alert>}
+      {serviceState.kind === 'enabled' && <>
         <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Privacy boundary</AlertTitle><AlertDescription>Only this sanitized preview can be sent to an external AI provider. Do not submit personal, confidential, credential-bearing, live malicious, or attachment content. Gemini is advisory, may process submitted data under free-tier terms, and never counts as reviewer two.</AlertDescription></Alert>
+        {(!serviceState.status.gemini_enabled || !serviceState.status.provider_ready) && <Alert><ShieldCheck className="h-4 w-4" /><AlertTitle>Gemini advisory review is unavailable</AlertTitle><AlertDescription>Human Dataset Review is enabled. Gemini remains optional and is currently disabled or not configured.</AlertDescription></Alert>}
 
         <Card><CardHeader><CardTitle className="flex items-center justify-between">Gold dataset quality dashboard <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void loadDashboard()} disabled={busy || !token}><RefreshCw className="mr-2 h-4 w-4" />Load metrics</Button><Button variant="outline" size="sm" onClick={() => void exportGold()} disabled={busy || !token}>Export approved</Button></div></CardTitle></CardHeader><CardContent>{dashboard ? <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"><div><p className="text-xs text-muted-foreground">Samples</p><p className="text-2xl font-bold">{dashboard.total_samples}</p></div><div><p className="text-xs text-muted-foreground">Completion</p><p className="text-2xl font-bold">{Math.round(dashboard.review_completion * 100)}%</p></div><div><p className="text-xs text-muted-foreground">Approved</p><p className="text-2xl font-bold">{dashboard.approved_samples}</p></div><div><p className="text-xs text-muted-foreground">Queue</p><p className="text-2xl font-bold">{Object.values(dashboard.review_queue).reduce((sum, count) => sum + count, 0)}</p></div><div><p className="text-xs text-muted-foreground">Second reviews</p><p className="text-2xl font-bold">{dashboard.second_review_count}</p></div><div><p className="text-xs text-muted-foreground">Agreement</p><p className="text-2xl font-bold">{dashboard.reviewer_agreement ? `${Math.round(dashboard.reviewer_agreement.agreement_rate * 100)}%` : '—'}</p></div><div className="sm:col-span-3 lg:col-span-6 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>Labels: {Object.entries(dashboard.label_distribution).map(([label, count]) => `${label} ${count}`).join(' · ') || 'none'}</span><span>Languages: {Object.entries(dashboard.language_distribution).map(([language, count]) => `${language} ${count}`).join(' · ') || 'none'}</span><span>Sources: {Object.entries(dashboard.source_distribution).map(([source, count]) => `${source} ${count}`).join(' · ') || 'none'}</span></div></div> : <p className="text-sm text-muted-foreground">Metrics remain local and require an authorized reviewer session.</p>}</CardContent></Card>
 
-        <Card><CardHeader><CardTitle className="flex items-center justify-between">1. Prepare sanitized evidence <Button variant="outline" size="sm" onClick={() => void refreshStatus()}><RefreshCw className="mr-2 h-4 w-4" />Refresh status</Button></CardTitle></CardHeader><CardContent className="space-y-4">
+        <Card><CardHeader><CardTitle className="flex items-center justify-between">1. Prepare sanitized evidence <Button type="button" variant="outline" size="sm" onClick={() => void refreshStatus()}><RefreshCw className="mr-2 h-4 w-4" />Refresh status</Button></CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3"><div><Label htmlFor="review-token">Local admin token (memory only)</Label><Input id="review-token" type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} /></div><div><Label htmlFor="reviewer-name">Human reviewer name</Label><Input id="reviewer-name" autoComplete="off" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} placeholder="Enter your own reviewer identity" /></div><div><Label htmlFor="sample-id">Stable sample ID</Label><Input id="sample-id" value={sampleId} onChange={(event) => { setSampleId(event.target.value); setPreview(null); }} /></div></div>
           <div className="grid gap-4 sm:grid-cols-4"><div><Label htmlFor="source-dataset">Source dataset</Label><Input id="source-dataset" value={sourceDataset} onChange={(event) => setSourceDataset(event.target.value)} /></div><div><Label htmlFor="source-identifier">Source identifier</Label><Input id="source-identifier" value={sourceIdentifier} onChange={(event) => setSourceIdentifier(event.target.value)} /></div><div><Label htmlFor="campaign-identifier">Campaign identifier</Label><Input id="campaign-identifier" value={campaignIdentifier} onChange={(event) => setCampaignIdentifier(event.target.value)} /></div><div><Label htmlFor="language">Language</Label><Input id="language" value={language} onChange={(event) => setLanguage(event.target.value)} /></div></div>
           <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="subject">Sanitized subject</Label><Input id="subject" maxLength={300} value={subject} onChange={(event) => setSubject(event.target.value)} /></div><div><Label htmlFor="display-name">Display name (optional)</Label><Input id="display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} /></div></div>
           <div className="grid gap-4 sm:grid-cols-3"><div><Label htmlFor="sender-domain">Sender domain</Label><Input id="sender-domain" value={senderDomain} onChange={(event) => setSenderDomain(event.target.value)} /></div><div><Label htmlFor="reply-domain">Reply-To domain</Label><Input id="reply-domain" value={replyToDomain} onChange={(event) => setReplyToDomain(event.target.value)} /></div><div><Label htmlFor="auth">Authentication summary</Label><Input id="auth" value={authSummary} onChange={(event) => setAuthSummary(event.target.value)} /></div></div>
           <div><Label htmlFor="body">Sanitized body excerpt</Label><Textarea id="body" maxLength={8000} rows={8} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Plain text evidence only; do not paste raw .eml content." /></div>
           <div className="grid gap-4 sm:grid-cols-4"><div><Label htmlFor="urls">URL domains only</Label><Input id="urls" value={urlDomains} onChange={(event) => setUrlDomains(event.target.value)} /></div><div><Label htmlFor="flags">URL structural flags</Label><Input id="flags" value={urlFlags} onChange={(event) => setUrlFlags(event.target.value)} /></div><div><Label htmlFor="extension">Attachment extension</Label><Input id="extension" value={attachmentExtension} onChange={(event) => setAttachmentExtension(event.target.value)} /></div><div><Label htmlFor="mime">Attachment MIME</Label><Input id="mime" value={attachmentMime} onChange={(event) => setAttachmentMime(event.target.value)} /></div></div>
-          <Button onClick={() => void createPreview()} disabled={busy || !token}><RefreshCw className="mr-2 h-4 w-4" />Sanitize and preview</Button>
+          <Button type="button" onClick={() => void createPreview()} disabled={busy || !token}><RefreshCw className="mr-2 h-4 w-4" />Sanitize and preview</Button>
         </CardContent></Card>
 
         {preview && <Card><CardHeader><CardTitle>2. Human-approved preview</CardTitle></CardHeader><CardContent className="space-y-4 text-sm"><p className="text-muted-foreground">Exactly this payload is bound to consent. Any sample, evidence, model, or prompt change invalidates the hash.</p><div className="grid gap-3 rounded-lg bg-surface-muted p-4 sm:grid-cols-2"><div><span className="text-muted-foreground">Subject</span><p className="font-medium">{preview.payload.subject || '—'}</p></div><div><span className="text-muted-foreground">Domains</span><p className="font-medium">{[preview.payload.sender_domain, preview.payload.reply_to_domain, ...preview.payload.url_domains].filter(Boolean).join(', ') || '—'}</p></div><div><span className="text-muted-foreground">Authentication</span><p>{preview.payload.authentication_summary.join('; ') || '—'}</p></div><div><span className="text-muted-foreground">Attachment metadata</span><p>{preview.payload.attachment_extension || 'none'} {preview.payload.attachment_mime && `· ${preview.payload.attachment_mime}`}</p></div><div className="sm:col-span-2"><span className="text-muted-foreground">Body preview</span><p className="whitespace-pre-wrap break-words">{preview.payload.body_excerpt || '—'}</p></div></div><p className="break-all font-mono text-xs text-muted-foreground">{preview.payload_bytes} bytes · SHA-256 {preview.payload_hash} · model {preview.payload.model_name} · prompt {preview.payload.prompt_version}</p><p>{preview.notice}</p><label className="flex items-start gap-3 rounded-lg border border-border p-3"><input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" /><span>I reviewed the sanitized preview and consent to sending this specific payload to Gemini for an advisory suggestion.</span></label></CardContent></Card>}

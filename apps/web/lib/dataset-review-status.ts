@@ -1,4 +1,5 @@
 export const DEFAULT_DATASET_REVIEW_API_BASE_URL = 'http://127.0.0.1:8000';
+export const DATASET_REVIEW_STATUS_TIMEOUT_MS = 10_000;
 
 export interface DatasetReviewStatusResponse {
   enabled: boolean;
@@ -27,6 +28,12 @@ export class DatasetReviewStatusError extends Error {
   }
 }
 
+export type DatasetReviewServiceState =
+  | { kind: 'loading' }
+  | { kind: 'enabled'; status: DatasetReviewStatusResponse }
+  | { kind: 'disabled'; status: DatasetReviewStatusResponse }
+  | { kind: 'unavailable'; message: string };
+
 export function resolveDatasetReviewApiBaseUrl(configured: string | undefined): string {
   return (configured?.trim() || DEFAULT_DATASET_REVIEW_API_BASE_URL).replace(/\/$/, '');
 }
@@ -50,25 +57,42 @@ export function parseDatasetReviewStatus(payload: unknown): DatasetReviewStatusR
   return payload;
 }
 
+export function toDatasetReviewServiceState(status: DatasetReviewStatusResponse): DatasetReviewServiceState {
+  return status.enabled ? { kind: 'enabled', status } : { kind: 'disabled', status };
+}
+
 export async function requestDatasetReviewStatus(
   fetcher: typeof fetch,
   apiBaseUrl: string,
+  signal?: AbortSignal,
+  timeoutMs = DATASET_REVIEW_STATUS_TIMEOUT_MS,
 ): Promise<DatasetReviewStatusResponse> {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort('timeout'), timeoutMs);
+  const abort = () => controller.abort(signal?.reason ?? 'cancelled');
+  signal?.addEventListener('abort', abort, { once: true });
   let response: Response;
   try {
     response = await fetcher(`${apiBaseUrl}/api/v1/dataset-review/status`, {
       method: 'GET',
       cache: 'no-store',
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
-  } catch {
-    throw new DatasetReviewStatusError('backend_unavailable', 'Unable to reach dataset review service.');
-  }
+    if (!response.ok) {
+      throw new DatasetReviewStatusError('backend_unavailable', 'Unable to reach dataset review service.');
+    }
 
-  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null);
+    return parseDatasetReviewStatus(payload);
+  } catch (error) {
+    if (error instanceof DatasetReviewStatusError) throw error;
+    if (controller.signal.reason === 'timeout') {
+      throw new DatasetReviewStatusError('backend_unavailable', 'Dataset review service did not respond in time.');
+    }
     throw new DatasetReviewStatusError('backend_unavailable', 'Unable to reach dataset review service.');
+  } finally {
+    globalThis.clearTimeout(timeout);
+    signal?.removeEventListener('abort', abort);
   }
-
-  const payload: unknown = await response.json().catch(() => null);
-  return parseDatasetReviewStatus(payload);
 }

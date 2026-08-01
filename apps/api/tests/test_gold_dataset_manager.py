@@ -20,6 +20,10 @@ from app.services.gold_dataset_manager import (
 )
 
 
+def private_path(tmp_path: Path, name: str) -> Path:
+    return tmp_path / 'repo' / 'services' / 'ml' / 'evaluation' / 'private' / name
+
+
 def make_review(index: int, *, label: ReviewLabel = ReviewLabel.safe, requires_second_review: bool = False) -> GoldDatasetReviewInput:
     return GoldDatasetReviewInput(
         sample_hash=f'sample-hash-{index}',
@@ -49,7 +53,7 @@ def add_bob(manager: GoldDatasetManager, review_id: str, label: ReviewLabel, *, 
 
 
 def test_workflow_transitions_and_invalid_transition(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     review = manager.create_review(make_review(1))
     assert review.state == GoldReviewState.pending
     reviewed = manager.transition_state(review.review_id, 'Alice', GoldReviewState.reviewed, 'Human review completed.')
@@ -62,7 +66,7 @@ def test_workflow_transitions_and_invalid_transition(tmp_path: Path):
 
 
 def test_duplicate_detection_uses_sample_and_normalized_identity(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     manager.create_review(make_review(1))
     with pytest.raises(DuplicateReviewError):
         manager.create_review(make_review(1))
@@ -72,7 +76,7 @@ def test_duplicate_detection_uses_sample_and_normalized_identity(tmp_path: Path)
 
 
 def test_reviewer_agreement_kappa_and_conflict_statistics_are_persisted(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     labels = [(ReviewLabel.safe, ReviewLabel.safe), (ReviewLabel.safe, ReviewLabel.phishing), (ReviewLabel.phishing, ReviewLabel.phishing)]
     for index, (alice, bob) in enumerate(labels, start=1):
         review = manager.create_review(make_review(index, label=alice))
@@ -91,7 +95,7 @@ def test_reviewer_agreement_kappa_and_conflict_statistics_are_persisted(tmp_path
 
 
 def test_second_review_is_required_before_approval(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     review = manager.create_review(make_review(10, requires_second_review=True))
     manager.transition_state(review.review_id, 'Alice', GoldReviewState.reviewed, 'First review completed.')
     with pytest.raises(Exception, match='second human review'):
@@ -102,7 +106,7 @@ def test_second_review_is_required_before_approval(tmp_path: Path):
 
 
 def test_audit_trail_is_immutable_and_records_changes(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     review = manager.create_review(make_review(20))
     manager.transition_state(review.review_id, 'Alice', GoldReviewState.reviewed, 'Complete first review.')
     manager.revise_review(review.review_id, 'Alice', phishing_label=ReviewLabel.suspicious, reviewer_confidence=0.7, reason='New human evidence was reviewed.')
@@ -116,7 +120,7 @@ def test_audit_trail_is_immutable_and_records_changes(tmp_path: Path):
 
 
 def test_privacy_safe_exports_and_reports(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     review = make_review(30).model_copy(update={
         'review_notes': 'From: person@example.com Subject: reset https://example.test/path Message-ID: <id@example.test> John Doe account details',
         'source_dataset': r'C:\private\inbox',
@@ -127,7 +131,7 @@ def test_privacy_safe_exports_and_reports(tmp_path: Path):
     created = manager.create_review(review)
     manager.transition_state(created.review_id, 'Alice', GoldReviewState.reviewed, 'Human review complete.')
     manager.transition_state(created.review_id, 'Alice', GoldReviewState.approved, 'Approved by human reviewer.')
-    export_dir = tmp_path / 'exports'
+    export_dir = private_path(tmp_path, 'exports')
     exported = manager.export_gold_dataset(export_dir)
     assert exported['exported_samples'] == 1
     jsonl = (export_dir / 'gold_dataset_v1.jsonl').read_text(encoding='utf-8')
@@ -138,7 +142,7 @@ def test_privacy_safe_exports_and_reports(tmp_path: Path):
     assert 'John Doe' not in jsonl
     record = json.loads(jsonl)
     assert record['human_label_authority'] is True
-    report_dir = tmp_path / 'reports'
+    report_dir = private_path(tmp_path, 'reports')
     report_paths = manager.generate_reports(report_dir)
     assert {path.name for path in report_paths.values()} == {
         'review_statistics.json', 'agreement_report.md', 'quality_metrics.json', 'label_distribution.csv', 'gold_dataset_summary.md',
@@ -146,7 +150,7 @@ def test_privacy_safe_exports_and_reports(tmp_path: Path):
 
 
 def test_dashboard_metrics_cover_queue_distribution_and_confidence(tmp_path: Path):
-    manager = GoldDatasetManager(tmp_path / 'gold.sqlite3')
+    manager = GoldDatasetManager(private_path(tmp_path, 'gold.sqlite3'))
     manager.create_review(make_review(40, label=ReviewLabel.safe))
     manager.create_review(make_review(41, label=ReviewLabel.phishing))
     dashboard = manager.dashboard()

@@ -12,6 +12,11 @@ The manager uses the ignored local SQLite file configured by
 `services/ml/evaluation/private/review_workspace.sqlite3`). Phase III adds
 `gold_reviews`, `gold_reviewer_decisions`, `gold_reviewer_agreement`, and
 `gold_review_audit` tables beside the existing sanitized Dataset Review tables.
+Relative storage paths resolve from the repository root, independently of the
+API process working directory. The configured SQLite path and all generated
+exports/reports must remain under the ignored
+`services/ml/evaluation/private/` directory; paths outside it and traversal
+paths are rejected.
 The audit table has database triggers that reject update and delete attempts.
 
 ```text
@@ -69,7 +74,7 @@ exported. Raw bodies, headers, attachment content, URLs, email addresses,
 Message-ID, paths, and PII are excluded.
 
 The report generator writes the following to the ignored
-`reports/gold_standard/phase_iii/` directory:
+`services/ml/evaluation/private/gold_dataset_reports/` directory:
 
 - `review_statistics.json`
 - `agreement_report.md`

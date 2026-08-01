@@ -6,10 +6,14 @@ from pathlib import Path
 import pytest
 
 from app.core.settings import Settings
-from app.schemas.gemini_review import GeminiReviewSuggestRequest, ReviewLabel, SanitizedReviewInput
+from app.schemas.gemini_review import GeminiProviderSuggestion, GeminiReviewSuggestRequest, ReviewLabel, SanitizedReviewInput
 from app.services.gemini_review_sanitizer import payload_hash_matches, sanitize_review_input
-from app.services.gemini_review_service import GeminiReviewService, ReviewServiceError, is_loopback_client
+from app.services.gemini_review_service import GeminiReviewService, ReviewServiceError, _gemini_provider_json_schema, is_loopback_client
 from app.services.gemini_review_storage import ReviewStore
+
+
+def private_path(tmp_path: Path, name: str) -> Path:
+    return tmp_path / 'repo' / 'services' / 'ml' / 'evaluation' / 'private' / name
 
 
 def review_settings(tmp_path: Path, **overrides: object) -> Settings:
@@ -21,7 +25,7 @@ def review_settings(tmp_path: Path, **overrides: object) -> Settings:
         'GEMINI_REVIEW_ENABLED': True,
         'GEMINI_API_KEY': 'synthetic-provider-secret',
         'GEMINI_MODEL': 'synthetic-model',
-        'DATASET_REVIEW_STORAGE_PATH': str(tmp_path / 'review.sqlite3'),
+        'DATASET_REVIEW_STORAGE_PATH': str(private_path(tmp_path, 'review.sqlite3')),
         'CORS_ORIGINS': 'http://localhost:3000',
     }
     values.update(overrides)
@@ -108,17 +112,17 @@ def test_loopback_access_is_fail_closed():
 
 
 def test_disabled_and_unconfigured_review_fail_without_provider_call(tmp_path: Path):
-    disabled = GeminiReviewService(review_settings(tmp_path, DATASET_REVIEW_ENABLED=False), store=ReviewStore(tmp_path / 'disabled.sqlite3'), client_factory=fake_client_factory)
+    disabled = GeminiReviewService(review_settings(tmp_path, DATASET_REVIEW_ENABLED=False), store=ReviewStore(private_path(tmp_path, 'disabled.sqlite3')), client_factory=fake_client_factory)
     with pytest.raises(ReviewServiceError, match='dataset_review_disabled'):
         disabled.preview(evidence())
-    unconfigured = GeminiReviewService(review_settings(tmp_path, GEMINI_MODEL=''), store=ReviewStore(tmp_path / 'unconfigured.sqlite3'), client_factory=fake_client_factory)
+    unconfigured = GeminiReviewService(review_settings(tmp_path, GEMINI_MODEL=''), store=ReviewStore(private_path(tmp_path, 'unconfigured.sqlite3')), client_factory=fake_client_factory)
     with pytest.raises(ReviewServiceError, match='provider_model_not_configured'):
         unconfigured.preview(evidence())
 
 
 def test_mocked_provider_is_advisory_and_never_sets_ground_truth(tmp_path: Path):
     settings = review_settings(tmp_path)
-    service = GeminiReviewService(settings, store=ReviewStore(tmp_path / 'review.sqlite3'), client_factory=fake_client_factory)
+    service = GeminiReviewService(settings, store=ReviewStore(private_path(tmp_path, 'review.sqlite3')), client_factory=fake_client_factory)
     payload, _ = service.preview(evidence())
     request = GeminiReviewSuggestRequest(
         payload=payload,
@@ -135,8 +139,48 @@ def test_mocked_provider_is_advisory_and_never_sets_ground_truth(tmp_path: Path)
     assert record.status.value == 'gemini_suggested'
 
 
+def test_generate_content_declares_the_backend_provider_schema(tmp_path: Path):
+    settings = review_settings(tmp_path)
+    client = fake_client_factory(settings)
+    captured: dict[str, object] = {}
+    original_generate = client.models.generate_content
+    client.models.generate_content = lambda **kwargs: (captured.update(kwargs) or original_generate(**kwargs))
+    service = GeminiReviewService(
+        settings,
+        store=ReviewStore(private_path(tmp_path, 'schema.sqlite3')),
+        client_factory=lambda _settings: client,
+    )
+    payload, _ = service.preview(evidence())
+
+    service._call_provider(payload, settings)
+
+    config = captured['config']
+    assert getattr(config, 'response_mime_type') == 'application/json'
+    assert getattr(config, 'response_json_schema') == _gemini_provider_json_schema()
+    assert 'minLength' not in str(config.response_json_schema)
+    assert 'maxLength' not in str(config.response_json_schema)
+    assert 'default' not in str(config.response_json_schema)
+
+
+def test_alternate_provider_json_shape_is_rejected(tmp_path: Path):
+    settings = review_settings(tmp_path)
+    service = GeminiReviewService(settings, store=ReviewStore(private_path(tmp_path, 'alternate.sqlite3')))
+    payload, _ = service.preview(evidence())
+    alternate_shape = {
+        'sample_id': payload.sample_id,
+        'advisory_status': 'unable_to_determine',
+        'reasons': ['Synthetic schema mismatch.'],
+        'safe_indicators': ['Synthetic indicator.'],
+        'suspicious_indicators': [],
+        'reviewer_notes': 'Synthetic test output.',
+    }
+
+    with pytest.raises(ReviewServiceError, match='invalid_provider_schema'):
+        service._validate_provider_output(alternate_shape, payload, settings)
+
+
 def test_consent_hash_and_access_controls_are_enforced(tmp_path: Path):
-    service = GeminiReviewService(review_settings(tmp_path), store=ReviewStore(tmp_path / 'review.sqlite3'), client_factory=fake_client_factory)
+    service = GeminiReviewService(review_settings(tmp_path), store=ReviewStore(private_path(tmp_path, 'review.sqlite3')), client_factory=fake_client_factory)
     payload, _ = service.preview(evidence())
     request = GeminiReviewSuggestRequest(
         payload=payload,

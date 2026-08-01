@@ -17,6 +17,7 @@ from app.core.logging import log_event
 from app.core.settings import Settings, get_settings
 from app.schemas.gemini_review import (
     DatasetReviewStatus,
+    GeminiProviderSuggestion,
     GeminiReviewSuggestion,
     GeminiReviewSuggestRequest,
     ProviderUsage,
@@ -34,6 +35,31 @@ from app.services.gemini_review_storage import ReviewStore
 
 
 logger = logging.getLogger(__name__)
+
+
+_GEMINI_JSON_SCHEMA_KEYS = frozenset({
+    '$anchor', '$defs', '$id', '$ref', 'additionalProperties', 'anyOf',
+    'description', 'enum', 'format', 'items', 'maximum', 'maxItems',
+    'minimum', 'minItems', 'oneOf', 'prefixItems', 'properties',
+    'propertyOrdering', 'required', 'title', 'type',
+})
+
+
+def _gemini_provider_json_schema() -> dict[str, Any]:
+    """Return the Pydantic contract reduced to Gemini's JSON Schema subset."""
+    return _filter_gemini_json_schema(GeminiProviderSuggestion.model_json_schema())
+
+
+def _filter_gemini_json_schema(value: Any, *, schema_map: bool = False) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _filter_gemini_json_schema(item, schema_map=key in {'$defs', 'properties'})
+            for key, item in value.items()
+            if schema_map or key in _GEMINI_JSON_SCHEMA_KEYS
+        }
+    if isinstance(value, list):
+        return [_filter_gemini_json_schema(item) for item in value]
+    return value
 
 
 class ReviewServiceError(RuntimeError):
@@ -234,9 +260,7 @@ class GeminiReviewService:
                 response = self._generate(client, prompt, settings)
                 data = self._extract_json(response)
                 usage = self._extract_usage(response)
-                if usage and not data.get('provider_usage'):
-                    data['provider_usage'] = usage
-                return self._validate_provider_output(data, payload, settings)
+                return self._validate_provider_output(data, payload, settings, provider_usage=usage)
             except ReviewServiceError:
                 raise
             except Exception as error:
@@ -266,6 +290,7 @@ class GeminiReviewService:
             from google.genai import types  # type: ignore[import-not-found]
             config = types.GenerateContentConfig(
                 response_mime_type='application/json',
+                response_json_schema=_gemini_provider_json_schema(),
                 temperature=0,
             )
         except ImportError:
@@ -273,7 +298,11 @@ class GeminiReviewService:
             # response-validation path before the optional SDK is installed.
             # The real client is constructed through _build_client, which
             # fails closed when google-genai is unavailable.
-            config = {'response_mime_type': 'application/json', 'temperature': 0}
+            config = {
+                'response_mime_type': 'application/json',
+                'response_json_schema': _gemini_provider_json_schema(),
+                'temperature': 0,
+            }
         return client.models.generate_content(model=settings.gemini_model, contents=prompt, config=config)
 
     @staticmethod
@@ -315,31 +344,33 @@ class GeminiReviewService:
         return {key: value for key, value in values.items() if value is not None} or None
 
     @staticmethod
-    def _validate_provider_output(data: dict[str, Any], payload: SanitizedReviewPayload, settings: Settings) -> GeminiReviewSuggestion:
-        allowed = set(GeminiReviewSuggestion.model_fields)
+    def _validate_provider_output(
+        data: dict[str, Any],
+        payload: SanitizedReviewPayload,
+        settings: Settings,
+        *,
+        provider_usage: dict[str, int] | None = None,
+    ) -> GeminiReviewSuggestion:
+        allowed = set(GeminiProviderSuggestion.model_fields)
         unknown = set(data) - allowed
         if unknown:
             raise ReviewServiceError('invalid_provider_schema', 502)
-        if 'sample_id' in data and data['sample_id'] != payload.sample_id:
-            raise ReviewServiceError('provider_sample_mismatch', 502)
-        if 'sanitized_payload_hash' in data and data['sanitized_payload_hash'] != payload.sanitized_payload_hash:
-            raise ReviewServiceError('provider_payload_hash_mismatch', 502)
-        if 'model_name' in data and data['model_name'] != settings.gemini_model:
-            raise ReviewServiceError('provider_model_mismatch', 502)
-        if 'prompt_version' in data and data['prompt_version'] != (settings.gemini_prompt_version or PROMPT_VERSION):
-            raise ReviewServiceError('provider_prompt_version_mismatch', 502)
-        data = dict(data)
-        data.update({
+        try:
+            provider_suggestion = GeminiProviderSuggestion.model_validate(data)
+        except Exception as error:
+            raise ReviewServiceError('invalid_provider_schema', 502) from error
+        normalized = provider_suggestion.model_dump(mode='python')
+        normalized.update({
             'suggestion_id': data.get('suggestion_id') or f'gemini-{uuid.uuid4().hex}',
             'sample_id': payload.sample_id,
             'model_name': settings.gemini_model,
             'prompt_version': settings.gemini_prompt_version or PROMPT_VERSION,
             'sanitized_payload_hash': payload.sanitized_payload_hash,
             'generated_at': data.get('generated_at') or datetime.now(timezone.utc).isoformat(),
-            'provider_usage': data.get('provider_usage') or {},
+            'provider_usage': provider_usage or {},
         })
         try:
-            suggestion = GeminiReviewSuggestion.model_validate(data)
+            suggestion = GeminiReviewSuggestion.model_validate(normalized)
         except Exception as error:
             raise ReviewServiceError('invalid_provider_schema', 502) from error
         if suggestion.sample_id != payload.sample_id or suggestion.sanitized_payload_hash != payload.sanitized_payload_hash:

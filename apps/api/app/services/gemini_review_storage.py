@@ -18,22 +18,18 @@ from app.schemas.gemini_review import (
     ReviewStatus,
     SanitizedReviewPayload,
 )
-
+from app.services.private_storage import resolve_private_evaluation_path
 
 SCHEMA_VERSION = 'dataset-review-1'
 
 
 class ReviewStore:
     def __init__(self, path: str | Path | None = None) -> None:
-        supplied_path = path is not None
-        configured = Path(path or get_settings().dataset_review_storage_path)
-        if not configured.is_absolute():
-            configured = Path.cwd() / configured
-        self.path = configured.resolve()
-        if not supplied_path:
-            private_root = (Path(__file__).resolve().parents[4] / 'services' / 'ml' / 'evaluation' / 'private').resolve()
-            if not self.path.is_relative_to(private_root):
-                raise ValueError('Dataset review storage must remain under the ignored private evaluation directory.')
+        configured = path if path is not None else get_settings().dataset_review_storage_path
+        self.path = resolve_private_evaluation_path(
+            configured,
+            error_message='Dataset review storage must remain under the ignored private evaluation directory.',
+        )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = RLock()
         self._initialize()
