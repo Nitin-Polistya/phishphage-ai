@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LockKeyhole, RefreshCw, Send, ShieldCheck } from 'lucide-react';
 
 import { ApiError, createGoldDatasetReview, exportGoldDataset, fetchDatasetReviewStatus, fetchGoldDatasetDashboard, previewDatasetReview, requestGeminiSuggestion, saveDatasetHumanReview, transitionGoldDatasetReview } from '@/lib/api';
+import { formatGoldExportError, safeGoldExportFiles, safeGoldExportLocation } from '@/lib/gold-dataset-export';
 import { toDatasetReviewServiceState, type DatasetReviewServiceState } from '@/lib/dataset-review-status';
-import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, ReviewLabel, ReviewMode } from '@/types/dataset-review';
+import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, GoldDatasetExportResponse, ReviewLabel, ReviewMode } from '@/types/dataset-review';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,9 @@ export function DatasetReviewWorkspace() {
   const [goldReviewId, setGoldReviewId] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<GoldDatasetExportResponse | null>(null);
+  const [exportError, setExportError] = useState('');
 
   const refreshStatus = useCallback(async () => {
     const requestId = ++statusRequestId.current;
@@ -105,6 +109,8 @@ export function DatasetReviewWorkspace() {
     setGoldReviewId('');
     setConsent(false);
     setMessage('Workspace locked. The administrative token remains only in this tab memory.');
+    setExportResult(null);
+    setExportError('');
   };
 
   const loadDashboard = async () => {
@@ -116,11 +122,25 @@ export function DatasetReviewWorkspace() {
   };
 
   const exportGold = async () => {
-    if (!token) return setMessage('Enter the local administrative token to export the gold dataset.');
-    setBusy(true); setMessage('');
-    try { const result = await exportGoldDataset(token); setMessage(`Exported ${result.exported_samples} approved human-reviewed samples: ${result.files.join(', ')}`); }
-    catch (error) { setMessage(errorMessage(error)); }
-    finally { setBusy(false); }
+    setExportResult(null);
+    setExportError('');
+    setMessage('');
+    if (!token) {
+      setExportError('Export authorization failed. Enter the local administrative token first.');
+      return;
+    }
+    setExporting(true);
+    setBusy(true);
+    try {
+      const result = await exportGoldDataset(token);
+      if (!result.all_files_written) throw new ApiError('unexpected', 'Export verification failed. One or more required files are missing or unsafe.', 'export_file_verification_failed');
+      setExportResult(result);
+    } catch (error) {
+      setExportError(formatGoldExportError(error));
+    } finally {
+      setExporting(false);
+      setBusy(false);
+    }
   };
 
   const createPreview = async () => {
@@ -207,6 +227,20 @@ export function DatasetReviewWorkspace() {
          <BatchReviewQueue token={token} reviewerName={reviewerName} onMessage={(nextMessage) => setMessage(nextMessage)} />
 
         <Card><CardHeader><CardTitle className="flex items-center justify-between">Gold dataset quality dashboard <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => void loadDashboard()} disabled={busy || !token}><RefreshCw className="mr-2 h-4 w-4" />Load metrics</Button><Button variant="outline" size="sm" onClick={() => void exportGold()} disabled={busy || !token}>Export approved</Button></div></CardTitle></CardHeader><CardContent>{dashboard ? <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6"><div><p className="text-xs text-muted-foreground">Samples</p><p className="text-2xl font-bold">{dashboard.total_samples}</p></div><div><p className="text-xs text-muted-foreground">Completion</p><p className="text-2xl font-bold">{Math.round(dashboard.review_completion * 100)}%</p></div><div><p className="text-xs text-muted-foreground">Approved</p><p className="text-2xl font-bold">{dashboard.approved_samples}</p></div><div><p className="text-xs text-muted-foreground">Queue</p><p className="text-2xl font-bold">{Object.values(dashboard.review_queue).reduce((sum, count) => sum + count, 0)}</p></div><div><p className="text-xs text-muted-foreground">Second reviews</p><p className="text-2xl font-bold">{dashboard.second_review_count}</p></div><div><p className="text-xs text-muted-foreground">Agreement</p><p className="text-2xl font-bold">{dashboard.reviewer_agreement ? `${Math.round(dashboard.reviewer_agreement.agreement_rate * 100)}%` : '—'}</p></div><div className="sm:col-span-3 lg:col-span-6 flex flex-wrap gap-2 text-xs text-muted-foreground"><span>Labels: {Object.entries(dashboard.label_distribution).map(([label, count]) => `${label} ${count}`).join(' · ') || 'none'}</span><span>Languages: {Object.entries(dashboard.language_distribution).map(([language, count]) => `${language} ${count}`).join(' · ') || 'none'}</span><span>Sources: {Object.entries(dashboard.source_distribution).map(([source, count]) => `${source} ${count}`).join(' · ') || 'none'}</span></div></div> : <p className="text-sm text-muted-foreground">Metrics remain local and require an authorized reviewer session.</p>}</CardContent></Card>
+
+        {exporting && <Alert role="status" aria-live="polite"><RefreshCw className="h-4 w-4 animate-spin" /><AlertTitle>Exporting approved records</AlertTitle><AlertDescription>The local backend is writing and verifying the private export files.</AlertDescription></Alert>}
+        {exportError && <Alert variant="destructive" role="alert"><ShieldCheck className="h-4 w-4" /><AlertTitle>Export failed</AlertTitle><AlertDescription>{exportError}</AlertDescription></Alert>}
+        {exportResult && <section role="status" aria-live="polite" aria-label="Gold dataset export result" className="rounded-lg border border-primary/40 bg-surface-muted p-4 text-sm">
+          <h2 className="font-semibold">Export successful</h2>
+          <p className="mt-1">{exportResult.exported_count} approved records exported.</p>
+          <p className="mt-3 text-muted-foreground">Saved under the private review directory:</p>
+          <code className="mt-1 block break-all font-mono text-xs">{safeGoldExportLocation(exportResult.output_location)}</code>
+          <p className="mt-3 text-muted-foreground">Files:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">{safeGoldExportFiles(exportResult.files).map((file) => <li key={file.filename}><span className="font-mono">{file.filename}</span> <span className="text-muted-foreground">({file.status}, {file.size_bytes} bytes)</span></li>)}</ul>
+          <p className="mt-3">{exportResult.all_files_written ? 'All files were successfully written and verified.' : 'File verification is incomplete.'}</p>
+          <p className="mt-1 text-muted-foreground">Export timestamp: <time dateTime={exportResult.exported_at}>{exportResult.exported_at}</time></p>
+          <p className="mt-1 text-muted-foreground">Files were written by the local backend; they were not downloaded by the browser.</p>
+        </section>}
 
         <Card><CardHeader><CardTitle className="flex items-center justify-between">1. Prepare sanitized evidence <Button type="button" variant="outline" size="sm" onClick={() => void refreshStatus()}><RefreshCw className="mr-2 h-4 w-4" />Refresh status</Button></CardTitle></CardHeader><CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3"><div><Label htmlFor="review-token">Local admin token (memory only)</Label><Input id="review-token" type="password" autoComplete="off" value={token} onChange={(event) => setToken(event.target.value)} /></div><div><Label htmlFor="reviewer-name">Human reviewer name</Label><Input id="reviewer-name" autoComplete="off" value={reviewerName} onChange={(event) => setReviewerName(event.target.value)} placeholder="Enter your own reviewer identity" /></div><div><Label htmlFor="sample-id">Stable sample ID</Label><Input id="sample-id" value={sampleId} onChange={(event) => { setSampleId(event.target.value); setPreview(null); }} /></div></div>

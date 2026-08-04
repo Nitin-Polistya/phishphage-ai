@@ -21,7 +21,14 @@ from app.schemas.gold_dataset import (
     BulkReviewSettingsRequest,
     BulkTransitionRequest,
 )
-from app.services.gold_dataset_manager import DuplicateReviewError, GoldDatasetError, GoldDatasetManager
+from app.services.gold_dataset_manager import (
+    DuplicateReviewError,
+    ExportStorageError,
+    ExportVerificationError,
+    GoldDatasetError,
+    GoldDatasetManager,
+    NoApprovedRecordsError,
+)
 from app.services.gemini_review_service import ReviewServiceError
 
 
@@ -199,11 +206,26 @@ def export_gold_dataset(
 ) -> GoldDatasetExportResponse:
     _authorize(request, x_dataset_review_token)
     manager = get_gold_dataset_manager()
-    exported = manager.export_gold_dataset()
-    reports = manager.generate_reports()
+    try:
+        exported = manager.export_gold_dataset()
+        reports = manager.generate_reports(exported['directory'])
+        paths = [*exported['files'], *reports.values()]
+        file_details = manager.verify_export_files(paths)
+    except NoApprovedRecordsError as error:
+        raise HTTPException(status_code=409, detail={'code': 'no_approved_records', 'message': str(error)}) from None
+    except ExportVerificationError as error:
+        raise HTTPException(status_code=500, detail={'code': 'export_file_verification_failed', 'message': str(error)}) from None
+    except ExportStorageError as error:
+        raise HTTPException(status_code=500, detail={'code': 'export_storage_failure', 'message': str(error)}) from None
+    except GoldDatasetError as error:
+        raise _gold_error(error) from None
+    except OSError:
+        raise HTTPException(status_code=500, detail={'code': 'export_storage_failure', 'message': 'The local export storage failed safely.'}) from None
     return GoldDatasetExportResponse(
-        export_directory='private local evaluation storage',
-        exported_samples=int(exported['exported_samples']),
-        files=[path.name for path in [*exported['files'], *reports.values()]],
+        exported_count=int(exported['exported_samples']),
+        exported_at=str(exported['exported_at']),
+        output_location=str(exported['directory_relative']),
+        files=file_details,
+        all_files_written=bool(file_details) and all(item['status'] == 'written' for item in file_details),
         privacy_contract='Approved human-reviewed metadata only; raw email, headers, URLs, addresses, Message-ID, attachment contents, and PII are excluded.',
     )

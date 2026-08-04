@@ -101,6 +101,21 @@ export interface GoldDatasetDashboard {
   second_review_count: number;
 }
 
+export interface GoldDatasetExportFile {
+  filename: string;
+  status: 'written';
+  size_bytes: number;
+}
+
+export interface GoldDatasetExportResponse {
+  exported_count: number;
+  exported_at: string;
+  output_location: string;
+  files: GoldDatasetExportFile[];
+  all_files_written: boolean;
+  privacy_contract: string;
+}
+
 export interface DatasetReviewQueueItem {
   item_id: string;
   batch_id: string;

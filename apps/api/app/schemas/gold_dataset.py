@@ -175,11 +175,26 @@ class GoldDatasetDashboard(StrictModel):
     second_review_count: int = Field(ge=0)
 
 
+class GoldDatasetExportFile(StrictModel):
+    filename: str = Field(min_length=1, max_length=160, pattern=r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
+    status: str = Field(pattern=r'^written$')
+    size_bytes: int = Field(ge=0)
+
+
 class GoldDatasetExportResponse(StrictModel):
-    export_directory: str
-    exported_samples: int = Field(ge=0)
-    files: list[str]
+    exported_count: int = Field(ge=1)
+    exported_at: datetime
+    output_location: str = Field(pattern=r'^services/ml/evaluation/private/[A-Za-z0-9._/-]+/$')
+    files: list[GoldDatasetExportFile] = Field(min_length=1, max_length=20)
+    all_files_written: bool
     privacy_contract: str
+
+    @field_validator('output_location')
+    @classmethod
+    def reject_output_traversal(cls, value: str) -> str:
+        if any(part in {'.', '..'} for part in value.rstrip('/').split('/')):
+            raise ValueError('output_location must not contain traversal segments.')
+        return value
 
 
 class AuditTrailEntry(StrictModel):

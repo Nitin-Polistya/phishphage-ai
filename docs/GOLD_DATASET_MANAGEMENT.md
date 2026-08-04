@@ -62,25 +62,29 @@ Statistics are persisted with a computation timestamp and version.
 
 ## Privacy-safe exports
 
-`export_gold_dataset()` writes to ignored local storage:
+`export_gold_dataset()` and the Dataset Review `POST /export` endpoint write to
+the ignored local storage directory
+`services/ml/evaluation/private/gold_dataset_reports/`:
 
 - `gold_dataset_v1.jsonl`
 - `gold_dataset_summary.json`
 - `gold_dataset_statistics.md`
-
-Only approved human-reviewed metadata is exported. Source sample IDs are
-digested, notes are redacted, and reviewer identity/Gemini reasoning are not
-exported. Raw bodies, headers, attachment content, URLs, email addresses,
-Message-ID, paths, and PII are excluded.
-
-The report generator writes the following to the ignored
-`services/ml/evaluation/private/gold_dataset_reports/` directory:
-
 - `review_statistics.json`
 - `agreement_report.md`
 - `quality_metrics.json`
 - `label_distribution.csv`
 - `gold_dataset_summary.md`
+
+The endpoint verifies that every listed artifact exists as a regular file
+under the private root before returning success. It returns the repository-
+relative logical output location, ISO-8601 export timestamp, filenames, byte
+sizes, and an `all_files_written` flag. Absolute filesystem paths are never
+returned to the API client or browser.
+
+Only approved human-reviewed metadata is exported. Source sample IDs are
+digested, notes are redacted, and reviewer identity/Gemini reasoning are not
+exported. Raw bodies, headers, attachment content, URLs, email addresses,
+Message-ID, paths, and PII are excluded.
 
 ## API and dashboard
 

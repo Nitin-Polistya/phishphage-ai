@@ -14,7 +14,7 @@ from app.schemas.gemini_review import SanitizedReviewInput
 from app.services import gemini_review_storage, gold_dataset_manager, private_storage
 from app.services.gemini_review_service import GeminiReviewService
 from app.services.gemini_review_storage import ReviewStore
-from app.services.gold_dataset_manager import GoldDatasetError, GoldDatasetManager
+from app.services.gold_dataset_manager import GoldDatasetError, GoldDatasetManager, NoApprovedRecordsError
 
 
 def private_path(name: str) -> Path:
@@ -66,10 +66,11 @@ def test_relative_storage_path_is_independent_of_working_directory(monkeypatch, 
 
 def test_default_exports_and_reports_stay_under_private_root():
     manager = GoldDatasetManager(private_path('gold.sqlite3'))
-    exported = manager.export_gold_dataset()
+    with pytest.raises(NoApprovedRecordsError):
+        manager.export_gold_dataset()
     reports = manager.generate_reports()
 
-    paths = [Path(exported['directory']), *[Path(path) for path in exported['files']], *reports.values()]
+    paths = [*reports.values()]
     assert all(path.is_relative_to(private_storage.PRIVATE_EVALUATION_ROOT) for path in paths)
 
 

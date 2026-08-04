@@ -1,13 +1,13 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { HealthResponse, PredictionResponse } from '@/types/inference';
-import type { BatchReviewResponse, BulkOperationResponse, DatasetReviewPreview, DatasetReviewQueueResponse, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, GoldReviewState, ReviewLabel, ReviewMode, SanitizedReviewPayload, SourceClaimedLabel } from '@/types/dataset-review';
+import type { BatchReviewResponse, BulkOperationResponse, DatasetReviewPreview, DatasetReviewQueueResponse, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, GoldDatasetExportResponse, GoldReviewState, ReviewLabel, ReviewMode, SanitizedReviewPayload, SourceClaimedLabel } from '@/types/dataset-review';
 import { DatasetReviewStatusError, requestDatasetReviewStatus, resolveDatasetReviewApiBaseUrl } from './dataset-review-status';
 export type { HealthResponse } from '@/types/inference';
 
 export type ApiErrorKind = 'validation' | 'backend_unavailable' | 'service_unavailable' | 'timeout' | 'cancelled' | 'unexpected';
 
 export class ApiError extends Error {
-  constructor(public readonly kind: ApiErrorKind, message: string) {
+  constructor(public readonly kind: ApiErrorKind, message: string, public readonly code?: string) {
     super(message);
     this.name = 'ApiError';
   }
@@ -47,6 +47,17 @@ function safeDetail(payload: unknown): string | null {
   return null;
 }
 
+function safeErrorDetail(payload: unknown): { message: string | null; code: string | null } {
+  if (!payload || typeof payload !== 'object' || !('detail' in payload)) return { message: null, code: null };
+  const detail = (payload as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return { message: safeDetail(payload), code: null };
+  const candidate = detail as { message?: unknown; code?: unknown };
+  return {
+    message: typeof candidate.message === 'string' && candidate.message.length <= 300 ? candidate.message : null,
+    code: typeof candidate.code === 'string' && /^[a-z0-9_:-]{1,80}$/.test(candidate.code) ? candidate.code : null,
+  };
+}
+
 function requestSignal(signal?: AbortSignal, timeoutMs = 10_000) {
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort('timeout'), timeoutMs);
@@ -74,11 +85,12 @@ async function datasetReviewRequest<T>(path: string, init: RequestInit = {}, tok
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    const detail = safeDetail(payload);
-    if (response.status === 401 || response.status === 403) throw new ApiError('validation', 'Dataset review authorization failed.');
-    if (response.status === 429) throw new ApiError('service_unavailable', detail || 'The review limit has been reached.');
-    if (response.status === 503) throw new ApiError('service_unavailable', detail || 'Gemini review is not configured.');
-    throw new ApiError('validation', detail || 'Dataset review could not be completed.');
+    const structuredDetail = safeErrorDetail(payload);
+    const detail = structuredDetail.message;
+    if (response.status === 401 || response.status === 403) throw new ApiError('validation', 'Dataset review authorization failed.', 'authorization_failed');
+    if (response.status === 429) throw new ApiError('service_unavailable', detail || 'The review limit has been reached.', structuredDetail.code || undefined);
+    if (response.status === 503) throw new ApiError('service_unavailable', detail || 'Gemini review is not configured.', structuredDetail.code || undefined);
+    throw new ApiError('validation', detail || 'Dataset review could not be completed.', structuredDetail.code || undefined);
   }
   return payload as T;
 }
@@ -166,8 +178,8 @@ export function fetchGoldDatasetDashboard(token: string): Promise<GoldDatasetDas
   return datasetReviewRequest<GoldDatasetDashboard>('/gold-dataset/dashboard', {}, token);
 }
 
-export function exportGoldDataset(token: string): Promise<{ exported_samples: number; files: string[]; privacy_contract: string }> {
-  return datasetReviewRequest<{ exported_samples: number; files: string[]; privacy_contract: string }>('/gold-dataset/export', { method: 'POST', body: JSON.stringify({}) }, token);
+export function exportGoldDataset(token: string): Promise<GoldDatasetExportResponse> {
+  return datasetReviewRequest<GoldDatasetExportResponse>('/gold-dataset/export', { method: 'POST', body: JSON.stringify({}) }, token);
 }
 
 export function importDatasetReviewBatch(payload: { format: 'csv' | 'jsonl'; content: string; imported_by: string; batch_id?: string; idempotency_key?: string }, token: string): Promise<BatchReviewResponse> {

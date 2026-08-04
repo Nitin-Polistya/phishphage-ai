@@ -42,12 +42,14 @@ from app.schemas.gold_dataset import (
     ReviewerDecisionInput,
     SourceClaimedLabel,
 )
+from app.services import private_storage
 from app.services.private_storage import resolve_private_evaluation_path
 
 
 SCHEMA_VERSION = 'gold-dataset-manager-2'
 EXPORT_VERSION = 'gold-dataset-v1'
 MAX_PREVIEW_BODY = 800
+DEFAULT_EXPORT_RELATIVE = 'services/ml/evaluation/private/gold_dataset_reports'
 _BATCH_FIELD_ALIASES = {
     'source_sample_id': 'source_sample_id',
     'source_dataset': 'source_dataset',
@@ -87,6 +89,18 @@ class DuplicateReviewError(GoldDatasetError):
 
 
 class InvalidStateTransitionError(GoldDatasetError):
+    pass
+
+
+class NoApprovedRecordsError(GoldDatasetError):
+    pass
+
+
+class ExportStorageError(GoldDatasetError):
+    pass
+
+
+class ExportVerificationError(GoldDatasetError):
     pass
 
 
@@ -867,23 +881,71 @@ class GoldDatasetManager:
                 second_review_count=second_count,
             )
 
-    def export_gold_dataset(self, output_dir: str | Path | None = None) -> dict[str, object]:
-        destination = self._output_dir(output_dir, 'services/ml/evaluation/private/gold_dataset_exports')
+    def verify_export_files(self, paths: list[Path]) -> list[dict[str, object]]:
+        """Verify generated artifacts without exposing filesystem paths."""
+        if not paths:
+            raise ExportVerificationError('The export did not produce any files.')
+        destination = paths[0].parent.resolve()
+        private_root = private_storage.PRIVATE_EVALUATION_ROOT.resolve()
+        if not destination.is_relative_to(private_root):
+            raise ExportVerificationError('The export location is outside private storage.')
+        verified: list[dict[str, object]] = []
+        for path in paths:
+            resolved = Path(path).resolve()
+            if resolved.parent != destination or not resolved.is_relative_to(private_root):
+                raise ExportVerificationError('An export file resolved outside private storage.')
+            if not resolved.is_file():
+                raise ExportVerificationError(f'Export file verification failed for {resolved.name}.')
+            try:
+                size_bytes = resolved.stat().st_size
+            except OSError as error:
+                raise ExportVerificationError(f'Export file verification failed for {resolved.name}.') from error
+            verified.append({'filename': resolved.name, 'status': 'written', 'size_bytes': size_bytes})
+        return verified
+
+    def _write_export_files(self, destination: Path, payloads: list[tuple[str, str]]) -> tuple[list[Path], list[dict[str, object]]]:
         destination.mkdir(parents=True, exist_ok=True)
+        paths = [destination / filename for filename, _ in payloads]
+        try:
+            for path, (_, content) in zip(paths, payloads, strict=True):
+                path.write_text(content, encoding='utf-8')
+        except OSError as error:
+            raise ExportStorageError('The local export storage could not write all required files.') from error
+        return paths, self.verify_export_files(paths)
+
+    def _logical_export_location(self, destination: Path) -> str:
+        resolved = destination.resolve()
+        if not resolved.is_relative_to(private_storage.PRIVATE_EVALUATION_ROOT.resolve()):
+            raise ExportVerificationError('The export location is outside private storage.')
+        relative = resolved.relative_to(private_storage.REPOSITORY_ROOT.resolve()).as_posix().strip('/')
+        return f'{relative}/'
+
+    def export_gold_dataset(self, output_dir: str | Path | None = None) -> dict[str, object]:
+        destination = self._output_dir(output_dir, DEFAULT_EXPORT_RELATIVE)
         with self._connect() as connection:
             rows = connection.execute("SELECT * FROM gold_reviews WHERE state='approved' ORDER BY review_id").fetchall()
+        if not rows:
+            raise NoApprovedRecordsError('No approved human-reviewed records are available for export.')
         records = [_privacy_safe_export_record(row) for row in rows]
-        jsonl_path = destination / 'gold_dataset_v1.jsonl'
-        summary_path = destination / 'gold_dataset_summary.json'
-        stats_path = destination / 'gold_dataset_statistics.md'
-        jsonl_path.write_text(''.join(json.dumps(record, sort_keys=True, ensure_ascii=True) + '\n' for record in records), encoding='utf-8')
         summary = self._summary(records)
-        summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True, ensure_ascii=True) + '\n', encoding='utf-8')
-        stats_path.write_text(_statistics_markdown(summary), encoding='utf-8')
-        return {'directory': destination, 'files': [jsonl_path, summary_path, stats_path], 'exported_samples': len(records)}
+        exported_at = _now()
+        payloads = [
+            ('gold_dataset_v1.jsonl', ''.join(json.dumps(record, sort_keys=True, ensure_ascii=True) + '\n' for record in records)),
+            ('gold_dataset_summary.json', json.dumps(summary, indent=2, sort_keys=True, ensure_ascii=True) + '\n'),
+            ('gold_dataset_statistics.md', _statistics_markdown(summary)),
+        ]
+        paths, file_details = self._write_export_files(destination, payloads)
+        return {
+            'directory': destination,
+            'directory_relative': self._logical_export_location(destination),
+            'files': paths,
+            'file_details': file_details,
+            'exported_samples': len(records),
+            'exported_at': exported_at,
+        }
 
     def generate_reports(self, output_dir: str | Path | None = None) -> dict[str, Path]:
-        destination = self._output_dir(output_dir, 'services/ml/evaluation/private/gold_dataset_reports')
+        destination = self._output_dir(output_dir, DEFAULT_EXPORT_RELATIVE)
         destination.mkdir(parents=True, exist_ok=True)
         dashboard = self.dashboard()
         agreement = dashboard.reviewer_agreement
@@ -903,14 +965,18 @@ class GoldDatasetManager:
             'label_distribution': destination / 'label_distribution.csv',
             'gold_dataset_summary': destination / 'gold_dataset_summary.md',
         }
-        paths['review_statistics'].write_text(json.dumps(review_statistics, indent=2, sort_keys=True, ensure_ascii=True) + '\n', encoding='utf-8')
-        paths['quality_metrics'].write_text(json.dumps(quality_metrics, indent=2, sort_keys=True, ensure_ascii=True) + '\n', encoding='utf-8')
-        with paths['label_distribution'].open('w', newline='', encoding='utf-8') as handle:
-            writer = csv.writer(handle)
-            writer.writerow(['label', 'count'])
-            writer.writerows(sorted(dashboard.label_distribution.items()))
-        paths['agreement_report'].write_text(_agreement_markdown(agreement), encoding='utf-8')
-        paths['gold_dataset_summary'].write_text(_summary_markdown(dashboard), encoding='utf-8')
+        try:
+            paths['review_statistics'].write_text(json.dumps(review_statistics, indent=2, sort_keys=True, ensure_ascii=True) + '\n', encoding='utf-8')
+            paths['quality_metrics'].write_text(json.dumps(quality_metrics, indent=2, sort_keys=True, ensure_ascii=True) + '\n', encoding='utf-8')
+            with paths['label_distribution'].open('w', newline='', encoding='utf-8') as handle:
+                writer = csv.writer(handle)
+                writer.writerow(['label', 'count'])
+                writer.writerows(sorted(dashboard.label_distribution.items()))
+            paths['agreement_report'].write_text(_agreement_markdown(agreement), encoding='utf-8')
+            paths['gold_dataset_summary'].write_text(_summary_markdown(dashboard), encoding='utf-8')
+        except OSError as error:
+            raise ExportStorageError('The local export storage could not write all required report files.') from error
+        self.verify_export_files(list(paths.values()))
         return paths
 
     def _assert_no_duplicate(self, connection: sqlite3.Connection, review: GoldDatasetReviewInput) -> None:
