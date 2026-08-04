@@ -16,6 +16,10 @@ from app.schemas.gold_dataset import (
     GoldReviewState,
     ReviewerDecisionInput,
     ReviewTransitionRequest,
+    BulkLabelRequest,
+    BulkOperationResponse,
+    BulkReviewSettingsRequest,
+    BulkTransitionRequest,
 )
 from app.services.gold_dataset_manager import DuplicateReviewError, GoldDatasetError, GoldDatasetManager
 from app.services.gemini_review_service import ReviewServiceError
@@ -48,6 +52,29 @@ def _gold_error(error: GoldDatasetError) -> HTTPException:
     code = 'duplicate_review' if isinstance(error, DuplicateReviewError) else 'gold_dataset_error'
     status = 409 if code == 'duplicate_review' else 422
     return HTTPException(status_code=status, detail={'code': code, 'message': str(error)})
+
+
+def _bulk_response(request: Request, token: str | None, handler) -> BulkOperationResponse:
+    _authorize(request, token)
+    try:
+        return handler()
+    except GoldDatasetError as error:
+        raise _gold_error(error) from None
+
+
+@router.post('/bulk-label', response_model=BulkOperationResponse, dependencies=[Depends(_feature_enabled)])
+def bulk_label_gold_reviews(request: Request, payload: BulkLabelRequest, x_dataset_review_token: str | None = Header(default=None)) -> BulkOperationResponse:
+    return _bulk_response(request, x_dataset_review_token, lambda: get_gold_dataset_manager().bulk_label(payload))
+
+
+@router.post('/bulk-transition', response_model=BulkOperationResponse, dependencies=[Depends(_feature_enabled)])
+def bulk_transition_gold_reviews(request: Request, payload: BulkTransitionRequest, x_dataset_review_token: str | None = Header(default=None)) -> BulkOperationResponse:
+    return _bulk_response(request, x_dataset_review_token, lambda: get_gold_dataset_manager().bulk_transition(payload))
+
+
+@router.post('/bulk-review-settings', response_model=BulkOperationResponse, dependencies=[Depends(_feature_enabled)])
+def bulk_review_settings(request: Request, payload: BulkReviewSettingsRequest, x_dataset_review_token: str | None = Header(default=None)) -> BulkOperationResponse:
+    return _bulk_response(request, x_dataset_review_token, lambda: get_gold_dataset_manager().bulk_review_settings(payload))
 
 
 @router.get('/dashboard', response_model=GoldDatasetDashboard)

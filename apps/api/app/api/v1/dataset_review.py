@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
 from app.core.settings import get_settings
 
@@ -17,8 +17,17 @@ from app.schemas.gemini_review import (
     ReviewerDecisionImportResponse,
     ReviewerQueueExportRequest,
     ReviewerQueueExportResponse,
+    ReviewLabel,
+)
+from app.schemas.gold_dataset import (
+    BatchImportRequest,
+    BatchReviewResponse,
+    DatasetReviewQueueResponse,
+    GoldReviewState,
+    SourceClaimedLabel,
 )
 from app.services.gemini_review_exports import reviewer_queue_csv, validate_decision_csv
+from app.services.gold_dataset_manager import BatchImportError, GoldDatasetError
 from app.services.gemini_review_service import GeminiReviewService, ReviewServiceError
 
 
@@ -53,6 +62,71 @@ def _feature_enabled() -> None:
     """Run before request-body validation so disabled routes fail closed."""
     if not get_settings().dataset_review_enabled:
         raise HTTPException(status_code=404, detail={'code': 'dataset_review_disabled', 'message': 'Dataset review is disabled.'})
+
+
+def _gold_manager():
+    # Keep the existing GoldDatasetManager singleton shared by both routers
+    # without introducing an import cycle at module import time.
+    from app.api.v1.gold_dataset import get_gold_dataset_manager
+    return get_gold_dataset_manager()
+
+
+@router.post('/batches/import', response_model=BatchReviewResponse, dependencies=[Depends(_feature_enabled)])
+def import_dataset_review_batch(
+    request: Request,
+    payload: BatchImportRequest,
+    x_dataset_review_token: str | None = Header(default=None),
+) -> BatchReviewResponse:
+    try:
+        review_service.authorize(token=x_dataset_review_token, client_host=request.client.host if request.client else None, origin=request.headers.get('origin'))
+        return _gold_manager().import_batch(payload)
+    except BatchImportError as error:
+        detail: dict[str, object] = {'code': 'invalid_batch', 'message': str(error)}
+        if error.errors:
+            detail['errors'] = error.errors
+        raise HTTPException(status_code=422, detail=detail) from None
+    except GoldDatasetError as error:
+        raise HTTPException(status_code=409, detail={'code': 'batch_error', 'message': str(error)}) from None
+    except ReviewServiceError as error:
+        raise _service_error(error) from None
+
+
+@router.get('/batches/{batch_id}', response_model=BatchReviewResponse, dependencies=[Depends(_feature_enabled)])
+def get_dataset_review_batch(
+    batch_id: str,
+    request: Request,
+    x_dataset_review_token: str | None = Header(default=None),
+) -> BatchReviewResponse:
+    try:
+        review_service.authorize(token=x_dataset_review_token, client_host=request.client.host if request.client else None, origin=request.headers.get('origin'))
+        return _gold_manager().get_batch(batch_id)
+    except ReviewServiceError as error:
+        raise _service_error(error) from None
+    except GoldDatasetError as error:
+        raise HTTPException(status_code=404, detail={'code': 'batch_not_found', 'message': 'Dataset review batch was not found.'}) from error
+
+
+@router.get('/queue', response_model=DatasetReviewQueueResponse, dependencies=[Depends(_feature_enabled)])
+def get_dataset_review_queue(
+    request: Request,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=100, ge=1, le=100),
+    source_label: SourceClaimedLabel | None = None,
+    human_label: ReviewLabel | None = None,
+    state: GoldReviewState | None = None,
+    language: str | None = Query(default=None, max_length=32),
+    source_dataset: str | None = Query(default=None, max_length=160),
+    campaign: str | None = Query(default=None, max_length=160),
+    duplicate_status: str | None = Query(default=None, max_length=40),
+    second_review_required: bool | None = None,
+    search: str | None = Query(default=None, max_length=160),
+    x_dataset_review_token: str | None = Header(default=None),
+) -> DatasetReviewQueueResponse:
+    try:
+        review_service.authorize(token=x_dataset_review_token, client_host=request.client.host if request.client else None, origin=request.headers.get('origin'))
+        return _gold_manager().list_queue(page=page, page_size=page_size, source_label=source_label, human_label=human_label, state=state, language=language, source_dataset=source_dataset, campaign=campaign, duplicate_status=duplicate_status, second_review_required=second_review_required, search=search)
+    except ReviewServiceError as error:
+        raise _service_error(error) from None
 
 
 @router.get('/status', response_model=DatasetReviewStatus)

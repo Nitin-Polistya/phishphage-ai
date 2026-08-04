@@ -1,6 +1,6 @@
 import type { AnalysisRequest, UnifiedAnalysisResponse } from '@/types/analysis';
 import type { HealthResponse, PredictionResponse } from '@/types/inference';
-import type { DatasetReviewPreview, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, ReviewLabel, ReviewMode, SanitizedReviewPayload } from '@/types/dataset-review';
+import type { BatchReviewResponse, BulkOperationResponse, DatasetReviewPreview, DatasetReviewQueueResponse, DatasetReviewStatus, GeminiSuggestion, GoldDatasetDashboard, GoldReviewState, ReviewLabel, ReviewMode, SanitizedReviewPayload, SourceClaimedLabel } from '@/types/dataset-review';
 import { DatasetReviewStatusError, requestDatasetReviewStatus, resolveDatasetReviewApiBaseUrl } from './dataset-review-status';
 export type { HealthResponse } from '@/types/inference';
 
@@ -168,6 +168,32 @@ export function fetchGoldDatasetDashboard(token: string): Promise<GoldDatasetDas
 
 export function exportGoldDataset(token: string): Promise<{ exported_samples: number; files: string[]; privacy_contract: string }> {
   return datasetReviewRequest<{ exported_samples: number; files: string[]; privacy_contract: string }>('/gold-dataset/export', { method: 'POST', body: JSON.stringify({}) }, token);
+}
+
+export function importDatasetReviewBatch(payload: { format: 'csv' | 'jsonl'; content: string; imported_by: string; batch_id?: string; idempotency_key?: string }, token: string): Promise<BatchReviewResponse> {
+  return datasetReviewRequest<BatchReviewResponse>('/batches/import', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function fetchDatasetReviewBatch(batchId: string, token: string): Promise<BatchReviewResponse> {
+  return datasetReviewRequest<BatchReviewResponse>(`/batches/${encodeURIComponent(batchId)}`, {}, token);
+}
+
+export function fetchDatasetReviewQueue(token: string, filters: { page?: number; page_size?: number; source_label?: SourceClaimedLabel; human_label?: ReviewLabel; state?: GoldReviewState; language?: string; source_dataset?: string; campaign?: string; duplicate_status?: string; second_review_required?: boolean; search?: string } = {}): Promise<DatasetReviewQueueResponse> {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') params.set(key, String(value)); });
+  return datasetReviewRequest<DatasetReviewQueueResponse>(`/queue${params.toString() ? `?${params.toString()}` : ''}`, {}, token);
+}
+
+export function bulkLabelDatasetReview(payload: { item_ids: string[]; label: ReviewLabel; reviewer_name: string; confidence?: number; label_quality?: 'high' | 'medium' | 'low' | 'unresolved'; requires_second_review?: boolean; reason: string; idempotency_key?: string }, token: string): Promise<BulkOperationResponse> {
+  return datasetReviewRequest<BulkOperationResponse>('/gold-dataset/bulk-label', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function bulkTransitionDatasetReview(payload: { item_ids: string[]; new_state: GoldReviewState; reviewer_name: string; reason: string; allow_partial?: boolean; idempotency_key?: string }, token: string): Promise<BulkOperationResponse> {
+  return datasetReviewRequest<BulkOperationResponse>('/gold-dataset/bulk-transition', { method: 'POST', body: JSON.stringify(payload) }, token);
+}
+
+export function bulkReviewSettings(payload: { item_ids: string[]; reviewer_name: string; confidence?: number; requires_second_review?: boolean; reason: string; idempotency_key?: string }, token: string): Promise<BulkOperationResponse> {
+  return datasetReviewRequest<BulkOperationResponse>('/gold-dataset/bulk-review-settings', { method: 'POST', body: JSON.stringify(payload) }, token);
 }
 
 export async function analyzeProductionEmail(rawEmail: string, signal?: AbortSignal): Promise<PredictionResponse> {

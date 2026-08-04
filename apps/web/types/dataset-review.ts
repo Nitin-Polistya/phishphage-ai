@@ -1,5 +1,7 @@
 export type ReviewLabel = 'safe' | 'suspicious' | 'phishing' | 'unable_to_determine';
 export type ReviewMode = 'independent' | 'ai_assisted';
+export type SourceClaimedLabel = 'safe' | 'phishing' | 'suspicious' | 'unknown';
+export type GoldReviewState = 'pending' | 'reviewed' | 'needs_second_review' | 'approved' | 'rejected' | 'archived';
 
 export interface DatasetReviewStatus {
   enabled: boolean;
@@ -97,4 +99,65 @@ export interface GoldDatasetDashboard {
   confidence_distribution: Record<string, number>;
   source_distribution: Record<string, number>;
   second_review_count: number;
+}
+
+export interface DatasetReviewQueueItem {
+  item_id: string;
+  batch_id: string;
+  row_number: number;
+  source_sample_id: string;
+  source_dataset: string;
+  campaign_id: string;
+  language: string;
+  source_claimed_label: SourceClaimedLabel;
+  current_human_label: ReviewLabel | null;
+  state: GoldReviewState;
+  confidence: number | null;
+  duplicate_status: string;
+  duplicate_reasons: string[];
+  second_review_required: boolean;
+  second_review_complete: boolean;
+  review_id: string | null;
+  subject_preview: string;
+  body_excerpt: string;
+  sender_domain: string;
+  reply_to_domain: string;
+  authentication_summary: string[];
+  url_domains: string[];
+  url_structural_flags: string[];
+  attachment_metadata: string;
+}
+
+export interface BatchReviewResponse {
+  batch_id: string;
+  source_format: 'csv' | 'jsonl';
+  imported_count: number;
+  duplicate_count: number;
+  imported_at: string;
+  items: DatasetReviewQueueItem[];
+  warnings: string[];
+}
+
+export interface DatasetReviewQueueResponse {
+  items: DatasetReviewQueueItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface BulkFailure {
+  item_id: string;
+  reason: string;
+}
+
+export interface BulkOperationResponse {
+  bulk_operation_id: string;
+  operation: string;
+  requested_count: number;
+  affected_count: number;
+  approved_count: number;
+  skipped_count: number;
+  atomic: boolean;
+  failures: BulkFailure[];
+  items: DatasetReviewQueueItem[];
 }

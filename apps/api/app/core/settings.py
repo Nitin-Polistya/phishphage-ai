@@ -68,6 +68,8 @@ class Settings(BaseSettings):
         default='services/ml/evaluation/private/review_workspace.sqlite3',
         alias='DATASET_REVIEW_STORAGE_PATH',
     )
+    dataset_review_max_batch_size: int = Field(default=100, ge=1, le=1000, alias='DATASET_REVIEW_MAX_BATCH_SIZE')
+    dataset_review_max_bulk_items: int = Field(default=100, ge=1, le=1000, alias='DATASET_REVIEW_MAX_BULK_ITEMS')
 
     @model_validator(mode='after')
     def validate_review_secret_contract(self) -> 'Settings':

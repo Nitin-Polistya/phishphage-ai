@@ -31,6 +31,18 @@ class GoldReviewState(str, Enum):
         return None
 
 
+class BatchImportFormat(str, Enum):
+    csv = 'csv'
+    jsonl = 'jsonl'
+
+
+class SourceClaimedLabel(str, Enum):
+    safe = 'safe'
+    phishing = 'phishing'
+    suspicious = 'suspicious'
+    unknown = 'unknown'
+
+
 class LabelQuality(str, Enum):
     high = 'high'
     medium = 'medium'
@@ -182,3 +194,111 @@ class AuditTrailEntry(StrictModel):
     reason: str
     old_state: GoldReviewState | None
     new_state: GoldReviewState | None
+    bulk_operation_id: UUID | None = None
+    batch_id: str | None = None
+    operation: str | None = None
+
+
+class BatchImportRequest(StrictModel):
+    format: BatchImportFormat
+    content: str = Field(min_length=1, max_length=2_000_000)
+    imported_by: str = Field(min_length=1, max_length=120)
+    batch_id: str | None = Field(default=None, max_length=80, pattern=r'^[A-Za-z0-9._:-]+$')
+    idempotency_key: str | None = Field(default=None, max_length=160, pattern=r'^[A-Za-z0-9._:-]+$')
+
+
+class BatchRowError(StrictModel):
+    row_number: int = Field(ge=1)
+    code: str = Field(min_length=1, max_length=80)
+    message: str = Field(min_length=1, max_length=240)
+    field: str | None = Field(default=None, max_length=80)
+
+
+class DatasetReviewQueueItem(StrictModel):
+    item_id: UUID
+    batch_id: str
+    row_number: int = Field(ge=1)
+    source_sample_id: str
+    source_dataset: str
+    campaign_id: str
+    language: str
+    source_claimed_label: SourceClaimedLabel
+    current_human_label: ReviewLabel | None
+    state: GoldReviewState
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    duplicate_status: str
+    duplicate_reasons: list[str] = Field(default_factory=list)
+    second_review_required: bool
+    second_review_complete: bool
+    review_id: UUID | None = None
+    subject_preview: str = Field(default='', max_length=300)
+    body_excerpt: str = Field(default='', max_length=800)
+    sender_domain: str = Field(default='', max_length=253)
+    reply_to_domain: str = Field(default='', max_length=253)
+    authentication_summary: list[str] = Field(default_factory=list, max_length=10)
+    url_domains: list[str] = Field(default_factory=list, max_length=30)
+    url_structural_flags: list[str] = Field(default_factory=list, max_length=30)
+    attachment_metadata: str = Field(default='', max_length=300)
+
+
+class BatchReviewResponse(StrictModel):
+    batch_id: str
+    source_format: BatchImportFormat
+    imported_count: int = Field(ge=0)
+    duplicate_count: int = Field(ge=0)
+    imported_at: datetime
+    items: list[DatasetReviewQueueItem] = Field(max_length=1000)
+    warnings: list[str] = Field(default_factory=list, max_length=100)
+
+
+class DatasetReviewQueueResponse(StrictModel):
+    items: list[DatasetReviewQueueItem] = Field(max_length=100)
+    total: int = Field(ge=0)
+    page: int = Field(ge=1)
+    page_size: int = Field(ge=1, le=100)
+
+
+class BulkLabelRequest(StrictModel):
+    item_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    label: ReviewLabel
+    reviewer_name: str = Field(min_length=1, max_length=120)
+    confidence: float = Field(default=0.9, ge=0.0, le=1.0)
+    label_quality: LabelQuality = LabelQuality.high
+    requires_second_review: bool = False
+    reason: str = Field(min_length=1, max_length=1000)
+    idempotency_key: str | None = Field(default=None, max_length=160, pattern=r'^[A-Za-z0-9._:-]+$')
+
+
+class BulkTransitionRequest(StrictModel):
+    item_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    new_state: GoldReviewState
+    reviewer_name: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1000)
+    allow_partial: bool = False
+    idempotency_key: str | None = Field(default=None, max_length=160, pattern=r'^[A-Za-z0-9._:-]+$')
+
+
+class BulkReviewSettingsRequest(StrictModel):
+    item_ids: list[UUID] = Field(min_length=1, max_length=1000)
+    reviewer_name: str = Field(min_length=1, max_length=120)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    requires_second_review: bool | None = None
+    reason: str = Field(min_length=1, max_length=1000)
+    idempotency_key: str | None = Field(default=None, max_length=160, pattern=r'^[A-Za-z0-9._:-]+$')
+
+
+class BulkFailure(StrictModel):
+    item_id: UUID
+    reason: str = Field(min_length=1, max_length=240)
+
+
+class BulkOperationResponse(StrictModel):
+    bulk_operation_id: UUID
+    operation: str
+    requested_count: int = Field(ge=0)
+    affected_count: int = Field(ge=0)
+    approved_count: int = Field(ge=0)
+    skipped_count: int = Field(ge=0)
+    atomic: bool
+    failures: list[BulkFailure] = Field(default_factory=list, max_length=100)
+    items: list[DatasetReviewQueueItem] = Field(default_factory=list, max_length=100)
