@@ -95,6 +95,15 @@ class ApprovedContentRecord:
     phishing_label: str
     subject: str
     body_excerpt: str
+    # These fields are already privacy-sanitized metadata in the private
+    # review store.  They are optional to preserve the adapter's small test
+    # fixture contract and are never written to evaluation reports.
+    sender_domain: str = ""
+    reply_to_domain: str = ""
+    authentication_summary: tuple[str, ...] = ()
+    url_domains: tuple[str, ...] = ()
+    url_structural_flags: tuple[str, ...] = ()
+    attachment_metadata: str = ""
 
 
 @dataclass(frozen=True)
@@ -222,7 +231,10 @@ def load_approved_content(path: str | Path) -> dict[str, ApprovedContentRecord]:
             """
             SELECT g.review_id, g.state, g.sample_hash, g.normalized_content_hash,
                    g.source_dataset, g.source_sample_id, g.campaign_identifier,
-                   g.phishing_label, i.subject_preview, i.body_excerpt
+                   g.phishing_label, i.subject_preview, i.body_excerpt,
+                   i.sender_domain, i.reply_to_domain,
+                   i.authentication_summary_json, i.url_domains_json,
+                   i.url_structural_flags_json, i.attachment_metadata
             FROM gold_reviews AS g
             JOIN dataset_review_items AS i ON i.current_review_id = g.review_id
             WHERE g.state = 'approved'
@@ -242,6 +254,16 @@ def load_approved_content(path: str | Path) -> dict[str, ApprovedContentRecord]:
         review_id = str(row["review_id"])
         if review_id in approved:
             raise GoldApprovalError("The private review store contains a duplicate review ID.")
+        try:
+            authentication_summary = json.loads(row["authentication_summary_json"] or "[]")
+            url_domains = json.loads(row["url_domains_json"] or "[]")
+            url_structural_flags = json.loads(row["url_structural_flags_json"] or "[]")
+        except (TypeError, json.JSONDecodeError) as error:
+            raise GoldApprovalError("The private review store contains malformed sanitized metadata.") from error
+        if not all(isinstance(value, list) and all(isinstance(item, str) for item in value) for value in (
+            authentication_summary, url_domains, url_structural_flags
+        )):
+            raise GoldApprovalError("The private review store contains malformed sanitized metadata.")
         approved[review_id] = ApprovedContentRecord(
             review_id=review_id,
             state=str(row["state"]),
@@ -253,6 +275,12 @@ def load_approved_content(path: str | Path) -> dict[str, ApprovedContentRecord]:
             phishing_label=str(row["phishing_label"]),
             subject=str(row["subject_preview"] or ""),
             body_excerpt=str(row["body_excerpt"] or ""),
+            sender_domain=str(row["sender_domain"] or ""),
+            reply_to_domain=str(row["reply_to_domain"] or ""),
+            authentication_summary=tuple(authentication_summary),
+            url_domains=tuple(url_domains),
+            url_structural_flags=tuple(url_structural_flags),
+            attachment_metadata=str(row["attachment_metadata"] or ""),
         )
     return approved
 
