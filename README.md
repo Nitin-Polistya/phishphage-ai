@@ -109,6 +109,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/API.md](docs/API.md).
 
 The exact 3-5 minute script is in [docs/DEMO.md](docs/DEMO.md). The synthetic inputs are in [docs/assets/demo/](docs/assets/demo/).
 
+## College Submission and Demonstration
+
+PhishPhage AI is presented as an academic/research prototype, not a production-certified security product. The current candidate prioritizes precision and low false positives; recall remains a material limitation. The complete submission package is available here:
+
+- [College project report](docs/COLLEGE_PROJECT_REPORT.md)
+- [Presentation outline](docs/COLLEGE_PRESENTATION_OUTLINE.md)
+- [Local demo guide](docs/COLLEGE_DEMO_GUIDE.md)
+- [Presentation checklist](docs/COLLEGE_PRESENTATION_CHECKLIST.md)
+- [Viva questions and answers](docs/COLLEGE_VIVA_QA.md)
+- [Screenshot plan](docs/COLLEGE_SCREENSHOT_PLAN.md)
+- [Offline demo backup](docs/OFFLINE_DEMO_BACKUP.md)
+
 ## Technology stack
 
 - Frontend: Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Lucide icons.

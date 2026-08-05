@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePreferences } from '@/hooks/use-preferences';
 import { useScanRecords } from '@/hooks/use-scan-records';
-import { API_BASE_URL, ApiError, fetchHealthStatus, validateApiBaseUrl, type HealthResponse } from '@/lib/api';
+import { API_BASE_URL, ApiError, fetchHealthStatus, USING_DEFAULT_API_BASE_URL, validateApiBaseUrl, type HealthResponse } from '@/lib/api';
 import { type AppPreferences } from '@/lib/preferences';
 import { downloadReports, requiresLargeBatchConfirmation } from '@/lib/reports';
 import { clearScans } from '@/lib/scan-store';
@@ -66,10 +66,15 @@ export function SettingsWorkspace({ frontendVersion }: { frontendVersion: string
     setHealth({ phase: 'checking', response: null, message: 'Checking…' });
     try {
       const response = await fetchHealthStatus();
-      setHealth({ phase: 'online', response, message: 'Available' });
+      setHealth({ phase: 'online', response, message: USING_DEFAULT_API_BASE_URL ? 'Healthy · using default local backend' : 'Healthy' });
     } catch (error) {
       const invalid = error instanceof ApiError && error.kind === 'validation';
-      setHealth({ phase: invalid ? 'invalid' : error instanceof ApiError && error.kind === 'backend_unavailable' ? 'offline' : 'error', response: null, message: invalid ? 'Invalid API URL' : 'Unavailable' });
+      const unavailable = error instanceof ApiError && error.kind === 'backend_unavailable';
+      setHealth({
+        phase: invalid ? 'invalid' : unavailable ? 'offline' : 'error',
+        response: null,
+        message: invalid ? 'Invalid API URL' : unavailable && USING_DEFAULT_API_BASE_URL ? 'Default local backend unavailable' : 'Unavailable',
+      });
     }
   }, []);
 
@@ -145,7 +150,7 @@ export function SettingsWorkspace({ frontendVersion }: { frontendVersion: string
         <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 text-sm font-medium text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Code2 className="h-4 w-4 text-foreground0" aria-hidden="true" />Developer Details<span className="ml-auto text-xs font-normal text-foreground0">Optional diagnostics</span><ChevronDown className="h-4 w-4 text-foreground0 transition-transform group-open:rotate-180" aria-hidden="true" /></summary>
         <div className="border-t border-border px-5 pb-4">
           <div className="flex justify-end py-3"><Button type="button" variant="ghost" size="sm" disabled={health.phase === 'checking'} onClick={() => void refreshStatus()} className="text-muted-foreground hover:bg-surface-muted hover:text-foreground"><RefreshCw className={cn(health.phase === 'checking' && 'animate-spin')} aria-hidden="true" />Refresh</Button></div>
-          <dl><DeveloperRow label="API URL" value={API_BASE_URL} /><DeveloperRow label="Backend availability" value={health.message} tone={healthTone} /><DeveloperRow label="Rule engine status" value={latestRuleEngine ? `Active · ${latestRuleEngine.version}` : 'Not yet observed'} tone={latestRuleEngine ? 'good' : 'neutral'} /><DeveloperRow label="ML engine status" value={latestMlEngine ? `${latestMlEngine.status === 'available' ? 'Available' : 'Unavailable'}${latestMlEngine.version ? ` · ${latestMlEngine.version}` : ''}` : 'Not yet observed'} tone={latestMlEngine?.status === 'available' ? 'good' : latestMlEngine?.status === 'unavailable' ? 'warning' : 'neutral'} /><DeveloperRow label="Firebase status" value={firebaseValue} /></dl>
+          <dl><DeveloperRow label="API URL" value={USING_DEFAULT_API_BASE_URL ? 'Using default local backend' : API_BASE_URL} /><DeveloperRow label="Backend availability" value={health.message} tone={healthTone} /><DeveloperRow label="Rule engine status" value={latestRuleEngine ? `Active · ${latestRuleEngine.version}` : 'Not yet observed'} tone={latestRuleEngine ? 'good' : 'neutral'} /><DeveloperRow label="ML engine status" value={latestMlEngine ? `${latestMlEngine.status === 'available' ? 'Available' : 'Unavailable'}${latestMlEngine.version ? ` · ${latestMlEngine.version}` : ''}` : 'Not yet observed'} tone={latestMlEngine?.status === 'available' ? 'good' : latestMlEngine?.status === 'unavailable' ? 'warning' : 'neutral'} /><DeveloperRow label="Firebase status" value={firebaseValue} /></dl>
         </div>
       </details>
 

@@ -1,159 +1,105 @@
-# Architecture
+# PhishPhage AI architecture
 
-## System overview
+PhishPhage AI is an academic/research prototype. The runtime analysis path and
+the dataset-review path are intentionally separate. No component in this
+diagram performs automatic retraining or automatic model activation.
 
-PhishPhage AI is a browser-to-API analysis system with a local privacy boundary. The frontend collects one input at a time. The API parses and analyzes the input in memory, then returns structured evidence. The browser may optionally save a sanitized summary of a completed scan for the dashboard, history, and report views.
-
-```mermaid
-flowchart LR
-  person[Reviewer] --> browser[Next.js browser app]
-  browser -->|JSON over configured CORS origin| api[FastAPI API]
-  api --> parser[RFC822 and MIME parser]
-  parser --> rules[Rule analyzers]
-  parser --> model[Registry-checked ML adapter]
-  rules --> fusion[Decision and explanation layer]
-  model --> fusion
-  fusion --> api
-  api --> browser
-  browser -. optional sanitized records .-> storage[(Browser local storage)]
-  registry[Versioned model registry] --> model
-```
-
-The public product name is PhishPhage AI. Historical reports, browser-storage keys, and research source IDs may retain compatibility identifiers; these are migration or provenance identifiers, not separate product or release names.
-
-## Frontend architecture
-
-The Next.js App Router exposes the landing page and the application views `/analyze`, `/dashboard`, `/history`, `/reports`, and `/settings`. The Analyze view supports Quick Paste, raw source, and `.eml` upload. It calls the mode-aware analysis preview API for the current workflow and polls the versioned health route for backend/model status.
-
-The API client applies timeouts and maps safe server errors to user-facing categories. React renders extracted evidence as text. It does not render submitted email HTML or create clickable extracted destinations. Local scan history is opt-in and stores derived metadata such as verdict, score, counts, recommendations, sanitized addresses, and model/rule versions; raw bodies and complete raw headers are not stored.
-
-## Backend architecture
-
-FastAPI registers the root endpoint, root health/readiness/metrics endpoints, and versioned v1 routes. Middleware runs before route handlers to assign or validate a request ID, enforce request-size limits, apply process-local fixed-window limits, add security headers, set `Cache-Control: no-store` for API paths, and emit privacy-safe request logs.
-
-The API has two analysis contracts:
-
-- `/api/v1/analysis/preview` is the mode-aware unified pipeline used by the current Analyze workspace. It returns parser output, rule analysis, ML availability/probabilities, fusion, completeness, authentication evidence, and freshness metadata.
-- `/api/v1/analyze` is the smaller production raw-email inference contract. It returns model metadata, a single phishing probability, risk score, confidence, signal families, recommendations, and processing time.
-
-## Email parsing flow
+## Runtime analysis path
 
 ```mermaid
 flowchart TD
-  input[Quick Paste, RFC822 text, or EML text] --> bounds[Input and RFC822 validation]
-  bounds --> mime[Python email parser]
-  mime --> fields[Headers, addresses, body, MIME parts]
-  mime --> html[HTML parsed as data]
-  html --> visible[Visible text and URL evidence]
-  mime --> attachments[Attachment metadata only]
-  fields --> normalized[ParsedEmail]
-  visible --> normalized
-  attachments --> normalized
+    user[User] --> web[Next.js frontend]
+    web --> api[FastAPI API]
+    api --> parser[Email parser]
+    parser --> rules[Rule-based analyzer]
+    parser --> features[Feature extraction]
+    features --> ml[ML inference]
+    rules --> fusion[Fusion and explainability]
+    ml --> fusion
+    fusion --> result[Result: score, probability, signals, recommendations]
+    result --> web
+
+    registry[Local model registry] --> loader[Hash-checking model loader]
+    loader --> ml
+    localArtifacts[(Local/private model artifacts)] --> loader
+    api --> ops[Health, readiness, metrics, safe logs]
+    web -. opt-in sanitized records .-> history[(Browser-local history/reports)]
 ```
 
-The parser rejects empty input, NUL characters, oversized messages, malformed headers, excessive headers, excessive MIME parts, excessive attachments, and excessive extracted URLs. It records filenames, content types, sizes, and risky extensions but never saves attachment bytes. HTML, CSS, metadata, forms, anchors, and tracking pixels are inspected locally; destinations are never fetched.
+The parser handles pasted text, raw RFC822 data, and `.eml` uploads as bounded
+untrusted input. HTML is not rendered, URLs are not fetched, and attachments
+are not executed. The model registry and hash-checking loader are local supply-
+chain controls; the candidate remains inactive in the current project state.
 
-## Rule-based analysis
+## Dataset review and future evaluation path
 
-The rule engine consumes the normalized email and generates deterministic signals across content, headers/authentication, links, domains, URLs, attachments, and input completeness. Authentication is represented as pass, fail, inconclusive, or missing. Missing authentication evidence is not automatically treated as a failure. Domain comparisons use the bundled offline Public Suffix List dependency and do not perform DNS or network lookups.
+```mermaid
+flowchart TD
+    source[Dataset Review input] --> sanitize[Privacy-safe sanitization]
+    sanitize --> suggestion[Optional Gemini advisory suggestion]
+    sanitize --> reviewer[Human reviewer]
+    suggestion -. advisory evidence only .-> reviewer
+    reviewer --> sqlite[(Local SQLite review storage)]
+    reviewer --> gold[Approved gold dataset]
+    gold --> evaluation[Offline evaluation and false-negative analysis]
+    evaluation --> future[Future retraining review]
+    future -. separately approved .-> candidate[Candidate artifact]
+    candidate -. registry review; no automatic activation .-> registry[Model registry]
+```
 
-The rules produce a classification, bounded risk score, confidence, recommendations, engineered feature diagnostics, and evidence text. The feature diagnostics are useful for explanation and research; the current registry-selected text model does not consume the newly added observational feature layer.
+### Boundaries and responsibilities
 
-## ML inference flow
+| Component | Boundary | Responsibility |
+|---|---|---|
+| User/browser | User-controlled | Supplies email and interprets evidence |
+| Next.js frontend | Application | Input modes, result display, history, reports, review UI |
+| FastAPI API | Application boundary | Typed requests, safe errors, orchestration, health |
+| Email parser | Local runtime | Bounded MIME/header/body extraction |
+| Rule analyzer | Local runtime | Deterministic evidence families and recommendations |
+| Feature extraction | Local runtime | Text representation and observational metadata |
+| ML inference | Local/private runtime | Registry-verified candidate probability |
+| Fusion/explainability | Local runtime | Corroboration, protective evidence, safe presentation |
+| Model registry | Local/private | Identity, version, hashes, threshold, activation state |
+| SQLite review storage | Private/local | Sanitized review records and immutable audit data |
+| Gemini | Optional external advisory | Sanitized suggestion only; never authoritative |
+| Gold dataset | Private/local | Human-approved metadata for offline evaluation |
+
+## Explicit non-flows
+
+- No URL reputation lookup or remote destination fetch occurs during analysis.
+- No attachment execution or attachment-content inspection occurs.
+- No raw email is sent to Gemini by the default runtime path.
+- Gemini cannot change a human label, production inference result, or registry state.
+- Dataset review does not retrain the model automatically.
+- Evaluation does not alter the threshold, calibration, model artifact, or labels.
+- A candidate model is not activated automatically.
+
+## Request/result sequence
 
 ```mermaid
 sequenceDiagram
-  participant API as FastAPI pipeline
-  participant R as Model registry
-  participant M as Model manager
-  participant A as Verified artifact bundle
-  participant I as Inference adapter
-  API->>R: Read selected model metadata
-  R-->>M: Candidate, version, threshold, hashes
-  M->>M: Contain paths under model directory
-  M->>A: Check artifact, vectorizer, manifest existence
-  M->>A: Verify SHA-256 values
-  M->>A: Validate bundle metadata and threshold
-  A-->>I: Trusted predictor
-  I->>I: Transform subject and body text
-  I-->>API: Legitimate and phishing probabilities
-  API->>API: Apply saved threshold and fuse with rules
+    participant U as User
+    participant W as Next.js
+    participant A as FastAPI
+    participant P as Parser
+    participant R as Rules
+    participant M as ML candidate
+    participant F as Fusion
+
+    U->>W: Submit synthetic or authorized email
+    W->>A: Bounded analysis request
+    A->>P: Parse in memory
+    P-->>A: Structured email evidence
+    A->>R: Analyze deterministic indicators
+    R-->>A: Signals and recommendations
+    A->>M: Predict only after registry/hash checks
+    M-->>A: Probability or explicit unavailable state
+    A->>F: Correlate independent evidence
+    F-->>A: Explainable result
+    A-->>W: Typed response
+    W-->>U: Result, indicators, limitations, next steps
 ```
 
-Model loading is lazy and cached per process. Discovery is not activation: the model manager never edits registry metadata. A missing registry, missing bundle, path escape, hash mismatch, incompatible API version, invalid probability shape, or invalid bundle metadata fails closed. When ML is optional, the unified pipeline returns deterministic rule analysis with `ml_analysis.status=unavailable`, null ML probabilities, a stale reason, and a qualified confidence for limited evidence. When `ML_REQUIRED=true`, readiness and analysis return HTTP 503 instead.
-
-## Request lifecycle
-
-```mermaid
-flowchart TD
-  request[HTTP request] --> id[Request ID and context]
-  id --> size[Content-length and body bounds]
-  size --> limit[Endpoint rate-limit bucket]
-  limit --> route[FastAPI route validation]
-  route --> parse[Parse or normalize input]
-  parse --> analyze[Rules and optional ML]
-  analyze --> response[Typed JSON response]
-  response --> headers[Security, cache, and request headers]
-  headers --> log[Structured privacy-safe completion event]
-```
-
-Every response receives `X-Request-ID`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options`, and a restrictive CSP. API responses are not cached. In production, HSTS is added on the assumption that TLS is guaranteed by the trusted ingress. Unhandled exceptions become generic safe errors; development logging may include tracebacks, production logging does not.
-
-## Observability flow
-
-The API emits one structured completion event per request to stdout. It includes request ID, method, path, status, rounded latency, success, a truncated user agent, and a SHA-256-derived client identifier. It does not include raw IP addresses or email content. In-memory counters cover request totals, analysis calls, inference calls, failures, rate-limit hits, latency, startup, and uptime. The `/metrics` response is JSON and process-local; counters reset on restart and are not a durable monitoring system.
-
-See [docs/OBSERVABILITY.md](OBSERVABILITY.md) for the operational contract.
-
-## Security middleware
-
-The security middleware is intentionally small and dependency-light. It uses direct peer identity unless an exact peer is listed in `TRUSTED_PROXY_IPS`; only then can the first `X-Forwarded-For` value influence rate limiting. CORS accepts an exact configured origin list, credentials are disabled, and allowed methods/headers are narrow. The API has no authentication or authorization layer in the current repository.
-
-## Browser-local storage
-
-Browser storage is outside the backend persistence boundary. The user preference `saveSuccessfulScans` controls whether sanitized scan records are written to the current browser profile. The history and reports views read those records; clearing them removes them from that profile. Storage can be unavailable or disabled, in which case analysis still works without local history. The frontend also stores UI preferences and sidebar state; this is not a server database.
-
-## Optional Firebase integration
-
-Firebase Admin SDK initialization is optional. The API reports `firebase=not_configured` when the complete service credential set is absent and continues to run. The repository does not define Firebase authorization rules, identity enforcement, a data schema, or a persistence workflow for raw email. Supplying Firebase credentials therefore does not turn the API into an authenticated or authorized service.
-
-## Deployment architecture
-
-The intended portfolio topology is a managed Next.js host and a non-root Dockerized FastAPI service. The backend provisions a private model bundle at startup, verifies its hash, and exposes a health check. The current provider files disable automatic deployment; no deployment has occurred.
-
-```mermaid
-flowchart LR
-  user[Browser] --> edge[Managed HTTPS frontend host]
-  edge -->|exact API origin| ingress[Trusted HTTPS ingress]
-  ingress --> container[Non-root FastAPI Docker service]
-  container --> release[Private model release input]
-  container --> stdout[Provider logs and health integration]
-  health[Provider health check] --> container
-```
-
-Horizontal scaling is not yet a production claim. Each instance loads its own model memory and maintains its own rate limiter. A shared gateway or store is required if a deployment needs coordinated limits. Provider CPU, memory, disk, pricing, sleep behavior, container startup, and HTTPS smoke testing remain unverified.
-
-## Trust boundaries
-
-1. Browser to frontend: input and browser storage are user-controlled.
-2. Frontend to API: JSON crosses an exact CORS boundary and remains unauthenticated.
-3. API to parser/analyzers: attacker-controlled email fields are treated as untrusted data.
-4. API to model artifacts: the release bundle is trusted only after path, hash, schema, and metadata checks.
-5. API to optional Firebase: credentials and any future shared state are deployment-controlled.
-6. Deployment platform to environment/artifacts: operators control secrets, private artifact provisioning, TLS, proxy identity, and capacity.
-
-## Failure modes and fallback behavior
-
-| Failure | Observable behavior |
-| --- | --- |
-| Invalid or copied display text in raw mode | HTTP 400 with a safe validation message; Quick Paste is suggested. |
-| Body, MIME, header, attachment, or URL limit exceeded | HTTP 413 or a safe validation error; parsing stops. |
-| Rate limit exceeded | HTTP 429 with `Retry-After`; no analysis runs. |
-| Model missing or hash invalid with optional ML | HTTP 200 unified result with rule-only analysis, null ML fields, and stale/unavailable metadata. |
-| Model missing or hash invalid with required ML | Health/readiness and analysis return HTTP 503. |
-| Unexpected parser/inference exception | Safe HTTP 500 response and a correlated server-side event without input content. |
-| Browser storage unavailable | Current analysis remains available; history/report persistence is skipped. |
-| Firebase absent | Health reports not configured; core API continues. |
-| Browser automation cannot launch | Interactive security evidence remains inconclusive; no security pass is claimed. |
-
-The architecture is designed for defensive analysis and human review, not automated enforcement or guaranteed verdicts.
+For the complete API contract, see [API.md](API.md). For model governance, see
+[MODEL.md](MODEL.md). For the human review state machine, see
+[GOLD_DATASET_MANAGEMENT.md](GOLD_DATASET_MANAGEMENT.md).
